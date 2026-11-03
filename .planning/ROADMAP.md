@@ -39,9 +39,9 @@ Decimal phases appear between their surrounding integers in numeric order.
   3. 同步脚本运行一次即生成配置副本 + `.sha256`，重复运行不产生 diff；一致时 `--check` 以零退出
   4. 在一个干净 clone 上按 README 记录的命令即可复现 1–3，不依赖任何本机残留状态
 
-**Plans**: 5 plans
+**Plans**: 1/5 plans executed
 **Wave 1**
-- [ ] 01-01-PLAN.md — 搬迁前冻结 230 项检查基线 + 固定 PyPI 索引（锁文件不再被镜像改写）
+- [x] 01-01-PLAN.md — 搬迁前冻结 230 项检查基线 + 固定 PyPI 索引（锁文件不再被镜像改写）
 
 **Wave 2** *(blocked on Wave 1 completion)*
 - [ ] 01-02-PLAN.md — 纯 git mv 三子树 + 配置副本与 .sha256 + 230 项回归闸门
@@ -212,7 +212,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 →
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. 仓库拆分 + 配置单一真源 + 桌面回归闸门 | 0/5 | Not started | - |
+| 1. 仓库拆分 + 配置单一真源 + 桌面回归闸门 | 1/5 | In Progress | - |
 | 2. 安卓工具链 + 真机冒烟 APK | 0/0 | Not started | - |
 | 3. 纯核心地基 | 0/0 | Not started | - |
 | 4. 设备输入层 + 绿色搓射竖切 | 0/0 | Not started | - |

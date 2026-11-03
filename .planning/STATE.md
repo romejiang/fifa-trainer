@@ -3,16 +3,16 @@ gsd_state_version: "1.0"
 current_phase: 1
 current_phase_name: 仓库拆分 + 配置单一真源 + 桌面回归闸门
 status: executing
-stopped_at: Phase 1 context gathered
-last_updated: "2026-11-03T20:03:04.635Z"
+stopped_at: Completed 01-01-PLAN.md
+last_updated: "2026-11-03T20:22:07.852Z"
 last_activity: 2026-11-04
-last_activity_desc: "Roadmap created: 10 phases, 37/37 v1 requirements mapped"
-state_head: d15e3d8bf51d094c5f75fca539970780d4fa9f1d
+last_activity_desc: Phase 1 execution started
+state_head: 07a11705e298df4eec78c7a27a1ca8521ba80a94
 progress:
   total_phases: 10
   completed_phases: 0
   total_plans: 5
-  completed_plans: 0
+  completed_plans: 1
   percent: 0
 ---
 
@@ -27,10 +27,10 @@ See: .planning/PROJECT.md (updated 2026-11-04)
 
 ## Current Position
 
-Phase: 1 (仓库拆分 + 配置单一真源 + 桌面回归闸门) — READY TO EXECUTE
-Plan: 0 of 0
+Phase: 1 (仓库拆分 + 配置单一真源 + 桌面回归闸门) — EXECUTING
+Plan: 2 of 5
 Status: Ready to execute
-Last activity: 2026-11-04 — Roadmap created: 10 phases, 37/37 v1 requirements mapped
+Last activity: 2026-11-04 — Phase 1 execution started
 
 Progress: [░░░░░░░░░░] 0%
 
@@ -52,6 +52,11 @@ Progress: [░░░░░░░░░░] 0%
 - Trend: —
 
 *Updated after each plan completion*
+**Per-Plan Metrics:**
+
+| Plan | Duration | Tasks | Files |
+|------|----------|-------|-------|
+| Phase 1 P01 | 2min | 3 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -67,6 +72,9 @@ Recent decisions affecting current work:
 - [Init] 震动三级契约：桌面手柄马达 → 手机本体 → 静默。安卓只会走到手机本体，UI 必须标注「手机震动」
 - [Init] 先做绿色搓射一条竖切（Phase 4），5 个动作的对等性在 Phase 5 收口；不做横向分层
 - [Init] Phase 10 触觉可选可砍，任何阶段都不等它；发布阶段（9）不依赖它
+- [Phase 1]: 基线 SHA-256 = 724b40a3904ddd37be432967f96ff99b8427e6b2e2e6369ef4b7b9f41a0a596a，01-02 的 check_desktop.sh 需钉成常量
+- [Phase 1]: 基线用 LC_ALL=C sort 排序（UTF-8 码点序==字节序），规避 BSD/GNU sort 的 locale collation 差异
+- [Phase 1]: INFRA-01 不在 01-01 标记完成：本计划只交付搬迁前基线，仓库拆分与 230 项闸门由 01-02 收口
 
 ### Pending Todos
 
@@ -89,6 +97,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-11-03T18:58:52.949Z
-Stopped at: Phase 1 context gathered
-Resume file: .planning/phases/01-repo-split-config-single-source/01-CONTEXT.md
+Last session: 2026-11-03T20:22:07.836Z
+Stopped at: Completed 01-01-PLAN.md
+Resume file: None
