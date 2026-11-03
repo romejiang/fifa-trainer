@@ -7,10 +7,17 @@ __pycache__/
 .ruff_cache/
 
 # PyInstaller / local build artifacts
-dist/
-build/*
-!build/build_windows.ps1
-!build/build_macos.sh
+# 必须写 desktop/build/* 而不是 desktop/build/：目录被整体排除后 ! 无法再把脚本捞回来
+desktop/dist/
+desktop/build/*
+!desktop/build/build_windows.ps1
+!desktop/build/build_macos.sh
+
+# 移动端产物（Phase 2 起才会有内容，先占位，避免第一次导出就把缓存提交进来）
+mobile/.godot/
+mobile/build/
+mobile/export/
+*.apk
 
 # Local logs / screenshots
 *.log
