@@ -1,0 +1,230 @@
+test_detectors.py	1400ms 才转完 200° -> too_slow
+test_detectors.py	30ms 内点完前后两下 -> too_fast
+test_detectors.py	5 秒长的震动，update() 也立即返回（非阻塞）
+test_detectors.py	60ms 内甩完 200° -> 不触发（太快，不算搓招）
+test_detectors.py	60ms 甩完 200° -> too_fast
+test_detectors.py	Croqueta 只保持 200ms -> hold_short
+test_detectors.py	R 重置 -> 组进度和完成组数一起清零
+test_detectors.py	apply_axis_inverts 只翻方向、不动轴索引
+test_detectors.py	dict 形式的步骤能正常解析（含 hold_ms）
+test_detectors.py	direction=cw 却逆时针转 -> wrong_direction
+test_detectors.py	direction=cw 时逆时针 -> 不触发
+test_detectors.py	direction=cw 时顺时针 -> 触发
+test_detectors.py	direction=cw：起点静止两帧后再转 -> 正常触发、不误报方向
+test_detectors.py	end_angle 写成不存在的方向名 -> 报错
+test_detectors.py	end_angle 写成空数组 -> 报错
+test_detectors.py	hold_ms 为负数 -> 报错
+test_detectors.py	hold_ms 之和 >= max_duration_ms（永远触发不了）-> 报错
+test_detectors.py	idle_timeout_ms 为 0 -> 报错
+test_detectors.py	input.idle_reset_ms / gesture_release_ms 能正常解析并生效
+test_detectors.py	input.idle_reset_ms 超出上限 -> 被夹到 5000
+test_detectors.py	input.invert 的值不是布尔 -> 报错
+test_detectors.py	input.invert 能解析（用于纠正'右摇杆上下反了'）
+test_detectors.py	input.invert 键名写错 -> 报错
+test_detectors.py	max_duration_ms <= min_duration_ms -> 报错
+test_detectors.py	min_angle >= max_angle -> 报错
+test_detectors.py	modifier_options 不是数组 -> 报错
+test_detectors.py	modifier_options 为空 -> 报错
+test_detectors.py	modifier_options 有重复按键 -> 报错
+test_detectors.py	release_hold_ms 为负数 -> 报错
+test_detectors.py	required_button 不在 modifier_options 里 -> 报错
+test_detectors.py	required_button 用别名 'L1' -> 规范化为 LB
+test_detectors.py	sequence 缺 steps -> 报错
+test_detectors.py	start_angle 写成不存在的方向名 -> 报错
+test_detectors.py	taps 按键名写错 -> 报错
+test_detectors.py	taps 类型能正常解析（RB + X，400~600ms，可选 RT）
+test_detectors.py	taps 间隔上限 <= 下限 -> 报错
+test_detectors.py	type 写错 -> 报错
+test_detectors.py	一次失败只产出一条裁定
+test_detectors.py	上一次震动未完时的触发被丢弃，不排队
+test_detectors.py	上一次震完之后再触发 -> 正常再震一次
+test_detectors.py	不回中接着再画一段 -> 不重复触发
+test_detectors.py	两下之间松开 RB -> hold_short
+test_detectors.py	两下只隔 300ms -> too_fast
+test_detectors.py	两下正好隔 400ms（下限）-> 触发
+test_detectors.py	两下正好隔 600ms（上限）-> 触发
+test_detectors.py	两下隔 700ms -> too_slow
+test_detectors.py	两步间隔 1.2s -> 不触发（超出 max_duration_ms=600）
+test_detectors.py	从侧往转 90°（不完整动作） -> 都不触发
+test_detectors.py	从侧面起手 -> 不触发（起点就不是马赛回旋）
+test_detectors.py	从前(0°)逆时针转 90° -> 触发
+test_detectors.py	从前(0°)顺时针转 90° -> 触发
+test_detectors.py	从前只转 40° -> 不触发（转得不够）
+test_detectors.py	从前往侧转 90° -> 踩单车
+test_detectors.py	从前往另一侧转 90° -> 踩单车
+test_detectors.py	从后 180° 转到 360°（越过 0° 边界）-> 正常触发
+test_detectors.py	从后(180°)顺时针转 200°/500ms -> 触发
+test_detectors.py	从后只转 90° 停在侧面 -> 不触发（终点不在身前）
+test_detectors.py	从后往前反向转 180° -> 马赛回旋
+test_detectors.py	从后往前转 180° -> 马赛回旋
+test_detectors.py	从后转 150° 停在 330°(≈-30°，在终点 0°±75 内) -> 触发
+test_detectors.py	从后连续转满 230° -> 只触发一次
+test_detectors.py	从后逆时针转 200° 同样触发（direction=any）
+test_detectors.py	保持 120ms 后松手、再保持 600ms -> 触发（重新计时后攒够，总时长仍在上限内）
+test_detectors.py	保持中途松开 L1 -> hold_short
+test_detectors.py	保持到 350ms 门槛整 -> 触发（边界值）
+test_detectors.py	保持到一半时进度确实在进行中
+test_detectors.py	修饰键中途松开 -> 识别进度被重置
+test_detectors.py	做对 10 个 -> 本组清零、记完成一组
+test_detectors.py	先按住 X 再按 RB -> 不会误把旧按键当第一下
+test_detectors.py	全程不按 RB -> 不触发
+test_detectors.py	切换到 RT 后只按 RB -> 不触发
+test_detectors.py	切换到 RT：按住 RT + 两下 X 450ms -> 触发
+test_detectors.py	前->前（方向错了）-> 不触发
+test_detectors.py	前->后 中间摇杆不回中 -> 不触发（不是真正的点拨）
+test_detectors.py	动作重名 -> 报错
+test_detectors.py	单震：只开一次、关一次
+test_detectors.py	只推 150ms 就松手 -> 不触发（必须保持住）
+test_detectors.py	同一个起手点 -> 踩单车也不误报
+test_detectors.py	同样的操作在 absolute 模式下 -> 不触发（方向基准不同）
+test_detectors.py	后端抛异常 -> 不冒泡到主循环，计入 failures
+test_detectors.py	后端返回失败 -> play() 返回 False
+test_detectors.py	后端返回失败 -> 计数并记录原因，不再假装成功
+test_detectors.py	向右前方跑动时 RS 相对朝向偏右侧 90° -> 触发
+test_detectors.py	向右前方跑动时 RS 相对朝向偏左侧 90° -> 触发
+test_detectors.py	向右跑动时 RS 偏 135°（相对）-> 不触发（不是 90°）
+test_detectors.py	向右跑动时 RS 相对朝向偏右侧 90° -> 触发
+test_detectors.py	向右跑动时 RS 相对朝向偏左侧 90° -> 触发
+test_detectors.py	向左跑动时 RS 相对朝向偏右侧 90° -> 触发
+test_detectors.py	向左跑动时 RS 相对朝向偏左侧 90° -> 触发
+test_detectors.py	回中保持 200ms 后解锁
+test_detectors.py	多脉冲只播第一个（不再排队连震）
+test_detectors.py	夹角 0° 与 350° 为 10°
+test_detectors.py	对照：一口气转完 200°/500ms -> 触发
+test_detectors.py	居中 (0,0) -> 0.0°，不是 atan2(0,-0) 的 180°
+test_detectors.py	左摇杆回中 -> 方向类动作不触发
+test_detectors.py	左摇杆回中 -> 朝向标记为无效
+test_detectors.py	幅度 0.65（够不到 enter_threshold=0.72）-> 不触发
+test_detectors.py	幅度只有 0.5（没推到外圈）-> 不触发
+test_detectors.py	引擎层：不按 L1 -> 该动作被过滤
+test_detectors.py	引擎层：按住 L1 -> 该动作放行
+test_detectors.py	引擎层：按住 L1+R1 仍然放行（all 模式下多按不影响）
+test_detectors.py	引擎：reset_stats 清空统计
+test_detectors.py	引擎：失败的尝试记录为失败，而且不震动
+test_detectors.py	引擎：失败计入 attempts / failures
+test_detectors.py	引擎：成功震一次，并计入 attempts
+test_detectors.py	归中 100ms 还不算空闲 -> 没有触发清零
+test_detectors.py	归中累计超过 idle_reset_ms -> 每个识别器各清零一次
+test_detectors.py	成功之后没有遗留的失败裁定
+test_detectors.py	成功摘要记录两下间隔
+test_detectors.py	成功摘要：右侧 90° 记录实际角度和保持时长
+test_detectors.py	成功摘要：左侧 90° 记录实际角度和保持时长
+test_detectors.py	成功摘要：带命中瞬间的累计旋转角度和经过的角度范围
+test_detectors.py	成功结果带上旋转摘要（供界面/日志调参）
+test_detectors.py	持续推着外圈连转两圈 -> 只触发一次
+test_detectors.py	按住 5 秒不动 -> 只触发一次
+test_detectors.py	按住 L1 + RS 相对朝向偏右侧 90°并保持 600ms -> 触发
+test_detectors.py	按住 L1 + RS 相对朝向偏左侧 90°并保持 600ms -> 触发
+test_detectors.py	按住 L1 但 RS 推正前方 -> 不触发（不是侧向 90°）
+test_detectors.py	按住 L1 时不判定其他动作（马赛回旋不触发）
+test_detectors.py	按住 RB，两下 X 间隔 450ms -> 触发
+test_detectors.py	按住不动 + L1 每 0.6s 闪断一帧 -> 只触发一次
+test_detectors.py	按住不动 + 幅度抖到 0.3 共 50ms -> 只触发一次
+test_detectors.py	按住不放 2 秒 -> 只触发一次
+test_detectors.py	按键名不认识 -> 报错
+test_detectors.py	推 300ms 还差一点 -> 不触发
+test_detectors.py	推正前方时 status 提示"方向不对"并给出角度
+test_detectors.py	推着左摇杆 -> 同一段弧正常触发
+test_detectors.py	方向名写错 -> 报错
+test_detectors.py	无修饰键的动作空闲时不显示方向提示（避免刷屏）
+test_detectors.py	最短弧 10° -> 350° 为 -20°（逆时针）
+test_detectors.py	最短弧 350° -> 10° 为 +20°（顺时针）
+test_detectors.py	松开 L1 后马赛回旋恢复判定
+test_detectors.py	松手 300ms 后再做一次 -> 应该触发两次（不能因防重复而失灵）
+test_detectors.py	正上方 -> 0°
+test_detectors.py	正下方 -> 180°
+test_detectors.py	正右方 -> 90°
+test_detectors.py	正左方 -> 270°
+test_detectors.py	步骤对象缺少 direction -> 报错
+test_detectors.py	没按 L1 但 90° 方向对 -> status 提示按住 L1
+test_detectors.py	画完一段弧 -> 马赛回旋触发一次
+test_detectors.py	画弧中途停顿 -> 识别器被作废、等回中才重新武装
+test_detectors.py	画弧画到一半停 800ms 再转完 -> 不触发（中间断掉了）
+test_detectors.py	相对角度 100° -> 触发（窗口 80~100°）
+test_detectors.py	相对角度 105° -> 不触发（窗口 80~100°）
+test_detectors.py	相对角度 75° -> 不触发（窗口 80~100°）
+test_detectors.py	相对角度 80° -> 触发（窗口 80~100°）
+test_detectors.py	真实手感：40ms 推杆行程 + 推住 500ms -> 触发
+test_detectors.py	真实时间轴下画弧 -> 马赛回旋触发一次
+test_detectors.py	磕球只点了第一下就停 -> incomplete
+test_detectors.py	磕球正常完成 -> 成功且没有任何失败裁定
+test_detectors.py	磕球：30ms 内点完前后两下 -> 不触发（太快）
+test_detectors.py	磕球：两步之间停 150ms -> 触发（总时长过 300ms 下限）
+test_detectors.py	磕球：两步之间停了 1.5 秒 -> 不触发（进度已清空，不能接起来）
+test_detectors.py	禁用时 play() 返回 False
+test_detectors.py	禁用时不产生任何震动事件
+test_detectors.py	第一下之后实时状态显示『等第二下』和目标窗口
+test_detectors.py	等了超过 600+150ms 还没有第二下 -> too_slow
+test_detectors.py	累计超过 max_angle -> overshoot
+test_detectors.py	统一 120ms 单震：100ms 时还在震、200ms 时已经停
+test_detectors.py	继续归中 -> 不重复清零
+test_detectors.py	绿色搓射成功也计入 10 个一组的进度
+test_detectors.py	绿色搓射：界面可选 RB / RT
+test_detectors.py	绿色搓射：相对朝向关闭（跟左摇杆无关）
+test_detectors.py	绿色搓射：类型 taps、默认修饰键 RB、连按 X
+test_detectors.py	角度够了但停在错的方向 -> wrong_end
+test_detectors.py	解锁后再画一次 -> 正常触发第二次
+test_detectors.py	触发时其他动作没有被误判
+test_detectors.py	起点 230°（在 180±65 容差内）-> 触发
+test_detectors.py	起点 250°（超出 180±65 容差）-> 不触发
+test_detectors.py	起点偏了但看得出是这招 -> wrong_start
+test_detectors.py	起点离得太远 -> 不报这个动作的失败
+test_detectors.py	转 200° 但用了 1400ms -> 不触发（超出时间窗口）
+test_detectors.py	转一半停住不动 -> stalled
+test_detectors.py	转得不够 -> too_short
+test_detectors.py	采样频率接近 250Hz
+test_detectors.py	重新推过摇杆后，空闲计时重新开始
+test_detectors.py	震动参数正确传递
+test_detectors.py	震动后端收到 1 次震动
+test_detectors.py	震动强度超出 0~1 -> 报错
+test_detectors.py	面朝右时：RS 向屏幕右再向屏幕左 -> 触发（相对左摇杆模式）
+test_detectors.py	马赛回旋：500ms 转完 200° -> 触发
+test_detectors.py	马赛回旋：80ms 内甩完 200° -> 不触发
+test_gui_smoke.py	GUI：50 条日志（两端滚动位置）都能绘制
+test_gui_smoke.py	GUI：Esc 退出并停止引擎
+test_gui_smoke.py	GUI：JSON 语法错误被捕获而不是直接退出
+test_gui_smoke.py	GUI：R 清空统计和记录
+test_gui_smoke.py	GUI：修好配置文件后能重新加载
+test_gui_smoke.py	GUI：再点 RB -> 切回 RB
+test_gui_smoke.py	GUI：切回 RB 也写回配置文件
+test_gui_smoke.py	GUI：切换后给出提示
+test_gui_smoke.py	GUI：卡片能画出动作进行中的实时状态
+test_gui_smoke.py	GUI：右推 -> 圆点向右画
+test_gui_smoke.py	GUI：右摇杆上推 -> 圆点向上画
+test_gui_smoke.py	GUI：右摇杆下拉 -> 圆点向下画
+test_gui_smoke.py	GUI：带选项的卡片能正常绘制
+test_gui_smoke.py	GUI：无手柄界面能绘制
+test_gui_smoke.py	GUI：演示模式能打开（模拟连接）
+test_gui_smoke.py	GUI：点击 RT -> 判定立即改用 RT
+test_gui_smoke.py	GUI：练习界面能完整绘制
+test_gui_smoke.py	GUI：绿色搓射卡片画出 RB / RT 两个选项
+test_gui_smoke.py	GUI：连接中界面能绘制
+test_gui_smoke.py	GUI：选择写回配置文件（只改绿色搓射）
+test_gui_smoke.py	GUI：配置文件其余内容仍能正常解析
+test_gui_smoke.py	GUI：配置错误时窗口仍能绘制（多行报错不重叠）
+test_gui_smoke.py	GUI：配置错误界面能绘制
+test_gui_smoke.py	GUI：默认选中 RB
+test_gui_smoke.py	字体：找到中文字体或安全返回 None（不抛异常）
+test_gui_smoke.py	日志：End 跳到最旧一端
+test_gui_smoke.py	日志：Home 回到最新一条
+test_gui_smoke.py	日志：往上滚回到最新一条
+test_gui_smoke.py	日志：最多保留 50 条
+test_gui_smoke.py	日志：滚到底时偏移 = 总数 - 可见行数
+test_gui_smoke.py	日志：留下的是最近 50 条
+test_gui_smoke.py	日志：继续往下滚不会越界
+test_gui_smoke.py	日志：默认停在最新一条（滚动偏移 0）
+test_gui_smoke.py	日志：鼠标滚轮向下 -> 查看更早记录
+test_gui_smoke.py	演示轨迹：5 个动作各成功一次（中英文名都在）
+test_gui_smoke.py	演示轨迹：会出现修饰键 LB
+test_gui_smoke.py	演示轨迹：幅度在 [0, 1] 内
+test_gui_smoke.py	演示轨迹：成功次数与尝试次数一致
+test_gui_smoke.py	演示轨迹：既有推杆也有回中
+test_gui_smoke.py	演示轨迹：没有手柄时不震动
+test_gui_smoke.py	演示轨迹：覆盖 4 种典型失败
+test_gui_smoke.py	演示轨迹：角度归一化到 [0, 360)
+test_gui_smoke.py	诊断日志：写下了 La Croqueta 的实际参数
+test_gui_smoke.py	诊断日志：写下了本次加载的配置路径
+test_gui_smoke.py	诊断日志：没按 L1 时记下"方向对了，要按住 L1"
+test_gui_smoke.py	诊断日志：记录了 La Croqueta 的保持进度
+test_gui_smoke.py	诊断日志：记录了右摇杆角度/原始值
+test_gui_smoke.py	诊断日志：记录了按键变化
