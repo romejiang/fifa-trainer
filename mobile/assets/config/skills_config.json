@@ -1,0 +1,233 @@
+{
+  "_readme": [
+    "FIFA / EA FC 花式动作搓招监测 —— 配置文件。",
+    "改完直接存盘，重新运行程序即可生效，无需改 Python 代码。",
+    "",
+    "每个动作的字段：",
+    "  name            动作名称，随便起",
+    "  enabled         true / false，是否启用",
+    "  type            'arc'（摇杆画弧）、'sequence'（方向点拨序列）或 'taps'（按键双击）",
+    "  relative_to_ls  true = 方向以左摇杆朝向为基准(0°=球员正前方)；false = 屏幕绝对方向",
+    "  required_button 可选修饰键，如 'L1'；不需要就写 null。也可写数组如 ['L1','R1']",
+    "  button_mode     required_button 是数组时：'all' 全部按住 / 'any' 任一按住",
+    "  params          各类型自己的参数，见下面两个示例",
+    "  rumble          震动参数，目前统一是低频 120ms 单震",
+    "  cooldown_ms     触发后冷却，防止同一次搓招连震",
+    "",
+    "arc（画弧）params：",
+    "  start_angle      画弧的**起点**必须是哪个方向（可写方向名或角度），null = 不限制。",
+    "                   这是区分动作的关键：从前往侧转是踩单车，从后往前转才是马赛回旋。",
+    "  start_tolerance  起点的容错夹角，默认 60",
+    "  end_angle        画弧的**终点**方向，可写一个方向或数组（如 [90, 270]），null = 不限制。",
+    "  end_tolerance    终点的容错夹角，默认 60",
+    "  enter_threshold  右摇杆推到多大幅度算'开始画弧'（0~1）",
+    "  exit_threshold   掉到多低算'松手结束'（要比 enter 小，做迟滞）",
+    "  min_angle/max_angle      累计旋转角度的合格区间（度）",
+    "  min_duration_ms/max_duration_ms  完成时间窗口（毫秒）。低于 min 视为太快，作废。",
+    "  idle_timeout_ms  停在原地不转超过这么久就作废（默认 180），避免停顿后接着算同一个动作。",
+    "  release_hold_ms  触发/作废后要连续回中这么久才允许下一段（默认 120）。",
+    "  direction        'any' 任意方向 / 'cw' 只认顺时针 / 'ccw' 只认逆时针",
+    "",
+    "sequence（方向序列）params：",
+    "  steps            方向列表，如 ['forward','back']。每个元素有三种写法：",
+    "                     'forward'                                  单一方向",
+    "                     ['left','right']                           任一方向",
+    "                     {'direction':['left','right'],'hold_ms':500}  需要保持一段时间",
+    "                   hold_ms 从右摇杆推过 enter_threshold 那一刻起算。真手推杆有几十毫秒行程，",
+    "                   '推住半秒'实际只记到 450ms 左右，所以阈值要留 50~100ms 余量。",
+    "                   可用名称：forward/up 前, back/down 后, left 左, right 右,",
+    "                              upright/downright/downleft/upleft 四个斜向，",
+    "                             也可以直接写角度数字 0/90/180/270。",
+    "  tolerance_deg    每个方向的容错夹角，默认 35",
+    "  enter_threshold  推过这个幅度才算一次有效点拨，默认 0.65",
+    "  release_threshold 回落到这个幅度以下才算'松手'，默认 0.35",
+    "  min_duration_ms  整个序列至少要花这么久（默认 250），太快游戏里根本搓不出来。",
+    "  max_duration_ms  整个序列必须在多久内完成（要大于各步 hold_ms 之和）",
+    "  idle_timeout_ms  两步之间停顿超过这么久就清空进度（默认 250）。",
+    "  require_neutral_between_steps  两步之间是否要求摇杆回中（默认 true，即真正的'点拨'）",
+    "  release_hold_ms  已触发过的动作，要连续松开多久才允许再触发（默认 150）。",
+    "                   防止摇杆在阈值附近抖一下就重新武装，出现'按住不放却一直震'。",
+    "",
+    "taps（按键双击/连按）params：",
+    "  button           要连按的键，如 'X'；也可用 A/B/Y、方向键名等规范名。",
+    "  min_interval_ms  两下按键之间的最短间隔（默认 400）。",
+    "  max_interval_ms  两下按键之间的最长间隔（默认 600）。",
+    "  timeout_grace_ms 超过上限后再等这么久仍没有第二下，就报'太慢'（默认 150）。",
+    "  release_hold_ms  成功/失败后要松开按键这么久才允许下一次（默认 120）。",
+    "  配合 required_button 使用：例如 required_button='RB' + button='X'",
+    "  = 按住 RB，在 400~600ms 内按两下 X。这类动作与右摇杆、球员朝向无关。",
+    "  modifier_options 可选：给用户切换按住哪个键，如 ['RB','RT']；",
+    "                   默认选中的键仍写在 required_button 里。",
+    "",
+    "rumble：目前所有动作统一用低频 120ms 单震，改这几个数就行：",
+    "  {\"low\": 0.8, \"high\": 0.0, \"duration_ms\": 120}",
+    "  low  = 低频大马达（沉闷、有力），high = 高频小马达（清脆、偏弱），都是 0.0~1.0",
+    "  嫌弱就调大 low（最大 1.0），嫌长就调小 duration_ms。",
+    "  引擎一次只播一个脉冲，不会排队连震。"
+  ],
+  "input": {
+    "poll_hz": 250,
+    "deadzone": 0.08,
+    "ls_facing_threshold": 0.35,
+    "initial_facing_deg": 0,
+    "trigger_threshold": 0.35,
+    "joystick_index": 0,
+    "axis_layout": null,
+    "button_names": null,
+    "calibration_ms": 250,
+    "idle_reset_ms": 250,
+    "gesture_release_ms": 150
+  },
+  "rumble": {
+    "enabled": true,
+    "backend": "auto",
+    "startup_test": true,
+    "startup_test_strength": 0.55,
+    "startup_test_ms": 160
+  },
+  "global_cooldown_ms": 60,
+  "skills": [
+    {
+      "name": "马赛回旋 Roulette",
+      "enabled": true,
+      "type": "arc",
+      "relative_to_ls": true,
+      "required_button": null,
+      "params": {
+        "start_angle": 180,
+        "start_tolerance": 65,
+        "end_angle": 0,
+        "end_tolerance": 80,
+        "enter_threshold": 0.72,
+        "exit_threshold": 0.52,
+        "min_angle": 70,
+        "max_angle": 230,
+        "min_duration_ms": 250,
+        "max_duration_ms": 600,
+        "idle_timeout_ms": 250,
+        "release_hold_ms": 120,
+        "direction": "any"
+      },
+      "rumble": {
+        "low": 0.8,
+        "high": 0.0,
+        "duration_ms": 120
+      },
+      "cooldown_ms": 400
+    },
+    {
+      "name": "踩单车 Stepover",
+      "enabled": true,
+      "type": "arc",
+      "relative_to_ls": true,
+      "required_button": null,
+      "params": {
+        "start_angle": 0,
+        "start_tolerance": 55,
+        "end_angle": [
+          90,
+          270
+        ],
+        "end_tolerance": 55,
+        "enter_threshold": 0.72,
+        "exit_threshold": 0.52,
+        "min_angle": 70,
+        "max_angle": 135,
+        "min_duration_ms": 250,
+        "max_duration_ms": 600,
+        "idle_timeout_ms": 250,
+        "release_hold_ms": 120,
+        "direction": "any"
+      },
+      "rumble": {
+        "low": 0.8,
+        "high": 0.0,
+        "duration_ms": 120
+      },
+      "cooldown_ms": 350
+    },
+    {
+      "name": "磕球过人 Heel-to-Heel",
+      "enabled": true,
+      "type": "sequence",
+      "relative_to_ls": true,
+      "required_button": null,
+      "params": {
+        "steps": [
+          "forward",
+          "back"
+        ],
+        "tolerance_deg": 35,
+        "enter_threshold": 0.65,
+        "release_threshold": 0.35,
+        "min_duration_ms": 250,
+        "max_duration_ms": 600,
+        "idle_timeout_ms": 250,
+        "release_hold_ms": 150,
+        "require_neutral_between_steps": true
+      },
+      "rumble": {
+        "low": 0.8,
+        "high": 0.0,
+        "duration_ms": 120
+      },
+      "cooldown_ms": 350
+    },
+    {
+      "name": "油炸丸子 La Croqueta",
+      "enabled": true,
+      "type": "sequence",
+      "relative_to_ls": true,
+      "required_button": "L1",
+      "params": {
+        "steps": [
+          {
+            "direction": [
+              "右",
+              "左"
+            ],
+            "hold_ms": 350
+          }
+        ],
+        "tolerance_deg": 10,
+        "enter_threshold": 0.6,
+        "release_threshold": 0.3,
+        "min_duration_ms": 250,
+        "max_duration_ms": 600,
+        "idle_timeout_ms": 350,
+        "release_hold_ms": 150,
+        "require_neutral_between_steps": true
+      },
+      "rumble": {
+        "low": 0.8,
+        "high": 0.0,
+        "duration_ms": 120
+      },
+      "cooldown_ms": 450
+    },
+    {
+      "name": "绿色搓射 Green Finesse",
+      "enabled": true,
+      "type": "taps",
+      "relative_to_ls": false,
+      "required_button": "RB",
+      "params": {
+        "button": "X",
+        "min_interval_ms": 400,
+        "max_interval_ms": 600,
+        "timeout_grace_ms": 150,
+        "release_hold_ms": 120,
+        "modifier_options": [
+          "RB",
+          "RT"
+        ]
+      },
+      "rumble": {
+        "low": 0.8,
+        "high": 0.0,
+        "duration_ms": 120
+      },
+      "cooldown_ms": 450
+    }
+  ]
+}
