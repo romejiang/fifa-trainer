@@ -126,49 +126,64 @@
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| JUDGE-01 | TBD | Pending |
-| JUDGE-02 | TBD | Pending |
-| JUDGE-03 | TBD | Pending |
-| JUDGE-04 | TBD | Pending |
-| JUDGE-05 | TBD | Pending |
-| JUDGE-06 | TBD | Pending |
-| JUDGE-07 | TBD | Pending |
-| INPUT-01 | TBD | Pending |
-| INPUT-02 | TBD | Pending |
-| INPUT-03 | TBD | Pending |
-| INPUT-04 | TBD | Pending |
-| INPUT-05 | TBD | Pending |
-| INPUT-06 | TBD | Pending |
-| LOOP-01 | TBD | Pending |
-| LOOP-02 | TBD | Pending |
-| LOOP-03 | TBD | Pending |
-| LOOP-04 | TBD | Pending |
-| LOOP-05 | TBD | Pending |
-| FEEDBACK-01 | TBD | Pending |
-| FEEDBACK-02 | TBD | Pending |
-| FEEDBACK-03 | TBD | Pending |
-| FEEDBACK-04 | TBD | Pending |
-| FEEDBACK-05 | TBD | Pending |
-| FEEDBACK-06 | TBD | Pending |
-| DATA-01 | TBD | Pending |
-| DATA-02 | TBD | Pending |
-| DATA-03 | TBD | Pending |
-| ONBOARD-01 | TBD | Pending |
-| ONBOARD-02 | TBD | Pending |
-| RESIL-01 | TBD | Pending |
-| RESIL-02 | TBD | Pending |
-| RESIL-03 | TBD | Pending |
-| INFRA-01 | TBD | Pending |
-| INFRA-02 | TBD | Pending |
-| INFRA-03 | TBD | Pending |
-| INFRA-04 | TBD | Pending |
-| INFRA-05 | TBD | Pending |
+| JUDGE-01 | Phase 5 | Pending |
+| JUDGE-02 | Phase 5 | Pending |
+| JUDGE-03 | Phase 5 | Pending |
+| JUDGE-04 | Phase 5 | Pending |
+| JUDGE-05 | Phase 5 | Pending |
+| JUDGE-06 | Phase 5 | Pending |
+| JUDGE-07 | Phase 5 | Pending |
+| INPUT-01 | Phase 4 | Pending |
+| INPUT-02 | Phase 4 | Pending |
+| INPUT-03 | Phase 4 | Pending |
+| INPUT-04 | Phase 4 | Pending |
+| INPUT-05 | Phase 4 | Pending |
+| INPUT-06 | Phase 8 | Pending |
+| LOOP-01 | Phase 6 | Pending |
+| LOOP-02 | Phase 6 | Pending |
+| LOOP-03 | Phase 6 | Pending |
+| LOOP-04 | Phase 6 | Pending |
+| LOOP-05 | Phase 6 | Pending |
+| FEEDBACK-01 | Phase 6 | Pending |
+| FEEDBACK-02 | Phase 7 | Pending |
+| FEEDBACK-03 | Phase 7 | Pending |
+| FEEDBACK-04 | Phase 7 | Pending |
+| FEEDBACK-05 | Phase 10 | Pending |
+| FEEDBACK-06 | Phase 7 | Pending |
+| DATA-01 | Phase 8 | Pending |
+| DATA-02 | Phase 8 | Pending |
+| DATA-03 | Phase 3 | Pending |
+| ONBOARD-01 | Phase 4 | Pending |
+| ONBOARD-02 | Phase 4 | Pending |
+| RESIL-01 | Phase 8 | Pending |
+| RESIL-02 | Phase 3 | Pending |
+| RESIL-03 | Phase 3 | Pending |
+| INFRA-01 | Phase 1 | Pending |
+| INFRA-02 | Phase 1 | Pending |
+| INFRA-03 | Phase 3 | Pending |
+| INFRA-04 | Phase 2 | Pending |
+| INFRA-05 | Phase 9 | Pending |
 
 **Coverage:**
 - v1 requirements: 37 total
-- Mapped to phases: 0
-- Unmapped: 37 ⚠️ (路线图创建后填充)
+- Mapped to phases: 37
+- Unmapped: 0 ✓
+
+**Per-phase counts:**
+
+| Phase | Requirements |
+|-------|--------------|
+| 1 | INFRA-01, INFRA-02 (2) |
+| 2 | INFRA-04 (1) |
+| 3 | RESIL-02, RESIL-03, INFRA-03, DATA-03 (4) |
+| 4 | INPUT-01, INPUT-02, INPUT-03, INPUT-04, INPUT-05, ONBOARD-01, ONBOARD-02 (7) |
+| 5 | JUDGE-01 … JUDGE-07 (7) |
+| 6 | LOOP-01 … LOOP-05, FEEDBACK-01 (6) |
+| 7 | FEEDBACK-02, FEEDBACK-03, FEEDBACK-04, FEEDBACK-06 (4) |
+| 8 | RESIL-01, INPUT-06, DATA-01, DATA-02 (4) |
+| 9 | INFRA-05 (1) |
+| 10 | FEEDBACK-05 (1) |
 
 ---
 *Requirements defined: 2026-11-04*
-*Last updated: 2026-11-04 after initial definition*
+*Last updated: 2026-11-04 after roadmap creation (10 phases)*
