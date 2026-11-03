@@ -11,7 +11,7 @@
     {
       "number": "2",
       "name": "安卓工具链 + 真机冒烟 APK",
-      "status": "pending"
+      "status": "in_progress"
     },
     {
       "number": "3",
@@ -56,8 +56,8 @@
   ],
   "next": {
     "command": "/gsd-progress --next",
-    "label": "Advance to the next step (plan phase 2)",
-    "reason": "Phase 2 of 10 — needs a plan"
+    "label": "Advance to the next step",
+    "reason": "Phase 2 of 10 · 10% · executing"
   },
-  "updated_at": "2026-11-03T21:01:54.145Z"
+  "updated_at": "2026-11-03T22:45:21.581Z"
 }
