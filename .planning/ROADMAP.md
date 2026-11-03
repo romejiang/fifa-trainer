@@ -66,7 +66,22 @@ Decimal phases appear between their surrounding integers in numeric order.
   4. 连上蓝牙手柄推动右摇杆时，屏幕上的原始轴数值实时变化，证明输入通道在真机可达
   5. `mobile/BUILD.md` 记录精确版本（Godot 4.7.2-stable / 导出模板 4.7.2.stable / JDK 17 / build-tools 36.1.0），release keystore 已生成并离线备份，另一台干净机器按文档能重导出
 
-**Plans**: TBD
+**Plans**: 5 plans
+**Wave 1**
+- [ ] 02-01-PLAN.md — 工具链自举 + `doctor.sh` 六项断言（引擎钉死 4.7.2-stable）
+
+**Wave 2** *(blocked on Wave 1 completion)*
+- [ ] 02-02-PLAN.md — 最小 Godot 工程 + PCK 往返 + 闸门 A
+
+**Wave 3** *(blocked on Wave 2 completion)*
+- [ ] 02-03-PLAN.md — 字体双链路（CJK 子集 + 符号 fallback）+ 字形闸门
+
+**Wave 4** *(blocked on Wave 3 completion)*
+- [ ] 02-04-PLAN.md — release keystore + 签名 APK + 闸门 B + 假绿反例
+
+**Wave 5** *(blocked on Wave 4 completion)*
+- [ ] 02-05-PLAN.md — BUILD.md + 干净 clone 重导出 + 真机验收表
+
 **UI hint**: yes
 
 ### Phase 3: 纯核心地基 — 几何 / 配置校验 / 无头运行 / 架构 lint
@@ -213,7 +228,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 →
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. 仓库拆分 + 配置单一真源 + 桌面回归闸门 | 5/5 | Complete    | 2026-11-04 |
-| 2. 安卓工具链 + 真机冒烟 APK | 0/0 | Not started | - |
+| 2. 安卓工具链 + 真机冒烟 APK | 0/5 | Planned | - |
 | 3. 纯核心地基 | 0/0 | Not started | - |
 | 4. 设备输入层 + 绿色搓射竖切 | 0/0 | Not started | - |
 | 5. 全动作判定对等性 | 0/0 | Not started | - |
