@@ -17,3 +17,8 @@ xinput = [
 build = [
     "pyinstaller>=6.0",
 ]
+
+# 本机 uv 配置指向镜像，不固定索引就会在 sync 时把 uv.lock 改写成镜像地址。
+[[tool.uv.index]]
+url = "https://pypi.org/simple"
+default = true
