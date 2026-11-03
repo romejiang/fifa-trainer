@@ -3,16 +3,16 @@ gsd_state_version: "1.0"
 current_phase: 1
 current_phase_name: 仓库拆分 + 配置单一真源 + 桌面回归闸门
 status: executing
-stopped_at: Completed 01-03-PLAN.md
-last_updated: "2026-11-03T20:33:51.349Z"
+stopped_at: Completed 01-04-PLAN.md
+last_updated: "2026-11-03T20:37:57.000Z"
 last_activity: 2026-11-04
 last_activity_desc: Phase 1 execution started
-state_head: dc0e7746a2a0b007b08f737fbf3be863a221dfe8
+state_head: 76fec53e1e821f00e367aebf67561ddd76043b83
 progress:
   total_phases: 10
   completed_phases: 0
   total_plans: 5
-  completed_plans: 3
+  completed_plans: 4
   percent: 0
 ---
 
@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-11-04)
 ## Current Position
 
 Phase: 1 (仓库拆分 + 配置单一真源 + 桌面回归闸门) — EXECUTING
-Plan: 4 of 5
+Plan: 5 of 5
 Status: Ready to execute
 Last activity: 2026-11-04 — Phase 1 execution started
 
@@ -59,6 +59,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 1 P01 | 2min | 3 tasks | 3 files |
 | Phase 1 P2 | 4min | 3 tasks | 26 files |
 | Phase 1 P3 | 2min | 2 tasks | 4 files |
+| Phase 1 P4 | 2min | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -86,6 +87,13 @@ Recent decisions affecting current work:
 - [Phase 1]: .gitattributes 只加 *.sha256 / *.txt 的 eol=lf：CI 只在 Linux 跑，给 YAML 加 eol 只会增加 Windows 检出时的 diff 噪音
 - [Phase 1]: 未传 -c 的 --write-config 分支不做真跑验证：它会覆盖真源本身；改用 write_config_target() 纯函数断言覆盖同一判定
 - [Phase 1]: plan 01-03 的 acceptance「不再出现 Path(args.config)」与其 action 示例代码冲突，按行为验收：显式路径只转一次 Path(...) 后复用 explicit_config
+- [Phase 1]: 根 README 只做仓库地图（71 行），桌面手册保持单一位置（desktop/README.md 776 行不改，D-03）
+- [Phase 1]: README 只描述、不复述坏命令形态：`--project` + 相对测试路径会 Failed to spawn，文档里不留可粘贴的失败示例
+- [Phase 1]: CI 只保留 4 步（检出 → 装 uv → cd desktop && uv sync --locked → bash tools/check_desktop.sh）：不额外插 sync_config 步骤，闸门内部第一步已做，重复即第二套定义
+- [Phase 1]: setup-uv 钉 0.9.5（与本机生成 uv.lock 的版本一致），避免新 uv 升级锁文件格式后 --locked 误红
+- [Phase 1]: actions 按 40 位 commit SHA 固定并附 # vX.Y.Z 注释；run 步骤零 ${{ }} 插值、零 secrets、零 continue-on-error
+- [Phase 1]: mobile/README.md 明确 Phase 2 才创建 project.godot（D-10），Phase 1 只放配置副本与文档
+- [Phase 1]: 时序敏感的 test_engine_end_to_end 不在 01-04 修复：files_modified 不含 desktop/tests/，在 CI 加重试等于放宽闸门；结论已写入 deferred-items.md
 
 ### Pending Todos
 
@@ -108,6 +116,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-11-03T20:33:51.332Z
-Stopped at: Completed 01-03-PLAN.md
+Last session: 2026-11-03T20:37:57.000Z
+Stopped at: Completed 01-04-PLAN.md
 Resume file: None
