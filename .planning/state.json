@@ -1,0 +1,63 @@
+{
+  "contract": "1.0.0",
+  "flavor": "core",
+  "milestone": null,
+  "phases": [
+    {
+      "number": "1",
+      "name": "仓库拆分 + 配置单一真源 + 桌面回归闸门",
+      "status": "pending"
+    },
+    {
+      "number": "2",
+      "name": "安卓工具链 + 真机冒烟 APK",
+      "status": "pending"
+    },
+    {
+      "number": "3",
+      "name": "纯核心地基",
+      "status": "pending"
+    },
+    {
+      "number": "4",
+      "name": "设备输入层 + 绿色搓射竖切",
+      "status": "pending"
+    },
+    {
+      "number": "5",
+      "name": "全动作判定对等性",
+      "status": "pending"
+    },
+    {
+      "number": "6",
+      "name": "训练循环",
+      "status": "pending"
+    },
+    {
+      "number": "7",
+      "name": "反馈呈现",
+      "status": "pending"
+    },
+    {
+      "number": "8",
+      "name": "长期使用韧性",
+      "status": "pending"
+    },
+    {
+      "number": "9",
+      "name": "发布 — 侧载 APK + 升级路径",
+      "status": "pending"
+    },
+    {
+      "number": "10",
+      "name": "手机触觉（可选）",
+      "status": "pending"
+    }
+  ],
+  "next": {
+    "command": "/gsd-progress --next",
+    "label": "Advance to the next step",
+    "reason": "Phase 1 of 10 · 0% · executing"
+  },
+  "updated_at": "2026-11-03T20:03:04.657Z"
+}
