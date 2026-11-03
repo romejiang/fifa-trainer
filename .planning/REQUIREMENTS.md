@@ -62,8 +62,8 @@
 
 ### 仓库与构建
 
-- [ ] **INFRA-01**: 仓库拆分为 `desktop/` + `mobile/` + `shared/`，桌面版 230 项检查全部通过
-- [ ] **INFRA-02**: `shared/skills_config.json` 为唯一真源；同步脚本 + hash 校验；应用启动时校验
+- [x] **INFRA-01**: 仓库拆分为 `desktop/` + `mobile/` + `shared/`，桌面版 230 项检查全部通过
+- [x] **INFRA-02**: `shared/skills_config.json` 为唯一真源；同步脚本 + hash 校验；应用启动时校验
 - [ ] **INFRA-03**: `mobile/src/core/` 架构 lint：禁止出现 `Input.` / `Time.` / `Node` / `FileAccess` / `print(`
 - [ ] **INFRA-04**: 真机冒烟 APK：能安装、能启动、能读到原始轴值
 - [ ] **INFRA-05**: 可侧载 APK 分发给朋友；包名 / keystore / versionCode 稳定，v1 → v2 升级不丢数据
@@ -158,8 +158,8 @@
 | RESIL-01 | Phase 8 | Pending |
 | RESIL-02 | Phase 3 | Pending |
 | RESIL-03 | Phase 3 | Pending |
-| INFRA-01 | Phase 1 | Pending |
-| INFRA-02 | Phase 1 | Pending |
+| INFRA-01 | Phase 1 | Complete |
+| INFRA-02 | Phase 1 | Complete |
 | INFRA-03 | Phase 3 | Pending |
 | INFRA-04 | Phase 2 | Pending |
 | INFRA-05 | Phase 9 | Pending |

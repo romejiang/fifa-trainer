@@ -3,16 +3,16 @@ gsd_state_version: "1.0"
 current_phase: 1
 current_phase_name: 仓库拆分 + 配置单一真源 + 桌面回归闸门
 status: executing
-stopped_at: Completed 01-01-PLAN.md
-last_updated: "2026-11-03T20:22:07.852Z"
+stopped_at: Completed 01-02-PLAN.md
+last_updated: "2026-11-03T20:28:44.312Z"
 last_activity: 2026-11-04
 last_activity_desc: Phase 1 execution started
-state_head: 07a11705e298df4eec78c7a27a1ca8521ba80a94
+state_head: 3f834755e3dba0693784ea1e7ff14eb5aaf7525a
 progress:
   total_phases: 10
   completed_phases: 0
   total_plans: 5
-  completed_plans: 1
+  completed_plans: 2
   percent: 0
 ---
 
@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-11-04)
 ## Current Position
 
 Phase: 1 (仓库拆分 + 配置单一真源 + 桌面回归闸门) — EXECUTING
-Plan: 2 of 5
+Plan: 3 of 5
 Status: Ready to execute
 Last activity: 2026-11-04 — Phase 1 execution started
 
@@ -57,6 +57,7 @@ Progress: [░░░░░░░░░░] 0%
 | Plan | Duration | Tasks | Files |
 |------|----------|-------|-------|
 | Phase 1 P01 | 2min | 3 tasks | 3 files |
+| Phase 1 P2 | 4min | 3 tasks | 26 files |
 
 ## Accumulated Context
 
@@ -75,6 +76,9 @@ Recent decisions affecting current work:
 - [Phase 1]: 基线 SHA-256 = 724b40a3904ddd37be432967f96ff99b8427e6b2e2e6369ef4b7b9f41a0a596a，01-02 的 check_desktop.sh 需钉成常量
 - [Phase 1]: 基线用 LC_ALL=C sort 排序（UTF-8 码点序==字节序），规避 BSD/GNU sort 的 locale collation 差异
 - [Phase 1]: INFRA-01 不在 01-01 标记完成：本计划只交付搬迁前基线，仓库拆分与 230 项闸门由 01-02 收口
+- [Phase 1]: 搬迁提交 02b03db 只含 git mv：19 条 rename、--numstat 全 0、0 删除，git log --follow 仍能追到 Initial commit
+- [Phase 1]: check_desktop.sh 顺序即安全属性：先 sync_config.py --check、再钉 BASELINE_SHA256、最后才 uv sync --locked 跑测试；副本缺失时 load_config() 静默回退会让闸门假绿
+- [Phase 1]: 配置真源字节 bccf123a…eee9 未改；两份副本 + .sha256 已提交，shasum -a 256 -c 双 OK；自测 23 项断言全绿
 
 ### Pending Todos
 
@@ -97,6 +101,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-11-03T20:22:07.836Z
-Stopped at: Completed 01-01-PLAN.md
+Last session: 2026-11-03T20:28:36.978Z
+Stopped at: Completed 01-02-PLAN.md
 Resume file: None
