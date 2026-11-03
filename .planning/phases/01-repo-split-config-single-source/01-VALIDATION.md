@@ -27,8 +27,8 @@ created: "2026-11-04"
 
 ## Sampling Rate
 
-- **After every task commit:** Run `tools/check_desktop.sh --quick`（仅检测器，跳过 SDL 冒烟）
-- **After every plan wave:** Run `tools/check_desktop.sh`（完整 230 项 + 基线比对）
+- **After every task commit:** Run `bash tools/check_desktop.sh`（全量 230 项；闸门不提供部分模式，全量仅 2–5 秒）
+- **After every plan wave:** Run `bash tools/check_desktop.sh`（完整 230 项 + 基线比对）
 - **Before `/gsd-verify-work`:** Full suite must be green
 - **Max feedback latency:** 15 seconds
 

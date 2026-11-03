@@ -782,7 +782,7 @@ jobs:
 | A6 | CI 的 uv 版本钉在 0.9.5（与本机一致） | Code Examples | 若用最新 uv（0.13.x），可能因锁文件格式升级导致 `--locked` 失败；升级需单独提交并重生 lockfile |
 | A7 | 符号链接不适合作为 `shared/` 的消费方式 | Alternatives / Pattern 3 | Godot 导出只打包项目树内文件（官方文档已说明非资源文件默认不导出），链接到项目外不可靠；D-04 已锁定副本，风险低 |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **INFRA-02 的"应用启动时校验"到底指谁？**
    - What we know: Phase 1 没有移动端应用；桌面版开发态读生成副本，加启动 hash 校验会改变行为（D-01 禁止）。
