@@ -3,16 +3,16 @@ gsd_state_version: "1.0"
 current_phase: 1
 current_phase_name: 仓库拆分 + 配置单一真源 + 桌面回归闸门
 status: executing
-stopped_at: Completed 01-02-PLAN.md
-last_updated: "2026-11-03T20:28:44.312Z"
+stopped_at: Completed 01-03-PLAN.md
+last_updated: "2026-11-03T20:33:51.349Z"
 last_activity: 2026-11-04
 last_activity_desc: Phase 1 execution started
-state_head: 3f834755e3dba0693784ea1e7ff14eb5aaf7525a
+state_head: dc0e7746a2a0b007b08f737fbf3be863a221dfe8
 progress:
   total_phases: 10
   completed_phases: 0
   total_plans: 5
-  completed_plans: 2
+  completed_plans: 3
   percent: 0
 ---
 
@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-11-04)
 ## Current Position
 
 Phase: 1 (仓库拆分 + 配置单一真源 + 桌面回归闸门) — EXECUTING
-Plan: 3 of 5
+Plan: 4 of 5
 Status: Ready to execute
 Last activity: 2026-11-04 — Phase 1 execution started
 
@@ -58,6 +58,7 @@ Progress: [░░░░░░░░░░] 0%
 |------|----------|-------|-------|
 | Phase 1 P01 | 2min | 3 tasks | 3 files |
 | Phase 1 P2 | 4min | 3 tasks | 26 files |
+| Phase 1 P3 | 2min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -79,6 +80,12 @@ Recent decisions affecting current work:
 - [Phase 1]: 搬迁提交 02b03db 只含 git mv：19 条 rename、--numstat 全 0、0 删除，git log --follow 仍能追到 Initial commit
 - [Phase 1]: check_desktop.sh 顺序即安全属性：先 sync_config.py --check、再钉 BASELINE_SHA256、最后才 uv sync --locked 跑测试；副本缺失时 load_config() 静默回退会让闸门假绿
 - [Phase 1]: 配置真源字节 bccf123a…eee9 未改；两份副本 + .sha256 已提交，shasum -a 256 -c 双 OK；自测 23 项断言全绿
+- [Phase 1]: default_config_path() 函数体零改动：冻结态与开发态的读取语义都是行为锚点，只新增写入侧的 shared_config_path() 与 write_config_target()
+- [Phase 1]: --write-config 三级路由收敛到纯函数 write_config_target()：显式 -c > 冻结态用户目录 > 开发态 shared/；运行期读取仍是 desktop/skills_config.json
+- [Phase 1]: .gitignore 必须用 desktop/build/* 而非 desktop/build/：目录被整体排除后 ! 白名单再也无法把两条打包脚本捞回来
+- [Phase 1]: .gitattributes 只加 *.sha256 / *.txt 的 eol=lf：CI 只在 Linux 跑，给 YAML 加 eol 只会增加 Windows 检出时的 diff 噪音
+- [Phase 1]: 未传 -c 的 --write-config 分支不做真跑验证：它会覆盖真源本身；改用 write_config_target() 纯函数断言覆盖同一判定
+- [Phase 1]: plan 01-03 的 acceptance「不再出现 Path(args.config)」与其 action 示例代码冲突，按行为验收：显式路径只转一次 Path(...) 后复用 explicit_config
 
 ### Pending Todos
 
@@ -101,6 +108,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-11-03T20:28:36.978Z
-Stopped at: Completed 01-02-PLAN.md
+Last session: 2026-11-03T20:33:51.332Z
+Stopped at: Completed 01-03-PLAN.md
 Resume file: None
