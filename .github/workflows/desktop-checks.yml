@@ -1,0 +1,29 @@
+# 桌面版回归闸门（CI）。
+#
+# CI 只调用与本地完全相同的 tools/check_desktop.sh，不在这里重复任何检查逻辑，
+# 否则会出现两套定义互相漂移。action 一律按 40 位 commit SHA 固定，行尾注释是
+# 人类可读的版本号；不使用 secrets，也不在 run 步骤里做任何事件上下文插值。
+
+name: desktop-checks
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  desktop:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 检出仓库
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+      - name: 安装 uv
+        uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2  # v10.3.3
+        with:
+          version: "0.9.5"          # 与本机生成 uv.lock 的版本一致
+          python-version: "3.12"
+          enable-cache: true
+      - name: 锁文件必须与 pyproject 一致
+        run: cd desktop && uv sync --locked
+      - name: 桌面回归闸门
+        run: bash tools/check_desktop.sh
