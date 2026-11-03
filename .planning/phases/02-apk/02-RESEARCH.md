@@ -708,9 +708,15 @@ bash "$ROOT/tools/android_doctor.sh"
 "$GODOT" --headless --path "$ROOT/mobile" --script res://tools/glyph_coverage.gd
 
 rm -f "$OUT"
-GODOT_ANDROID_KEYSTORE_RELEASE_PATH="${GODOT_ANDROID_KEYSTORE_RELEASE_PATH:?缺 keystore 路径}" \
-GODOT_ANDROID_KEYSTORE_RELEASE_USER="${GODOT_ANDROID_KEYSTORE_RELEASE_USER:?缺 alias}" \
-GODOT_ANDROID_KEYSTORE_RELEASE_PASSWORD="${GODOT_ANDROID_KEYSTORE_RELEASE_PASSWORD:?缺密码}" \
+# 只有口令是必填输入（由人的密码管理器提供，见 mobile/BUILD.md 第四节）。
+# 路径与别名在仓库里各只有一个正确答案，由脚本解析出与 doctor 相同的默认值；
+# 要求调用者再导出两个恒定变量，只会制造一种与「包打成没打成」无关的红。
+KEYSTORE_PATH="${FIFA_KEYSTORE:-$HOME/.fifa-trainer/release.keystore}"
+KEYSTORE_ALIAS="${FIFA_KEYSTORE_ALIAS:-fifa-trainer}"
+: "${GODOT_ANDROID_KEYSTORE_RELEASE_PASSWORD:?缺密码：见 mobile/BUILD.md 第四节}"
+export GODOT_ANDROID_KEYSTORE_RELEASE_PASSWORD
+GODOT_ANDROID_KEYSTORE_RELEASE_PATH="$KEYSTORE_PATH" \
+GODOT_ANDROID_KEYSTORE_RELEASE_USER="$KEYSTORE_ALIAS" \
   "$GODOT" --headless --path "$ROOT/mobile" --export-release "Android" "$OUT"
 
 # 退出码 0 还不够：失败时会留下未签名 APK
@@ -758,28 +764,30 @@ echo "OK: $OUT"
 
 ---
 
-## Open Questions
+## Open Questions (RESOLVED)
+
+> 下列五问已在 Phase 2 的规划中全部裁定并落进计划；每条以 `RESOLVED:` 开头，写的是**决定**，不是待议项。
 
 1. **`✗` 保留还是换成 `×`？**
    - 已知：Noto Sans SC 无 U+2717；Symbols2 有；双字体方案已实测可行，代价 +6.6 KB 与一个 `.tres`。
    - 不清楚：用户是否介意多一个字体文件（几乎不占体积）。
-   - 建议：**保留 `✗`，走双字体**（成功标准 2 原文写的就是 `✓ ✗`；改字符等于改验收标准）。
+   - RESOLVED：**保留 `✗`，走双字体**（成功标准 2 原文写的就是 `✓ ✗`；改字符等于改验收标准）。落地在 02-03：两个子集 + `FontVariation` + `allow_system_fallback = false`。
 
 2. **首屏 smoke 屏是"一次性脚手架"还是"未来首屏的雏形"？**
    - 已知：Phase 3 之后会有真正的核心与 UI；Phase 6/7 才是真正的首屏。
    - 不清楚：是否值得现在就把布局做好看。
-   - 建议：**明确写成"验收面板，可整体删除"**，用最少的节点（两个 Label + 一个 Timer），不做样式。避免 Phase 6 之前先背上一个假 UI。
+   - RESOLVED：**明确写成"验收面板，可整体删除"**，用最少的节点（两个 Label + 一个 Timer），不做样式。避免 Phase 6 之前先背上一个假 UI。落地在 02-02 的 `mobile/src/smoke/`。
 
 3. **Godot 装到哪里、是否随仓库？**
    - 已知：官方 zip 170 MB；装到 `~/Applications/Godot-4.7.2.app` 或仓库外任意固定路径都行。
-   - 建议：**装到仓库外**（`$HOME/Applications/`），用 `GODOT_BIN` 环境变量覆盖；绝不把 170 MB 二进制放进 git。
+   - RESOLVED：**装到仓库外**（`$HOME/Applications/`），用 `GODOT_BIN` 环境变量覆盖；绝不把 170 MB 二进制放进 git。落地在 02-01 Task 1（SHA-512 校验后安装）。
 
 4. **CI 要不要跑闸门 B（打 APK）？**
    - 已知：闸门 A 只需 Linux 版 Godot（77 MB），可在 GitHub Actions 跑；闸门 B 需要 1.9 GB 模板 + JDK + Android SDK。
-   - 建议：**Phase 2 只把闸门 A 进 CI（可选）**，闸门 B 留在本机脚本。Phase 9 再决定是否上 CI 打发布包。
+   - RESOLVED：**Phase 2 只把闸门 A 进 CI（可选）**，闸门 B 留在本机脚本。Phase 9 再决定是否上 CI 打发布包。02-02 已在 `<objective>` 里记录「本阶段不接 GitHub Actions」这一范围裁定。
 
 5. **keystore 备份怎么算"已备份"？**
-   - 建议：BUILD.md 写清"离线介质 + 至少两处 + 密码与文件分开存放"，并在 `doctor` 里校验 keystore 能被 `keytool -list` 打开（能打开 = 密码对、文件没坏），但**不**把 keystore 放进任何自动化路径。
+   - RESOLVED：BUILD.md 写清"离线介质 + 至少两处 + 密码与文件分开存放"，并在 `doctor` 里校验 keystore 能被 `keytool -list` 打开（能打开 = 密码对、文件没坏），但**不**把 keystore 放进任何自动化路径。落地在 02-05 的 `mobile/BUILD.md` 第四节与 `mobile/ACCEPTANCE.md` 第四节（后者是有日期与操作者的填写表）。
 
 ---
 
