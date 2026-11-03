@@ -14,7 +14,7 @@
 
 Decimal phases appear between their surrounding integers in numeric order.
 
-- [ ] **Phase 1: 仓库拆分 + 配置单一真源 + 桌面回归闸门** - `desktop/` + `mobile/` + `shared/`，桌面 230 项检查全绿，配置漂移可被脚本抓住
+- [x] **Phase 1: 仓库拆分 + 配置单一真源 + 桌面回归闸门** - `desktop/` + `mobile/` + `shared/`，桌面 230 项检查全绿，配置漂移可被脚本抓住 (completed 2026-11-04)
 - [ ] **Phase 2: 安卓工具链 + 真机冒烟 APK** - 签名 APK 能装能启动，中文不豆腐，`*.json` 真进包，能读到手柄原始轴
 - [ ] **Phase 3: 纯核心地基** - 几何 / 领域模型 / 配置校验 / 无头运行 / 架构 lint，零引擎依赖
 - [ ] **Phase 4: 设备输入层 + 绿色搓射竖切** - 引导式配对、轴探测、校准、布局确认，真机上产出第一次判定
@@ -39,7 +39,7 @@ Decimal phases appear between their surrounding integers in numeric order.
   3. 同步脚本运行一次即生成配置副本 + `.sha256`，重复运行不产生 diff；一致时 `--check` 以零退出
   4. 在一个干净 clone 上按 README 记录的命令即可复现 1–3，不依赖任何本机残留状态
 
-**Plans**: 5/5 plans executed
+**Plans**: 5/5 plans complete
 **Wave 1**
 - [x] 01-01-PLAN.md — 搬迁前冻结 230 项检查基线 + 固定 PyPI 索引（锁文件不再被镜像改写）
 
@@ -212,7 +212,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 →
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. 仓库拆分 + 配置单一真源 + 桌面回归闸门 | 5/5 | Awaiting verify | - |
+| 1. 仓库拆分 + 配置单一真源 + 桌面回归闸门 | 5/5 | Complete    | 2026-11-04 |
 | 2. 安卓工具链 + 真机冒烟 APK | 0/0 | Not started | - |
 | 3. 纯核心地基 | 0/0 | Not started | - |
 | 4. 设备输入层 + 绿色搓射竖切 | 0/0 | Not started | - |
