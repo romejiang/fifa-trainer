@@ -20,7 +20,8 @@ __all__ = [
     "DEFAULT_CONFIG", "load_config", "dump_default_config",
     "resolve_direction", "direction_name", "parse_step", "DEFAULT_CONFIG_FILENAME",
     "APP_NAME", "is_frozen", "app_dir", "user_config_dir",
-    "default_config_path", "ensure_user_config",
+    "default_config_path", "shared_config_path", "write_config_target",
+    "ensure_user_config",
 ]
 
 DEFAULT_CONFIG_FILENAME = "skills_config.json"
@@ -62,6 +63,24 @@ def default_config_path() -> Path:
     if is_frozen():
         return user_config_dir() / DEFAULT_CONFIG_FILENAME
     return app_dir() / DEFAULT_CONFIG_FILENAME
+
+
+def shared_config_path() -> Path:
+    """开发态唯一手写配置：<repo>/shared/skills_config.json。
+
+    app_dir() 在开发态是 desktop/，它的父目录就是仓库根。这个路径只用于
+    --write-config 的写入去向，运行期读取的仍然是同步出来的桌面副本。
+    """
+    return app_dir().parent / "shared" / DEFAULT_CONFIG_FILENAME
+
+
+def write_config_target(explicit: Optional[Path] = None) -> Path:
+    """--write-config 的落点：显式路径 > 冻结态用户目录 > 开发态唯一真源。"""
+    if explicit is not None:
+        return Path(explicit)
+    if is_frozen():
+        return default_config_path()
+    return shared_config_path()
 
 
 def ensure_user_config(path: Optional[Path] = None) -> Path:

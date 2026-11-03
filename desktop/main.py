@@ -44,6 +44,7 @@ from padskills import __version__
 from padskills.config import (
     DEFAULT_CONFIG_FILENAME, AppConfig, Pulse, default_config_path,
     dump_default_config, ensure_user_config, is_frozen, load_config,
+    write_config_target,
 )
 from padskills.engine import Engine
 from padskills.input_source import list_devices, open_source
@@ -209,8 +210,9 @@ def main(argv: Optional[List[str]] = None) -> int:
             "  uv run main.py                    正式运行（只在成功时打印）\n"
         ),
     )
-    parser.add_argument("-c", "--config", default=str(default_config_path()),
-                        help="配置文件路径（默认在项目根目录 / 用户配置目录）")
+    parser.add_argument("-c", "--config", default=None,
+                        help="配置文件路径（默认：开发态 desktop/skills_config.json；"
+                             "冻结态用户配置目录）")
     parser.add_argument("--gui", action="store_true", help="打开桌面练习窗口")
     parser.add_argument("--demo", action="store_true",
                         help="GUI 演示模式：不用手柄，循环播放成功和失败的轨迹")
@@ -233,9 +235,17 @@ def main(argv: Optional[List[str]] = None) -> int:
     parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
     args = parser.parse_args(argv)
 
+    # 未传 -c 时，运行期读的仍然是同步出来的桌面副本（desktop/skills_config.json），
+    # 只有 --write-config 的写入去向被改成唯一真源 shared/skills_config.json。
+    explicit_config = Path(args.config) if args.config else None
+    config_path = explicit_config if explicit_config is not None else default_config_path()
+
     if args.write_config:
-        path = dump_default_config(Path(args.config))
+        path = dump_default_config(write_config_target(explicit_config))
         print(f"已生成默认配置: {path.resolve()}")
+        if not is_frozen():
+            print("提示：请运行 python3 tools/sync_config.py "
+                  "把真源同步到桌面/移动端副本")
         return 0
 
     if args.list:
@@ -243,13 +253,13 @@ def main(argv: Optional[List[str]] = None) -> int:
 
     if args.gui or args.demo:
         from padskills.gui import main_gui
-        return main_gui(config_path=args.config, index=args.index, demo=args.demo)
+        return main_gui(config_path=str(config_path), index=args.index, demo=args.demo)
 
     # 打包运行：首次启动把默认配置写到用户目录，之后用户可以直接编辑
     if is_frozen():
-        ensure_user_config(Path(args.config))
+        ensure_user_config(config_path)
 
-    cfg = load_config(Path(args.config))
+    cfg = load_config(config_path)
     if args.index is not None:
         cfg.input.joystick_index = args.index
     if args.no_rumble:
