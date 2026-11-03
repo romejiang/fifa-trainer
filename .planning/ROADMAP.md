@@ -28,6 +28,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 ## Phase Details
 
 ### Phase 1: 仓库拆分 + 配置单一真源 + 桌面回归闸门
+
 **Goal**: 把仓库拆成 `desktop/` + `mobile/` + `shared/`，搬完桌面版行为零变化；`shared/skills_config.json` 成为唯一真源，并有一部可执行的同步 + hash 校验挡住第二份手写副本。
 **Mode:** mvp
 **Depends on**: Nothing (first phase)
@@ -37,15 +38,23 @@ Decimal phases appear between their surrounding integers in numeric order.
   2. `shared/skills_config.json` 是仓库里唯一手写的动作配置；手改 `mobile/assets/config/` 下的副本后，`tools/sync_config.py --check` 以非零退出并指出差异
   3. 同步脚本运行一次即生成配置副本 + `.sha256`，重复运行不产生 diff；一致时 `--check` 以零退出
   4. 在一个干净 clone 上按 README 记录的命令即可复现 1–3，不依赖任何本机残留状态
-**Plans**: 5 plans
 
+**Plans**: 5 plans
+**Wave 1**
 - [ ] 01-01-PLAN.md — 搬迁前冻结 230 项检查基线 + 固定 PyPI 索引（锁文件不再被镜像改写）
+
+**Wave 2** *(blocked on Wave 1 completion)*
 - [ ] 01-02-PLAN.md — 纯 git mv 三子树 + 配置副本与 .sha256 + 230 项回归闸门
+
+**Wave 3** *(blocked on Wave 2 completion)*
 - [ ] 01-03-PLAN.md — `--write-config` 三级路由 + `.gitignore` / `.gitattributes` 跟随布局
 - [ ] 01-04-PLAN.md — 根 README 重写为仓库地图 + GitHub Actions 闸门
+
+**Wave 4** *(blocked on Wave 3 completion)*
 - [ ] 01-05-PLAN.md — 干净 clone 复现脚本 + 篡改反例（成功标准 2 与 4 的机械证明）
 
 ### Phase 2: 安卓工具链 + 真机冒烟 APK
+
 **Goal**: 用锁定的工具链导出一个签名 arm64 APK，证明它能装、能启动、中文不豆腐、共享配置真的进了包、手柄原始轴在真机上能读到。
 **Mode:** mvp
 **Depends on**: Phase 1
@@ -56,10 +65,12 @@ Decimal phases appear between their surrounding integers in numeric order.
   3. 应用启动时读到 Phase 1 同步过来的 `res://assets/config/` 配置并显示 `SKILL_COUNT = 5`，证明 `*.json` 真的进了 PCK
   4. 连上蓝牙手柄推动右摇杆时，屏幕上的原始轴数值实时变化，证明输入通道在真机可达
   5. `mobile/BUILD.md` 记录精确版本（Godot 4.7.2-stable / 导出模板 4.7.2.stable / JDK 17 / build-tools 36.1.0），release keystore 已生成并离线备份，另一台干净机器按文档能重导出
+
 **Plans**: TBD
 **UI hint**: yes
 
 ### Phase 3: 纯核心地基 — 几何 / 配置校验 / 无头运行 / 架构 lint
+
 **Goal**: `mobile/src/core/` 成为一个零引擎依赖、可在无场景树无手柄条件下运行并通过测试的纯 GDScript 层，角度约定与配置错误信息一次钉死。
 **Mode:** mvp
 **Depends on**: Phase 1
@@ -70,10 +81,12 @@ Decimal phases appear between their surrounding integers in numeric order.
   3. 注入坏配置（BOM / 字符串布尔 / `null` 数值 / `start_angle` 数组）后得到结构化错误列表（`json_path` + `code` + 修复建议），可原样渲染成错误屏；不存在 `push_error` 或静默降级
   4. `src/core/` 架构 lint 在出现 `Input.` / `Time.` / `Node` / `FileAccess` / `print(` 时非零退出，干净时零退出
   5. 用户修改写进 `user://` 稀疏覆盖层；base 配置 hash 变化时覆盖层被丢弃并提示，运行期绝不尝试写 `res://`
+
 **Plans**: TBD
 **UI hint**: yes
 
 ### Phase 4: 设备输入层 + 绿色搓射竖切
+
 **Goal**: 在真实安卓手机 + 真实蓝牙手柄上完成「按任意键唤醒 → 轴探测 → 摇杆校准 → 布局确认」，并做出一次绿色搓射，屏幕上给出这一次的判定与原因。阶段内部顺序固定：先移植 tap 检测器并证明，再接适配器，最后才是最小界面。
 **Mode:** mvp
 **Depends on**: Phase 2, Phase 3
@@ -84,10 +97,12 @@ Decimal phases appear between their surrounding integers in numeric order.
   3. 引导探针记录右摇杆上/右/下/左对应的实际轴序号与符号并落盘为 per-device profile；换一只手柄再连会重新探测，绝不沿用上一次的映射
   4. 布局建议（Xbox / PlayStation）自动给出，但必须用户按键确认后才进入练习，未确认不前进一步
   5. 在真机上做一次绿色搓射，屏幕产出且仅产出一次判定并显示成功或失败原因；快速连做两次得到两次独立判定（事件流保住了帧内反转）
+
 **Plans**: TBD
 **UI hint**: yes
 
 ### Phase 5: 全动作判定对等性 — 三类检测器 + 引擎仲裁 + 抽稀矩阵
+
 **Goal**: 三类检测器与 `GestureEngine` 作为一个单元 1:1 移植，5 个动作的判定序列与 Python 桌面版逐条一致，并在 60 / 90 / 120 Hz 抽稀下证明不漂移。
 **Mode:** mvp
 **Depends on**: Phase 4
@@ -98,9 +113,11 @@ Decimal phases appear between their surrounding integers in numeric order.
   3. 一次挥动最多产出一个判定：双动作竞争、修饰键中途切换、手势锁、逐动作 + 全局冷却、idle 重置的仲裁夹具全部通过
   4. 每次判定返回结构化 `measured{}`（起止角、扫过角、每步耗时、保持时长），反馈层可直接消费，无需二次计算
   5. 250 Hz → 60 / 90 / 120 Hz 抽稀重跑不漂移；若漂移，报告给出证据与阈值调整记录，且 `release_hold_ms` 与 `global_cooldown_ms` 有专门的边界夹具
+
 **Plans**: TBD
 
 ### Phase 6: 训练循环 — 10 次一组、免触摸推进、暂停恢复
+
 **Goal**: 一次练习可以连续进行：10 次一组、结果停留后自动进入下一次、待触发与冷却状态可见，全程不需要触碰屏幕。
 **Mode:** mvp
 **Depends on**: Phase 5
@@ -111,10 +128,12 @@ Decimal phases appear between their surrounding integers in numeric order.
   3. 结果停留结束后自动进入待触发；待触发与冷却状态在屏幕上有明确可见的指示，用户知道「现在这一下算不算」
   4. 按手柄 Start 暂停，恢复时检测器重置并进入 3 秒倒计时，倒计时期间的动作不产生判定
   5. 冷启动直接进入上次练习的动作，不需要重新选择
+
 **Plans**: TBD
 **UI hint**: yes
 
 ### Phase 7: 反馈呈现 — 实测区间、实时轨迹、音效、支架可读布局
+
 **Goal**: 每次判定在 1 秒内被看懂——看得出差多少、看得到自己刚才的轨迹、听得见成功失败，并且在支架观看距离上读得清。
 **Mode:** mvp
 **Depends on**: Phase 6
@@ -125,10 +144,12 @@ Decimal phases appear between their surrounding integers in numeric order.
   3. 成功 / 失败音效可全局开关，关闭后任何核心功能都不受影响
   4. 结果横幅在命中同一帧产生、至少停留 1.5 秒，即使下一次挥动已经开始也不被立刻覆盖
   5. 横屏锁定 + 屏幕常亮；在约 1 m 的支架观看距离上，动作名、失败原因、度数文字全部可读
+
 **Plans**: TBD
 **UI hint**: yes
 
 ### Phase 8: 长期使用韧性 — 生命周期、断连、持久化
+
 **Goal**: 切后台、锁屏、掉手柄、进程被杀都不产生误判、不丢数据；重开还在，回来还能接着练。
 **Mode:** mvp
 **Depends on**: Phase 7
@@ -138,10 +159,12 @@ Decimal phases appear between their surrounding integers in numeric order.
   2. 锁屏解锁、拔手柄再插（新 device index）后自动重连并回到待触发；掉线期间的动作不计入尝试、不产生失败判定
   3. 杀掉进程再重开后，每动作累计尝试数与成功数、每动作最近 N 次结果（成败 + 原因 + 时间）完整保留
   4. 写盘走 temp + rename：写到一半被杀不会留下半损坏文件；文件损坏时回退到上一份可用数据并明确提示
+
 **Plans**: TBD
 **UI hint**: yes
 
 ### Phase 9: 发布 — 侧载 APK + 升级路径
+
 **Goal**: 朋友拿到一个 APK 就能装上就用；下一次版本能在不卸载的前提下覆盖安装，统计一条不丢。本阶段不依赖 Phase 10。
 **Mode:** mvp
 **Depends on**: Phase 8（不依赖 Phase 10）
@@ -152,9 +175,11 @@ Decimal phases appear between their surrounding integers in numeric order.
   3. `zipalign -c -P 16 -v 4` 通过；`unzip -l` 确认包内无 `lib/x86_64/`、无 `.DS_Store`、无 keystore 或密钥
   4. 一页带截图的安装指南覆盖「允许安装未知应用」、Play Protect 拦截、「先按任意键手柄才会出现」；朋友照指南能独立装上
   5. 在一个干净 clone 上跑一次脚本化导出即产出同一份 APK，版本号来自唯一来源而不是手改多处
+
 **Plans**: TBD
 
 ### Phase 10: 手机触觉（可选，不阻塞任何阶段）
+
 **Goal**: 在视觉反馈已经自成闭环的前提下，增加一个明确标注为「手机震动」、可全局关闭的附加通道。删掉本阶段，v1 依然完整可交付。
 **Mode:** mvp
 **Depends on**: Phase 7（反馈骨架）；不被任何阶段依赖
@@ -164,6 +189,7 @@ Decimal phases appear between their surrounding integers in numeric order.
   2. 界面与设置里明确写「震动的是手机，不是手柄」，不存在任何「手柄震动」文案或「测试手柄震动」按钮
   3. 全局开关关闭后完全静默，且不产生错误日志
   4. 删掉整个阶段不改变任何其他阶段的成功标准——没有任何阶段以它为前提
+
 **Plans**: TBD
 **UI hint**: yes
 
