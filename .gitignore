@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# PyInstaller / local build artifacts
+dist/
+build/*
+!build/build_windows.ps1
+!build/build_macos.sh
+
+# Local logs / screenshots
+*.log
+trainer.log
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

@@ -1,0 +1,19 @@
+[project]
+name = "fifa-skill-rumble"
+version = "1.0.0"
+description = "FIFA / EA FC 花式动作搓招实时监测与手柄震动反馈（飞智八爪鱼 4 实测通过）"
+requires-python = ">=3.11"
+dependencies = [
+    "pygame-ce>=2.5.8",
+]
+
+# 可选：只有当 pygame 的震动接口在你的设备上失效时才需要装。
+#   uv sync --extra xinput
+[project.optional-dependencies]
+xinput = [
+    "XInput-Python>=0.4.0; sys_platform == 'win32'",
+]
+# 打包成 .exe / .app 时才需要：uv sync --extra build
+build = [
+    "pyinstaller>=6.0",
+]
