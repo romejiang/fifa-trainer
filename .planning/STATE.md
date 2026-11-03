@@ -3,16 +3,16 @@ gsd_state_version: "1.0"
 current_phase: 1
 current_phase_name: 仓库拆分 + 配置单一真源 + 桌面回归闸门
 status: executing
-stopped_at: Completed 01-04-PLAN.md
-last_updated: "2026-11-03T20:37:57.000Z"
+stopped_at: Completed 01-05-PLAN.md（Phase 1 的 5 个计划全部执行完，待 verify）
+last_updated: "2026-11-03T20:42:00.000Z"
 last_activity: 2026-11-04
-last_activity_desc: Phase 1 execution started
-state_head: 76fec53e1e821f00e367aebf67561ddd76043b83
+last_activity_desc: Completed 01-05-PLAN.md
+state_head: 173124dcbdc0a04d36ad070d4441f42fb0613260
 progress:
   total_phases: 10
   completed_phases: 0
   total_plans: 5
-  completed_plans: 4
+  completed_plans: 5
   percent: 0
 ---
 
@@ -29,7 +29,7 @@ See: .planning/PROJECT.md (updated 2026-11-04)
 
 Phase: 1 (仓库拆分 + 配置单一真源 + 桌面回归闸门) — EXECUTING
 Plan: 5 of 5
-Status: Ready to execute
+Status: All 5 plans executed — awaiting verify
 Last activity: 2026-11-04 — Phase 1 execution started
 
 Progress: [░░░░░░░░░░] 0%
@@ -60,6 +60,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 1 P2 | 4min | 3 tasks | 26 files |
 | Phase 1 P3 | 2min | 2 tasks | 4 files |
 | Phase 1 P4 | 2min | 2 tasks | 3 files |
+| Phase 1 P5 | 2min | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -94,6 +95,12 @@ Recent decisions affecting current work:
 - [Phase 1]: actions 按 40 位 commit SHA 固定并附 # vX.Y.Z 注释；run 步骤零 ${{ }} 插值、零 secrets、零 continue-on-error
 - [Phase 1]: mobile/README.md 明确 Phase 2 才创建 project.godot（D-10），Phase 1 只放配置副本与文档
 - [Phase 1]: 时序敏感的 test_engine_end_to_end 不在 01-04 修复：files_modified 不含 desktop/tests/，在 CI 加重试等于放宽闸门；结论已写入 deferred-items.md
+- [Phase 1]: 干净 clone 脚本入口用 rc=2 拒绝脏工作区：clone 只复制提交，脏树下的绿指向旧代码；rc=2 表示「不接受这次运行」，与检查失败的 rc=1 区分
+- [Phase 1]: 零漂移断言放在 clone 内而不是源仓库，证明 .venv/ 与 __pycache__/ 的忽略规则在全新检出上也成立
+- [Phase 1]: --tamper 反例选 mobile/assets/config/skills_config.json：两份副本对 --check 等价，但移动端副本无运行期消费者，反例只暴露配置闸门本身
+- [Phase 1]: 反例第 4 步除 --check 变绿外追加 git status --porcelain 为空，证明还原彻底且 clone 未被前次运行弄脏
+- [Phase 1]: 反例把原始报错行打进日志；断言必须是「出现被点名文件」而非「出现不一致」，避免 pipefail 下 grep 空匹配静默退出
+- [Phase 1]: 验证脚本零复制：不写死 230、不写死测试路径，只调 check_desktop.sh 与 sync_config.py
 
 ### Pending Todos
 
@@ -116,6 +123,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-11-03T20:37:57.000Z
-Stopped at: Completed 01-04-PLAN.md
+Last session: 2026-11-03T20:42:00.000Z
+Stopped at: Completed 01-05-PLAN.md
 Resume file: None
