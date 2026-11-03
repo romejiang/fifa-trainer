@@ -27,7 +27,7 @@ mode="${1:-}"
 case "$mode" in
     "" | --tamper) ;;
     *)
-        echo "✗ 未知参数：$mode（只接受留空或 --tamper）" >&2
+        echo "✗ 未知参数：${mode}（只接受留空或 --tamper）" >&2
         exit 2
         ;;
 esac
@@ -68,7 +68,7 @@ fi
 
 target="mobile/assets/config/skills_config.json"
 
-echo "▸ 反例：手改移动端副本 $target…"
+echo "▸ 反例：手改移动端副本 ${target}…"
 printf ' ' >> "$target"
 
 # 期望失败必须用 if 包起来，绝不能用 || true 吞掉退出码后照样打印成功 ——
@@ -77,12 +77,14 @@ if out="$(python3 tools/sync_config.py --check 2>&1)"; then
     echo "✗ 手改副本后 --check 仍然通过" >&2
     exit 1
 fi
-if ! printf '%s' "$out" | grep -qF -e "$target" -e "不一致"; then
-    echo "✗ --check 失败了，但输出既没指名 $target 也没说「不一致」" >&2
+if ! printf '%s' "$out" | grep -qF "$target"; then
+    echo "✗ --check 失败了，但输出没有指名 $target" >&2
     printf '%s\n' "$out" >&2
     exit 1
 fi
 echo "  ✓ sync_config.py --check 抓住并指名 $target"
+# 把抓人的那几行原样留在日志里，读日志的人不需要相信一句结论。
+printf '%s\n' "$out" | grep -F "$target" | sed 's/^/    /'
 
 if out="$(bash tools/check_desktop.sh 2>&1)"; then
     echo "✗ 手改副本后回归闸门仍然通过" >&2
@@ -98,6 +100,11 @@ echo "  ✓ 回归闸门同样被拦住"
 git checkout -- "$target"
 if ! python3 tools/sync_config.py --check; then
     echo "✗ 还原后 --check 仍然失败：问题在脚本或仓库，不在篡改" >&2
+    exit 1
+fi
+if [[ -n "$(git status --porcelain)" ]]; then
+    echo "✗ 还原后工作区仍有残留改动（git checkout -- 没盖住）:" >&2
+    git status --porcelain >&2
     exit 1
 fi
 

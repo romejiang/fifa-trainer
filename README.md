@@ -57,6 +57,8 @@ bash tools/check_desktop.sh
 
 任何一步不符都会非零退出并指出具体文件。
 
+想在干净副本上复现整条链路（含配置反例）可运行 `bash tools/verify_clean_clone.sh`：它会 clone 已提交状态、重放上面这条闸门，再断言跑完工作区零漂移；加 `--tamper` 会额外验证手改副本必被抓住。
+
 ## 五、改配置
 
 - **唯一可手写的真源**：`shared/skills_config.json`
