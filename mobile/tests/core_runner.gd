@@ -43,6 +43,7 @@ class Reporter extends RefCounted:
 
 
 const SUITES := {
+	"config_corpus": preload("res://tests/unit/test_config_corpus.gd"),
 	"config_loader": preload("res://tests/unit/test_config_loader.gd"),
 	"config_validator": preload("res://tests/unit/test_config_validator.gd"),
 	"geometry": preload("res://tests/unit/test_geometry.gd"),

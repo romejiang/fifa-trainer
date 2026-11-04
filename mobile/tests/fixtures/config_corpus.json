@@ -1,0 +1,107 @@
+{
+  "schema_version": 1,
+  "cases": [
+    {
+      "id": "bom",
+      "bom": true,
+      "data": {
+        "skills": [
+          {
+            "name": "BOM 测试动作",
+            "type": "taps",
+            "params": {
+              "button": "X",
+              "min_interval_ms": 400,
+              "max_interval_ms": 600
+            }
+          }
+        ]
+      },
+      "godot": {
+        "verdict": "reject",
+        "codes": ["bom_detected"],
+        "paths": ["$"]
+      },
+      "python": {
+        "verdict": "reject",
+        "note": "load_config 用 read_text 再 json.loads(str)，BOM 会抛 JSONDecodeError"
+      },
+      "divergence": ""
+    },
+    {
+      "id": "string_bool",
+      "data": {
+        "skills": [
+          {
+            "name": "字符串布尔",
+            "type": "taps",
+            "enabled": "false",
+            "params": {
+              "button": "X",
+              "min_interval_ms": 400,
+              "max_interval_ms": 600
+            }
+          }
+        ]
+      },
+      "godot": {
+        "verdict": "reject",
+        "codes": ["bool_expected"],
+        "paths": ["skills[0].enabled"]
+      },
+      "python": {
+        "verdict": "accept",
+        "note": "bool(\"false\") 为 True，属已知缺陷；GDScript 故意拒绝"
+      },
+      "divergence": "string_bool_python_silently_true"
+    },
+    {
+      "id": "null_number",
+      "data": {
+        "skills": [
+          {
+            "name": "null 数值",
+            "type": "arc",
+            "params": {
+              "min_duration_ms": null
+            }
+          }
+        ]
+      },
+      "godot": {
+        "verdict": "reject",
+        "codes": ["number_expected"],
+        "paths": ["skills[0].params.min_duration_ms"]
+      },
+      "python": {
+        "verdict": "reject",
+        "note": "float(None) 抛 TypeError，不是 ValueError，load_config 抓不住"
+      },
+      "divergence": ""
+    },
+    {
+      "id": "start_angle_array",
+      "data": {
+        "skills": [
+          {
+            "name": "起点数组",
+            "type": "arc",
+            "params": {
+              "start_angle": [90, 180]
+            }
+          }
+        ]
+      },
+      "godot": {
+        "verdict": "reject",
+        "codes": ["start_angle_not_scalar"],
+        "paths": ["skills[0].params.start_angle"]
+      },
+      "python": {
+        "verdict": "accept_then_detector_reject",
+        "note": "parse_config 接受；ArcDetector.__init__ 的 resolve_direction(list) 才抛 ValueError"
+      },
+      "divergence": "start_angle_array_late_failure_in_python"
+    }
+  ]
+}
