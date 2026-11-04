@@ -49,6 +49,7 @@ const SUITES := {
 	"config_validator": preload("res://tests/unit/test_config_validator.gd"),
 	"geometry": preload("res://tests/unit/test_geometry.gd"),
 	"models": preload("res://tests/unit/test_models.gd"),
+	"overlay_merge": preload("res://tests/unit/test_overlay_merge.gd"),
 	"vocabulary": preload("res://tests/unit/test_vocabulary.gd"),
 }
 
