@@ -1,5 +1,5 @@
 ---
-status: testing
+status: complete-with-accepted-risk
 phase: 02-安卓工具链 + 真机冒烟 APK
 source: [02-VERIFICATION.md]
 started: 2026-11-04T16:20:00Z
@@ -48,7 +48,7 @@ result: [pending]
 ### 5. 第二台干净机器重导出
 expected: `bash mobile/tools/gate-b.sh` 退出 0，证书指纹与 `BUILD.md` §6 逐字相同
 how: 在一台未配置过的机器上按 `BUILD.md` §1–§8 执行，填 `mobile/ACCEPTANCE.md` §5
-result: [pending]
+result: accepted-risk（用户 2026-11-05 决定自行安排）— 目前没有第二台干净机器。替代证据：`verify_clean_export.sh` 已在临时 clone 中从零重导出并全绿（26,797,306 字节、证书指纹一致），证明文档与脚本足以复现；真实「另一台电脑」未验证。
 
 ### 6. 真机跑 device-smoke.sh 并检查截图
 expected: 末行 `DEVICE_SMOKE_OK serial=… package=com.fifaskill.trainer pid=… screenshot=…`；截图非空且确为验收屏
@@ -60,8 +60,9 @@ result: pass — `DEVICE_SMOKE_OK serial=ZY22F5FXX9 package=com.fifaskill.traine
 total: 6
 passed: 4
 partial: 0
+accepted_risk: 2（§4 离线备份、§5 第二台机器；用户 2026-11-05 明确「我自己安排，先往下走」）
 issues: 0
-pending: 2（§4 keystore 备份、§5 第二台机器重导出 —— 用户另行安排）
+pending: 0
 skipped: 0
 blocked: 0
 
