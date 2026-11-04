@@ -102,7 +102,23 @@ Decimal phases appear between their surrounding integers in numeric order.
   4. `src/core/` 架构 lint 在出现 `Input.` / `Time.` / `Node` / `FileAccess` / `print(` 时非零退出，干净时零退出
   5. 用户修改写进 `user://` 稀疏覆盖层；base 配置 hash 变化时覆盖层被丢弃并提示，运行期绝不尝试写 `res://`
 
-**Plans**: TBD
+**Plans**: 6 plans, 5 waves
+**Wave 1**
+- [ ] 03-01-PLAN.md — 无头 runner + 几何黄金对等 + 完成哨兵（含四种假绿反例）
+
+**Wave 2** *(blocked on Wave 1 completion)*
+- [ ] 03-02-PLAN.md — 架构 lint（`Input.` / `Time.` / `Node` / `FileAccess` / `print(`）+ `CORE.md` 边界契约
+- [ ] 03-03-PLAN.md — 按键/方向词汇表 + 六个域对象（一个文件一个 `class_name`）
+
+**Wave 3** *(blocked on Wave 2 completion)*
+- [ ] 03-04-PLAN.md — bytes 入口（BOM）+ `ConfigResult` / `Array[ConfigError]` + 全量校验与可见 warning
+
+**Wave 4** *(blocked on Wave 3 completion)*
+- [ ] 03-05-PLAN.md — 坏配置语料 + Python/GDScript 判定对等（分歧必须记录）
+
+**Wave 5** *(blocked on Wave 4 completion)*
+- [ ] 03-06-PLAN.md — `user://` 稀疏覆盖层 + `ConfigStore` 原子写 + `user://` 定名
+
 **UI hint**: yes
 
 ### Phase 4: 设备输入层 + 绿色搓射竖切
@@ -234,7 +250,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 →
 |-------|----------------|--------|-----------|
 | 1. 仓库拆分 + 配置单一真源 + 桌面回归闸门 | 5/5 | Complete    | 2026-11-04 |
 | 2. 安卓工具链 + 真机冒烟 APK | 5/5 | Complete    | 2026-11-05 |
-| 3. 纯核心地基 | 0/0 | Not started | - |
+| 3. 纯核心地基 | 0/6 | Planned | - |
 | 4. 设备输入层 + 绿色搓射竖切 | 0/0 | Not started | - |
 | 5. 全动作判定对等性 | 0/0 | Not started | - |
 | 6. 训练循环 | 0/0 | Not started | - |
