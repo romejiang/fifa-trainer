@@ -143,21 +143,21 @@ func _remove_overrides() -> void:
 
 
 ## bytes 读是 BOM 检测的前提：字符串 API 会在解码时静默剥掉文件头的 EF BB BF。
+## 先取长度再读：超限文件在分配内存之前就被拒绝，上限才真的挡得住畸形输入。
 static func _read_bytes(path: String) -> Dictionary:
-	var bytes := FileAccess.get_file_as_bytes(path)
-	if bytes.size() > MAX_BYTES:
+	var file := FileAccess.open(path, FileAccess.READ)
+	if file == null:
+		return {"bytes": PackedByteArray(), "error": ConfigError.new("$", &"file_read_error",
+			"无法读取文件 %s（错误码 %d）" % [path, FileAccess.get_open_error()],
+			"确认文件存在且当前用户可读。")}
+	var length := file.get_length()
+	if length > MAX_BYTES:
+		file.close()
 		return {"bytes": PackedByteArray(), "error": ConfigError.new("$", &"file_too_large",
-			"文件 %s 有 %d 字节，超过 %d 字节上限" % [path, bytes.size(), MAX_BYTES],
+			"文件 %s 有 %d 字节，超过 %d 字节上限" % [path, length, MAX_BYTES],
 			"确认这是配置文件；覆盖层正常大小不到 2 KB。")}
-	if bytes.is_empty():
-		# 空文件是正常状态（decode_bytes 会报 file_empty）；但读失败也返回空，
-		# 再 open 一次才能把「没有权限」与「真的是空文件」分开。
-		var probe := FileAccess.open(path, FileAccess.READ)
-		if probe == null:
-			return {"bytes": PackedByteArray(), "error": ConfigError.new("$", &"file_read_error",
-				"无法读取文件 %s（错误码 %d）" % [path, FileAccess.get_open_error()],
-				"确认文件存在且当前用户可读。")}
-		probe.close()
+	var bytes := file.get_buffer(length)
+	file.close()
 	return {"bytes": bytes, "error": null}
 
 

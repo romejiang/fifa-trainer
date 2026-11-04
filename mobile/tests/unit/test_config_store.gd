@@ -14,6 +14,8 @@ extends RefCounted
 
 const BASE_PATH := "res://assets/config/skills_config.json"
 const TEST_OVERRIDES := "user://config/test_overrides.json"
+const TEST_BASE_MISSING := "user://config/test_base_missing.json"
+const TEST_BASE_LARGE := "user://config/test_base_large.json"
 const GREEN := "绿色搓射 Green Finesse"
 const FORBIDDEN_PATH := "res://config/should_not_exist.json"
 
@@ -27,6 +29,8 @@ func run(r) -> void:
 	_check_atomic_write(r)
 	_check_broken_overlay(r)
 	_check_too_large_overlay(r)
+	_check_overlay_schema_invalid(r)
+	_check_base_failures(r)
 	_check_stale_hash(r)
 	_check_warnings_reach_result(r)
 	_clean()
@@ -137,6 +141,34 @@ func _check_too_large_overlay(r) -> void:
 	r.check(not FileAccess.file_exists(TEST_OVERRIDES), "超大覆盖层必须被删除")
 
 
+## 覆盖层结构不对（skills 不是对象）：整体丢弃，base 仍然可用。
+func _check_overlay_schema_invalid(r) -> void:
+	_clean()
+	var overlay := _overlay({})
+	overlay["skills"] = []
+	_write_raw(TEST_OVERRIDES, JSON.stringify(overlay))
+	var result := _store().load_config()
+	r.check(result.ok(), "skills 非对象时 base 仍必须可用：%s" % _describe(result))
+	r.check(result.notice.contains("已恢复默认"),
+		"skills 非对象必须给出「已恢复默认」notice（实际 %s）" % result.notice)
+	r.check(not result.overrides_applied, "skills 非对象时不得应用任何覆盖")
+	r.check(not FileAccess.file_exists(TEST_OVERRIDES), "结构坏掉的覆盖层必须被删除")
+
+
+## base 自己读不到或超过上限：必须返回错误结果，而不是半个配置。
+func _check_base_failures(r) -> void:
+	var missing := ConfigStore.new(TEST_BASE_MISSING, TEST_OVERRIDES).load_config()
+	r.check(not missing.ok(), "base 不存在时必须返回失败")
+	r.check(missing.has_code(&"file_missing"), "base 不存在时错误码必须是 file_missing")
+	r.check(missing.config == null, "base 不存在时不得产出半个配置")
+
+	_write_raw(TEST_BASE_LARGE, "x".repeat(ConfigStore.MAX_BYTES + 1))
+	var large := ConfigStore.new(TEST_BASE_LARGE, TEST_OVERRIDES).load_config()
+	r.check(not large.ok(), "base 超过上限时必须返回失败")
+	r.check(large.has_code(&"file_too_large"), "base 超限时错误码必须是 file_too_large")
+	r.check(large.config == null, "base 超限时不得产出半个配置")
+
+
 ## 写旧：base 摘要变了必须整体丢弃，notice 逐字等于约定原文。
 func _check_stale_hash(r) -> void:
 	_clean()
@@ -223,4 +255,6 @@ static func _write_raw(path: String, text: String) -> void:
 func _clean() -> void:
 	DirAccess.remove_absolute(TEST_OVERRIDES)
 	DirAccess.remove_absolute(TEST_OVERRIDES + ConfigStore.TEMP_SUFFIX)
+	DirAccess.remove_absolute(TEST_BASE_MISSING)
+	DirAccess.remove_absolute(TEST_BASE_LARGE)
 	DirAccess.remove_absolute(FORBIDDEN_PATH)
