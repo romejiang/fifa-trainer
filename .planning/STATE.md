@@ -3,16 +3,16 @@ gsd_state_version: "1.0"
 current_phase: 2
 current_phase_name: 安卓工具链 + 真机冒烟 APK
 status: executing
-stopped_at: Completed 02-03-PLAN.md（字体双链路 + 字形闸门）
-last_updated: "2026-11-04T14:35:58.000Z"
+stopped_at: Completed 02-04-PLAN.md（release keystore + 签名 APK + 闸门 B）
+last_updated: "2026-11-04T15:07:00.000Z"
 last_activity: 2026-11-04
-last_activity_desc: 02-03 complete — 810 字符清单 + 双字体子集 + 关闭系统兜底的字形闸门
-state_head: 51f3859d52f66a6d20c2b5965531818174c98f36
+last_activity_desc: 02-04 complete — 26.8 MB v2+v3 签名 arm64 APK，闸门 B 与反例自测全绿
+state_head: 8e7c6e65dc59e2d491821dd61d11471f58b098d5
 progress:
   total_phases: 10
   completed_phases: 1
   total_plans: 10
-  completed_plans: 8
+  completed_plans: 9
   percent: 10
 ---
 
@@ -28,16 +28,16 @@ See: .planning/PROJECT.md (updated 2026-11-04)
 ## Current Position
 
 Phase: 2 (安卓工具链 + 真机冒烟 APK) — EXECUTING
-Plan: 3 of 5（已完成 02-01 / 02-02 / 02-03）
+Plan: 4 of 5（已完成 02-01 / 02-02 / 02-03 / 02-04）
 Status: Executing Phase 2
-Last activity: 2026-11-04 — 02-03 完成：810 字符清单 + 两个字体子集 + 关闭系统兜底后 GLYPH_OK chars=810
+Last activity: 2026-11-04 — 02-04 完成：26,793,210 B 的 v2+v3 签名 arm64 APK，闸门 B 连跑两次全绿，反例自测 SELFTEST_OK
 
 Progress: [█░░░░░░░░░] 10%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 8
+- Total plans completed: 9
 - Average duration: — min
 - Total execution time: 0.0 hours
 
@@ -46,7 +46,7 @@ Progress: [█░░░░░░░░░] 10%
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
 | 1 | 5 | - | - |
-| 2 | 3 | 16min | 5min |
+| 2 | 4 | 29min | 7min |
 
 **Recent Trend:**
 - Last 5 plans: —
@@ -65,6 +65,7 @@ Progress: [█░░░░░░░░░] 10%
 | Phase 2 P01 | 9min | 2 tasks | 1 file |
 | Phase 2 P02 | 3min | 2 tasks | 9 files |
 | Phase 2 P03 | 4min | 3 tasks | 12 files |
+| Phase 2 P04 | 13min | 3 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -124,6 +125,12 @@ Recent decisions affecting current work:
 - [Phase 2]: 关闭系统兜底要逐层遍历 FontVariation 的 base_font 与每个 fallbacks 条目；`if font is FontFile` 对顶层资源永远不成立
 - [Phase 2]: 字形闸门额外断言 `ThemeDB.fallback_font.resource_path == AppFont.tres`：只造一个没人引用的 .tres 也能让 has_char 全绿
 - [Phase 2]: `*.ttf.import` 与 `glyph_coverage.gd.uid` 是提交物；`git check-ignore` 对三个路径必须非零
+- [Phase 2]: `rm -f` 必须先于 `--export-release`：导出器先写包后签名，缺 keystore 会留下大小正常的未签名 APK（P3），任何「文件存在即成功」的判据都是假的
+- [Phase 2]: 验签一律用 `apksigner verify --verbose --print-certs`：只加 `--print-certs` 时 apksigner 0.9 不输出 `Verified using …` 行，v2 断言会永远红
+- [Phase 2]: 闸门 B 只有一个必填输入（口令，`${VAR:?}` + export）；密钥库路径与别名由 `FIFA_KEYSTORE` / `FIFA_KEYSTORE_ALIAS` 解析出与 doctor.sh 逐字相同的默认值
+- [Phase 2]: 口令守卫放在 doctor 之前：doctor 的 keystore 断言读同一个变量，放后面会先撞 doctor 的报错，误导成「密钥库坏了」
+- [Phase 2]: 反例的 canary 必须用「上游一次产出固定字节 + 下游读到底」（`od -An -N12`）：无限产出 + 按字节截断的管道在 pipefail 下会 SIGPIPE 让反例脚本自己死掉
+- [Phase 2]: 签名身份定死：包名 `com.fifaskill.trainer`、别名 `fifa-trainer`、`versionCode=1` / `versionName=0.1.0`；证书 SHA-256 `E1:84:1A:17:…:E0:46` 是 Phase 9 覆盖安装的可核对指纹
 
 ### Pending Todos
 
@@ -147,6 +154,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-11-04T14:32:00.000Z
-Stopped at: Completed 02-03-PLAN.md（字体双链路 + 字形闸门）
+Last session: 2026-11-04T15:07:00.000Z
+Stopped at: Completed 02-04-PLAN.md（release keystore + 签名 APK + 闸门 B）
 Resume file: None

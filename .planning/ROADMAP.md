@@ -77,7 +77,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] 02-03-PLAN.md — 字体双链路（CJK 子集 + 符号 fallback）+ 字形闸门 (completed 2026-11-04)
 
 **Wave 4** *(blocked on Wave 3 completion)*
-- [ ] 02-04-PLAN.md — release keystore + 签名 APK + 闸门 B + 假绿反例
+- [x] 02-04-PLAN.md — release keystore + 签名 APK + 闸门 B + 假绿反例 (completed 2026-11-04)
 
 **Wave 5** *(blocked on Wave 4 completion)*
 - [ ] 02-05-PLAN.md — BUILD.md + 干净 clone 重导出 + 真机验收表
@@ -228,7 +228,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 →
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. 仓库拆分 + 配置单一真源 + 桌面回归闸门 | 5/5 | Complete    | 2026-11-04 |
-| 2. 安卓工具链 + 真机冒烟 APK | 2/5 | In progress | - |
+| 2. 安卓工具链 + 真机冒烟 APK | 4/5 | In progress | - |
 | 3. 纯核心地基 | 0/0 | Not started | - |
 | 4. 设备输入层 + 绿色搓射竖切 | 0/0 | Not started | - |
 | 5. 全动作判定对等性 | 0/0 | Not started | - |
