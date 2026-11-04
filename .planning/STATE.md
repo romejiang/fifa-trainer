@@ -3,16 +3,16 @@ gsd_state_version: "1.0"
 current_phase: 2
 current_phase_name: 安卓工具链 + 真机冒烟 APK
 status: executing
-stopped_at: Phase 1 complete, ready to plan Phase 2
-last_updated: "2026-11-04T10:14:00.000Z"
+stopped_at: Completed 02-02-PLAN.md（最小工程 + PCK 往返 + 闸门 A）
+last_updated: "2026-11-04T10:18:03.000Z"
 last_activity: 2026-11-04
-last_activity_desc: 02-01 complete — doctor.sh 六项宿主断言 + 引擎装到仓库外
-state_head: 292e9c9a8fc03d1907745b46c65bb81fbbfc2bad
+last_activity_desc: 02-02 complete — 最小 Godot 工程 + PCK 往返 + 闸门 A 一条命令
+state_head: 9d5da81dd516d123d71bf73bf5ade205bf497d65
 progress:
   total_phases: 10
   completed_phases: 1
   total_plans: 10
-  completed_plans: 5
+  completed_plans: 6
   percent: 10
 ---
 
@@ -28,16 +28,16 @@ See: .planning/PROJECT.md (updated 2026-11-04)
 ## Current Position
 
 Phase: 2 (安卓工具链 + 真机冒烟 APK) — EXECUTING
-Plan: 2 of 5
+Plan: 2 of 5（已完成 02-01 / 02-02）
 Status: Executing Phase 2
-Last activity: 2026-11-04 — 02-01 完成：doctor.sh 六项断言，Godot 4.7.2-stable 装在仓库外
+Last activity: 2026-11-04 — 02-02 完成：`--import → --export-pack → --main-pack` 读回 5 条动作，闸门 A 一条命令
 
 Progress: [█░░░░░░░░░] 10%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 6
+- Total plans completed: 7
 - Average duration: — min
 - Total execution time: 0.0 hours
 
@@ -46,7 +46,7 @@ Progress: [█░░░░░░░░░] 10%
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
 | 1 | 5 | - | - |
-| 2 | 1 | 9min | 9min |
+| 2 | 2 | 12min | 6min |
 
 **Recent Trend:**
 - Last 5 plans: —
@@ -63,6 +63,7 @@ Progress: [█░░░░░░░░░] 10%
 | Phase 1 P4 | 2min | 2 tasks | 3 files |
 | Phase 1 P5 | 2min | 2 tasks | 2 files |
 | Phase 2 P01 | 9min | 2 tasks | 1 file |
+| Phase 2 P02 | 3min | 2 tasks | 9 files |
 
 ## Accumulated Context
 
@@ -109,6 +110,13 @@ Recent decisions affecting current work:
 - [Phase 2]: 留空只跑 godot/template/jdk/sdk/keystore 五项构建断言；`device` 只在点名时运行且 0 台 fail-visible
 - [Phase 2]: keystore 口令只从 `GODOT_ANDROID_KEYSTORE_RELEASE_PASSWORD` 读、只经 `keytool -storepass:env` 传给 keytool；输出只出现变量名
 - [Phase 2]: bash 3.2 的 UTF-8 解析缺陷：变量紧邻全角标点必须写 `${VAR}`，否则变量名会吞掉半个汉字
+- [Phase 2]: 闸门 A 第一步必须是 `sync_config.py --check`：副本被手改时 PCK 闸门照样能解析出 5 条动作并报绿（假绿）
+- [Phase 2]: `--main-pack` 一律不带 `--path`：带 `--path` 时 `res://` 指回工程目录，读到源码而不是导出物
+- [Phase 2]: `EXPECTED_SKILLS := 5` 硬编码并带注释；禁止改成「读到几条算几条」，否则断言永远绿（与 `BASELINE_SHA256` 同构）
+- [Phase 2]: 首屏 `-1.000` 用 ASCII 连字符 U+002D，不用数学减号 U+2212（后者不在字形清单里，会造成字体闸门假绿）
+- [Phase 2]: `*.gd.uid` 导入边车是提交物，不进 `.gitignore`；只有 `mobile/.godot/` 与 `mobile/build/` 是忽略物
+- [Phase 2]: `project.godot` 的 `[gui] theme/custom_font` 留给 02-03 补：字体资产届时才存在
+- [Phase 2]: 闸门 A 不接 GitHub Actions，CI 打发布包的决策归 Phase 9（本计划 `<objective>` 的范围裁定）
 
 ### Pending Todos
 
@@ -132,5 +140,5 @@ Items acknowledged and deferred at milestone close, most recent first:
 ## Session Continuity
 
 Last session: 2026-11-04T10:14:00.000Z
-Stopped at: Completed 02-01-PLAN.md（doctor.sh 六项断言；Godot 4.7.2-stable 已装在仓库外）
+Stopped at: Completed 02-02-PLAN.md（最小 Godot 工程 + PCK 往返 + 闸门 A）
 Resume file: None
