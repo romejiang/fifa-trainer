@@ -3,16 +3,16 @@ gsd_state_version: "1.0"
 current_phase: 3
 current_phase_name: 纯核心地基 — 几何 / 配置校验 / 无头运行 / 架构 lint
 status: executing
-stopped_at: Phase 3 plan 02 complete (core purity lint + CORE.md), ready for 03-03
-last_updated: "2026-11-04T19:32:00.000Z"
+stopped_at: Phase 3 plan 03 complete (键/方向词汇表 + 六个域对象), ready for 03-04
+last_updated: "2026-11-04T19:40:00.000Z"
 last_activity: 2026-11-05
-last_activity_desc: Phase 3 plan 02 complete
-state_head: fa18e24b4097bc02e71c72d710b052dd08126720
+last_activity_desc: Phase 3 plan 03 complete
+state_head: be18bef92779618407d30515fea433761981a6d3
 progress:
   total_phases: 10
   completed_phases: 2
   total_plans: 16
-  completed_plans: 12
+  completed_plans: 13
   percent: 20
 ---
 
@@ -28,18 +28,18 @@ See: .planning/PROJECT.md (updated 2026-11-04)
 ## Current Position
 
 Phase: 3 (纯核心地基 — 几何 / 配置校验 / 无头运行 / 架构 lint) — EXECUTING
-Plan: 3 of 6
+Plan: 4 of 6
 Status: Executing Phase 3
-Last activity: 2026-11-05 — 03-02 完成：架构边界 lint + CORE.md 可执行定义
+Last activity: 2026-11-05 — 03-03 完成：按键 / 方向词汇表 + 六个域对象
 
 Progress: [██░░░░░░░░] 20%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 10
+- Total plans completed: 13
 - Average duration: — min
-- Total execution time: 0.6 hours
+- Total execution time: 0.7 hours
 
 **By Phase:**
 
@@ -69,6 +69,7 @@ Progress: [██░░░░░░░░] 20%
 | Phase 2 P05 | 8min | 3 tasks | 6 files |
 | Phase 3 P01 | 13min | 2 tasks | 13 files |
 | Phase 3 P02 | 4min | 2 tasks | 5 files |
+| Phase 3 P03 | 5min | 3 tasks | 21 files |
 
 ## Accumulated Context
 
@@ -150,6 +151,13 @@ Recent decisions affecting current work:
 - [Phase 3]: lint 目标不存在或零个 `.gd` 一律 rc=2 + `LINT_INVALID`：路径写错时返回 0 等于自动通过
 - [Phase 3]: lint 反例自测必须先于真扫描：写坏的规则会以「干净通过」保护一切；步骤横幅带脚本名，让「先于 Godot」可被 grep 机械验证
 - [Phase 3]: lint 只扫 `mobile/src/core`；`tests/` 允许 print/printerr，不把测试的日志需求当边界违规
+- [Phase 3]: 词汇表条目数即契约：`CANONICAL` 17 / `BUTTON_ALIASES` 39 / `DIRECTION_ALIASES` 42，`size()` 断言先于行为断言，增删必须同时改 `test_vocabulary.gd`
+- [Phase 3]: 词汇表失败值是空串 / null，不是异常也不是原样返回；错误文本与 `json_path` 一律由校验层拼（core 零异常零日志）
+- [Phase 3]: 字符串 `"-90"` 的负号按分隔符剥掉（与 Python 逐字一致）得 90.0，要 270° 必须写数字 `-90`；该既有语义被显式钉死，改成保留负号会让两端相差 180°
+- [Phase 3]: 六个域对象一个文件一个 `class_name`：塞进一个文件只能退化成内嵌类，`Array[Skill]` / `Array[Pulse]` 直接编译不过
+- [Phase 3]: 域对象零校验零日志（只有字段与 `_init`）；`Skill.pattern` 默认一条 `Pulse`（对应 Python 的 `(Pulse(),)`），不是空数组
+- [Phase 3]: `InputConfig.axis_layout` / `button_names` 用 `Variant = null`：`null`（自动推断）与 `{}`（手动但为空）语义不同，禁止用空字典代替
+- [Phase 3]: `AppConfig` 不移植 `path` 字段：Godot 无 pathlib，来源路径归 `ConfigResult.source_path`，域对象不记录 I/O 痕迹
 
 ### Pending Todos
 
@@ -176,6 +184,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-11-04T19:32:00.000Z
-Stopped at: Phase 3 plan 02 complete (core purity lint + CORE.md), ready for 03-03
+Last session: 2026-11-04T19:40:00.000Z
+Stopped at: Phase 3 plan 03 complete (键/方向词汇表 + 六个域对象), ready for 03-04
 Resume file: None

@@ -108,7 +108,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 
 **Wave 2** *(blocked on Wave 1 completion)*
 - [x] 03-02-PLAN.md — 架构 lint（`Input.` / `Time.` / `Node` / `FileAccess` / `print(`）+ `CORE.md` 边界契约
-- [ ] 03-03-PLAN.md — 按键/方向词汇表 + 六个域对象（一个文件一个 `class_name`）
+- [x] 03-03-PLAN.md — 按键/方向词汇表 + 六个域对象（一个文件一个 `class_name`）
 
 **Wave 3** *(blocked on Wave 2 completion)*
 - [ ] 03-04-PLAN.md — bytes 入口（BOM）+ `ConfigResult` / `Array[ConfigError]` + 全量校验与可见 warning
