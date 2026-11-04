@@ -3,7 +3,7 @@
 连上手柄练花式动作：做对了手柄震一下；没做对也会当场告诉你**是快了、慢了，还是起点 / 终点 / 保持时间不对**。
 
 - **桌面版已可用**：Python + pygame-ce，250Hz 实时识别右摇杆轨迹
-- **移动版建设中**：Godot，安卓优先；Phase 2 才创建 Godot 工程
+- **移动版建设中**：Godot，安卓优先；工具链已锁定并导出了签名 APK，重建步骤见 [`mobile/BUILD.md`](mobile/BUILD.md)
 - **一份配置**：`shared/skills_config.json` 是唯一可手写的真源，其余副本由脚本生成
 
 本文件只是仓库地图。桌面版的安装、操作、打包与排错，请看 [`desktop/README.md`](desktop/README.md)。
@@ -19,9 +19,9 @@
 ## 二、目录地图
 
 - `desktop/` —— 桌面版全部代码、测试、构建脚本与使用手册（Python + pygame-ce）
-- `mobile/` —— 移动版（Godot，安卓优先）；Phase 2 起才创建 Godot 工程，当前只有配置副本与说明
+- `mobile/` —— 移动版（Godot，安卓优先）：Godot 工程 + 工具链闸门 + 构建手册
 - `shared/` —— 唯一手写的动作配置 `skills_config.json` 与 230 项检查基线 `expected_checks.txt`
-- `tools/` —— 仓库级工具：配置同步、桌面回归闸门、检查项采集
+- `tools/` —— 仓库级工具：配置同步、桌面回归闸门、检查项采集、字体子集生成（`make_font_subset.py`）
 
 `.planning/` 放项目规划与代码地图，不参与运行时。
 
@@ -69,5 +69,5 @@ bash tools/check_desktop.sh
 ## 六、进一步阅读
 
 - [`desktop/README.md`](desktop/README.md) —— 桌面版完整手册（安装、操作、打包、排障）。其中「九、项目结构」一节描述的是搬迁前的扁平布局，以本文件的目录地图为准。
-- [`mobile/README.md`](mobile/README.md) —— 移动端目录说明与 Phase 2 的边界。
+- [`mobile/README.md`](mobile/README.md) —— 移动端目录说明与三条入口命令；重建与真机验收另见 [`mobile/BUILD.md`](mobile/BUILD.md) 与 [`mobile/ACCEPTANCE.md`](mobile/ACCEPTANCE.md)。
 - [`.planning/codebase/`](.planning/codebase/) —— 架构、技术栈、测试与代码约定的代码地图。
