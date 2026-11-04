@@ -3,16 +3,16 @@ gsd_state_version: "1.0"
 current_phase: 2
 current_phase_name: 安卓工具链 + 真机冒烟 APK
 status: executing
-stopped_at: Completed 02-02-PLAN.md（最小工程 + PCK 往返 + 闸门 A）
-last_updated: "2026-11-04T10:18:03.000Z"
+stopped_at: Completed 02-03-PLAN.md（字体双链路 + 字形闸门）
+last_updated: "2026-11-04T14:35:58.000Z"
 last_activity: 2026-11-04
-last_activity_desc: 02-02 complete — 最小 Godot 工程 + PCK 往返 + 闸门 A 一条命令
-state_head: 9d5da81dd516d123d71bf73bf5ade205bf497d65
+last_activity_desc: 02-03 complete — 810 字符清单 + 双字体子集 + 关闭系统兜底的字形闸门
+state_head: 51f3859d52f66a6d20c2b5965531818174c98f36
 progress:
   total_phases: 10
   completed_phases: 1
   total_plans: 10
-  completed_plans: 6
+  completed_plans: 8
   percent: 10
 ---
 
@@ -28,16 +28,16 @@ See: .planning/PROJECT.md (updated 2026-11-04)
 ## Current Position
 
 Phase: 2 (安卓工具链 + 真机冒烟 APK) — EXECUTING
-Plan: 2 of 5（已完成 02-01 / 02-02）
+Plan: 3 of 5（已完成 02-01 / 02-02 / 02-03）
 Status: Executing Phase 2
-Last activity: 2026-11-04 — 02-02 完成：`--import → --export-pack → --main-pack` 读回 5 条动作，闸门 A 一条命令
+Last activity: 2026-11-04 — 02-03 完成：810 字符清单 + 两个字体子集 + 关闭系统兜底后 GLYPH_OK chars=810
 
 Progress: [█░░░░░░░░░] 10%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 7
+- Total plans completed: 8
 - Average duration: — min
 - Total execution time: 0.0 hours
 
@@ -46,7 +46,7 @@ Progress: [█░░░░░░░░░] 10%
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
 | 1 | 5 | - | - |
-| 2 | 2 | 12min | 6min |
+| 2 | 3 | 16min | 5min |
 
 **Recent Trend:**
 - Last 5 plans: —
@@ -64,6 +64,7 @@ Progress: [█░░░░░░░░░] 10%
 | Phase 1 P5 | 2min | 2 tasks | 2 files |
 | Phase 2 P01 | 9min | 2 tasks | 1 file |
 | Phase 2 P02 | 3min | 2 tasks | 9 files |
+| Phase 2 P03 | 4min | 3 tasks | 12 files |
 
 ## Accumulated Context
 
@@ -117,6 +118,12 @@ Recent decisions affecting current work:
 - [Phase 2]: `*.gd.uid` 导入边车是提交物，不进 `.gitignore`；只有 `mobile/.godot/` 与 `mobile/build/` 是忽略物
 - [Phase 2]: `project.godot` 的 `[gui] theme/custom_font` 留给 02-03 补：字体资产届时才存在
 - [Phase 2]: 闸门 A 不接 GitHub Actions，CI 打发布包的决策归 Phase 9（本计划 `<objective>` 的范围裁定）
+- [Phase 2]: 字形清单整文件扫描（含注释）→ 810 个字符；代价是子集大几十 KB，换来「往首屏加中文不必记得改常量」，cmap 交叉核对 810/810 有覆盖
+- [Phase 2]: `make_font_subset.py` 纯标准库，`fonttools==4.60.2` 只出现在 `uv run --with` 子进程里；`--check` 只读比对「清单 vs 源文件」
+- [Phase 2]: 闸门分层不可合并：`glyph_coverage.gd` 只看「清单 vs 子集」，源文件新增字符而清单未重生成时只有 `make_font_subset.py --check` 能抓住
+- [Phase 2]: 关闭系统兜底要逐层遍历 FontVariation 的 base_font 与每个 fallbacks 条目；`if font is FontFile` 对顶层资源永远不成立
+- [Phase 2]: 字形闸门额外断言 `ThemeDB.fallback_font.resource_path == AppFont.tres`：只造一个没人引用的 .tres 也能让 has_char 全绿
+- [Phase 2]: `*.ttf.import` 与 `glyph_coverage.gd.uid` 是提交物；`git check-ignore` 对三个路径必须非零
 
 ### Pending Todos
 
@@ -126,7 +133,8 @@ None yet.
 
 - Phase 2 / 4 之前需备齐 **2 台不同 OEM 手机 + Xbox 与 DualSense 手柄**；模拟器不能替代真机验证
 - 60 Hz 抽稀是否保住 `release_hold_ms = 120` 与 `global_cooldown_ms = 60` 尚未实测，由 Phase 5 的抽稀矩阵回答；在此之前不动任何阈值
-- 中文 UI 字体必须在 Phase 2 定案（内嵌 Noto Sans SC 子集，或 SystemFont + 内嵌兜底），否则朋友的非 Pixel 机型是豆腐块
+- 中文 UI 字体已定案（内嵌 Noto Sans SC 子集 + Noto Sans Symbols 2 fallback），无设备机器上的字形闸门已绿；
+  剩余风险是安卓真机是否按 FontVariation 的 fallbacks 渲染，由 02-05 真机验收表收口
 - `set_use_accumulated_input(false)` 在安卓上是否真的产生亚帧时间戳未验证（Phase 4 真机记录 `t_ms` 直方图）
 
 ## Deferred Items
@@ -139,6 +147,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-11-04T10:14:00.000Z
-Stopped at: Completed 02-02-PLAN.md（最小 Godot 工程 + PCK 往返 + 闸门 A）
+Last session: 2026-11-04T14:32:00.000Z
+Stopped at: Completed 02-03-PLAN.md（字体双链路 + 字形闸门）
 Resume file: None

@@ -74,7 +74,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] 02-02-PLAN.md — 最小 Godot 工程 + PCK 往返 + 闸门 A (completed 2026-11-04)
 
 **Wave 3** *(blocked on Wave 2 completion)*
-- [ ] 02-03-PLAN.md — 字体双链路（CJK 子集 + 符号 fallback）+ 字形闸门
+- [x] 02-03-PLAN.md — 字体双链路（CJK 子集 + 符号 fallback）+ 字形闸门 (completed 2026-11-04)
 
 **Wave 4** *(blocked on Wave 3 completion)*
 - [ ] 02-04-PLAN.md — release keystore + 签名 APK + 闸门 B + 假绿反例
