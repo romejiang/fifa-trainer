@@ -50,6 +50,8 @@ func _load_corpus(r) -> Dictionary:
 ## 规模与 id 下限：删空语料、丢掉点名用例、复制 id 都必须变红。
 func _check_scale(r, cases: Array) -> void:
 	r.check(cases.size() >= 4, "语料规模下限：至少 4 条用例（实际 %d）" % cases.size())
+	# 03-05 Task 2 把总规模抬到 16：只留 4 条也能通过前一条，删掉大半语料不会被发现。
+	r.check(cases.size() >= 16, "语料规模下限：至少 16 条用例（实际 %d）" % cases.size())
 	var ids: Dictionary = {}
 	for case in cases:
 		if typeof(case) == TYPE_DICTIONARY:

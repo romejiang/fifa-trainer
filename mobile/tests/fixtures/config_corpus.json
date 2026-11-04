@@ -102,6 +102,609 @@
         "note": "parse_config 接受；ArcDetector.__init__ 的 resolve_direction(list) 才抛 ValueError"
       },
       "divergence": "start_angle_array_late_failure_in_python"
+    },
+    {
+      "id": "valid_arc",
+      "data": {
+        "skills": [
+          {
+            "name": "合法弧线",
+            "type": "arc",
+            "params": {
+              "start_angle": 180,
+              "end_angle": [0, 90],
+              "min_angle": 150,
+              "max_angle": 220,
+              "min_duration_ms": 300,
+              "max_duration_ms": 700
+            }
+          }
+        ]
+      },
+      "godot": {
+        "verdict": "accept",
+        "codes": [],
+        "paths": []
+      },
+      "python": {
+        "verdict": "accept",
+        "note": "parse_config 与 build_detector 全通过"
+      },
+      "divergence": ""
+    },
+    {
+      "id": "valid_sequence",
+      "data": {
+        "skills": [
+          {
+            "name": "合法序列",
+            "type": "sequence",
+            "params": {
+              "steps": [
+                "forward",
+                {
+                  "direction": ["右", "左"],
+                  "hold_ms": 350
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "godot": {
+        "verdict": "accept",
+        "codes": [],
+        "paths": []
+      },
+      "python": {
+        "verdict": "accept",
+        "note": "parse_config 与 build_detector 全通过"
+      },
+      "divergence": ""
+    },
+    {
+      "id": "valid_taps",
+      "data": {
+        "skills": [
+          {
+            "name": "合法点按",
+            "type": "taps",
+            "required_button": "RB",
+            "params": {
+              "button": "X",
+              "modifier_options": ["RB", "RT"],
+              "min_interval_ms": 400,
+              "max_interval_ms": 600
+            }
+          }
+        ]
+      },
+      "godot": {
+        "verdict": "accept",
+        "codes": [],
+        "paths": []
+      },
+      "python": {
+        "verdict": "accept",
+        "note": "parse_config 与 build_detector 全通过"
+      },
+      "divergence": ""
+    },
+    {
+      "id": "root_not_object",
+      "text": "[]",
+      "godot": {
+        "verdict": "reject",
+        "codes": ["root_not_object"],
+        "paths": ["$"]
+      },
+      "python": {
+        "verdict": "reject",
+        "note": "parse_config 对非对象根节点抛 ValueError"
+      },
+      "divergence": ""
+    },
+    {
+      "id": "skills_empty",
+      "data": {
+        "skills": []
+      },
+      "godot": {
+        "verdict": "reject",
+        "codes": ["skills_empty"],
+        "paths": ["$.skills"]
+      },
+      "python": {
+        "verdict": "reject",
+        "note": "parse_config 要求 skills 是非空数组"
+      },
+      "divergence": ""
+    },
+    {
+      "id": "skill_not_object",
+      "data": {
+        "skills": ["x"]
+      },
+      "godot": {
+        "verdict": "reject",
+        "codes": ["skill_not_object"],
+        "paths": ["skills[0]"]
+      },
+      "python": {
+        "verdict": "reject",
+        "note": "_parse_skill 收到非字典时抛 ValueError"
+      },
+      "divergence": ""
+    },
+    {
+      "id": "skill_type_invalid",
+      "data": {
+        "skills": [
+          {
+            "name": "坏类型",
+            "type": "arcs"
+          }
+        ]
+      },
+      "godot": {
+        "verdict": "reject",
+        "codes": ["skill_type_invalid"],
+        "paths": ["skills[0].type"]
+      },
+      "python": {
+        "verdict": "reject",
+        "note": "_parse_skill 的 type 白名单只有 arc / sequence / taps"
+      },
+      "divergence": ""
+    },
+    {
+      "id": "params_not_object",
+      "data": {
+        "skills": [
+          {
+            "name": "坏参数",
+            "type": "taps",
+            "params": []
+          }
+        ]
+      },
+      "godot": {
+        "verdict": "reject",
+        "codes": ["params_not_object"],
+        "paths": ["skills[0].params"]
+      },
+      "python": {
+        "verdict": "accept",
+        "note": "空数组是 falsy，raw.get(\"params\") or {} 静默变成 {}，Python 接受；GDScript 故意拒绝"
+      },
+      "divergence": "params_empty_list_python_coerced_to_default"
+    },
+    {
+      "id": "steps_empty",
+      "data": {
+        "skills": [
+          {
+            "name": "空步骤",
+            "type": "sequence",
+            "params": {
+              "steps": []
+            }
+          }
+        ]
+      },
+      "godot": {
+        "verdict": "reject",
+        "codes": ["steps_empty"],
+        "paths": ["skills[0].params.steps"]
+      },
+      "python": {
+        "verdict": "reject",
+        "note": "sequence 的 steps 必须是非空数组"
+      },
+      "divergence": ""
+    },
+    {
+      "id": "step_direction_missing",
+      "data": {
+        "skills": [
+          {
+            "name": "缺方向",
+            "type": "sequence",
+            "params": {
+              "steps": [
+                {
+                  "hold_ms": 100
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "godot": {
+        "verdict": "reject",
+        "codes": ["step_direction_missing"],
+        "paths": ["skills[0].params.steps[0]"]
+      },
+      "python": {
+        "verdict": "reject",
+        "note": "parse_step 发现 direction 与 dir 都缺失时抛 ValueError"
+      },
+      "divergence": ""
+    },
+    {
+      "id": "direction_unknown",
+      "data": {
+        "skills": [
+          {
+            "name": "未知旋转方向",
+            "type": "arc",
+            "params": {
+              "direction": "clockwisee"
+            }
+          }
+        ]
+      },
+      "godot": {
+        "verdict": "reject",
+        "codes": ["direction_unknown"],
+        "paths": ["skills[0].params.direction"]
+      },
+      "python": {
+        "verdict": "accept",
+        "note": "detectors.py:154-160 的 else 分支把未知 direction 静默当成 any（0）；GDScript 故意严格化"
+      },
+      "divergence": "arc_direction_unknown_python_falls_back_to_any"
+    },
+    {
+      "id": "max_not_greater_than_min",
+      "data": {
+        "skills": [
+          {
+            "name": "时长窗口倒置",
+            "type": "sequence",
+            "params": {
+              "steps": ["forward"],
+              "min_duration_ms": 700,
+              "max_duration_ms": 700
+            }
+          }
+        ]
+      },
+      "godot": {
+        "verdict": "reject",
+        "codes": ["max_not_greater_than_min"],
+        "paths": ["skills[0].params.max_duration_ms"]
+      },
+      "python": {
+        "verdict": "reject",
+        "note": "max_duration_ms 必须严格大于 min_duration_ms"
+      },
+      "divergence": ""
+    },
+    {
+      "id": "hold_sum_exceeds_max",
+      "data": {
+        "skills": [
+          {
+            "name": "保持时间超窗",
+            "type": "sequence",
+            "params": {
+              "steps": [
+                {
+                  "direction": "forward",
+                  "hold_ms": 500
+                }
+              ],
+              "min_duration_ms": 300,
+              "max_duration_ms": 400
+            }
+          }
+        ]
+      },
+      "godot": {
+        "verdict": "reject",
+        "codes": ["hold_sum_exceeds_max"],
+        "paths": ["skills[0].params.max_duration_ms"]
+      },
+      "python": {
+        "verdict": "reject",
+        "note": "各步 hold_ms 之和必须小于 max_duration_ms"
+      },
+      "divergence": ""
+    },
+    {
+      "id": "button_unknown",
+      "data": {
+        "skills": [
+          {
+            "name": "未知按键",
+            "type": "taps",
+            "params": {
+              "button": "ZZ"
+            }
+          }
+        ]
+      },
+      "godot": {
+        "verdict": "reject",
+        "codes": ["button_unknown"],
+        "paths": ["skills[0].params.button"]
+      },
+      "python": {
+        "verdict": "reject",
+        "note": "canonical_button 对未知按键抛 ValueError"
+      },
+      "divergence": ""
+    },
+    {
+      "id": "button_mode_invalid",
+      "data": {
+        "skills": [
+          {
+            "name": "坏按钮模式",
+            "type": "taps",
+            "button_mode": "some"
+          }
+        ]
+      },
+      "godot": {
+        "verdict": "reject",
+        "codes": ["button_mode_invalid"],
+        "paths": ["skills[0].button_mode"]
+      },
+      "python": {
+        "verdict": "reject",
+        "note": "_parse_required_buttons 的 mode 白名单只有 all / any"
+      },
+      "divergence": ""
+    },
+    {
+      "id": "modifier_requires_required_button",
+      "data": {
+        "skills": [
+          {
+            "name": "只配选项不配默认键",
+            "type": "taps",
+            "params": {
+              "button": "X",
+              "modifier_options": ["RB", "RT"]
+            }
+          }
+        ]
+      },
+      "godot": {
+        "verdict": "reject",
+        "codes": ["modifier_requires_required_button"],
+        "paths": ["skills[0].params.modifier_options"]
+      },
+      "python": {
+        "verdict": "reject",
+        "note": "配了 modifier_options 就必须同时写 required_button"
+      },
+      "divergence": ""
+    },
+    {
+      "id": "required_button_not_in_options",
+      "data": {
+        "skills": [
+          {
+            "name": "默认键不在选项里",
+            "type": "taps",
+            "required_button": "LB",
+            "params": {
+              "button": "X",
+              "modifier_options": ["RB", "RT"]
+            }
+          }
+        ]
+      },
+      "godot": {
+        "verdict": "reject",
+        "codes": ["required_button_not_in_options"],
+        "paths": ["skills[0].required_button"]
+      },
+      "python": {
+        "verdict": "reject",
+        "note": "required_button 必须出现在 modifier_options 里"
+      },
+      "divergence": ""
+    },
+    {
+      "id": "modifier_duplicate",
+      "data": {
+        "skills": [
+          {
+            "name": "重复修饰键",
+            "type": "taps",
+            "required_button": "RB",
+            "params": {
+              "button": "X",
+              "modifier_options": ["RB", "RB"]
+            }
+          }
+        ]
+      },
+      "godot": {
+        "verdict": "reject",
+        "codes": ["modifier_duplicate"],
+        "paths": ["skills[0].params.modifier_options"]
+      },
+      "python": {
+        "verdict": "reject",
+        "note": "modifier_options 规范化后必须唯一"
+      },
+      "divergence": ""
+    },
+    {
+      "id": "rumble_backend_invalid",
+      "data": {
+        "skills": [
+          {
+            "name": "基准动作",
+            "type": "taps",
+            "params": {
+              "button": "X"
+            }
+          }
+        ],
+        "rumble": {
+          "backend": "wasm"
+        }
+      },
+      "godot": {
+        "verdict": "reject",
+        "codes": ["rumble_backend_invalid"],
+        "paths": ["$.rumble.backend"]
+      },
+      "python": {
+        "verdict": "reject",
+        "note": "_parse_rumble 的 backend 白名单只有 auto / pygame / sdl2 / xinput / none"
+      },
+      "divergence": ""
+    },
+    {
+      "id": "invert_key_invalid",
+      "data": {
+        "skills": [
+          {
+            "name": "基准动作",
+            "type": "taps",
+            "params": {
+              "button": "X"
+            }
+          }
+        ],
+        "input": {
+          "invert": {
+            "rs_z": true
+          }
+        }
+      },
+      "godot": {
+        "verdict": "reject",
+        "codes": ["invert_key_invalid"],
+        "paths": ["$.input.invert"]
+      },
+      "python": {
+        "verdict": "reject",
+        "note": "input.invert 的键白名单只有 ls_x / ls_y / rs_x / rs_y"
+      },
+      "divergence": ""
+    },
+    {
+      "id": "invert_value_not_bool",
+      "data": {
+        "skills": [
+          {
+            "name": "基准动作",
+            "type": "taps",
+            "params": {
+              "button": "X"
+            }
+          }
+        ],
+        "input": {
+          "invert": {
+            "rs_y": "true"
+          }
+        }
+      },
+      "godot": {
+        "verdict": "reject",
+        "codes": ["invert_value_not_bool"],
+        "paths": ["$.input.invert.rs_y"]
+      },
+      "python": {
+        "verdict": "reject",
+        "note": "_parse_input 要求 invert 的值是真正的 bool"
+      },
+      "divergence": ""
+    },
+    {
+      "id": "duplicate_skill_name",
+      "data": {
+        "skills": [
+          {
+            "name": "同名动作",
+            "type": "taps",
+            "params": {
+              "button": "X"
+            }
+          },
+          {
+            "name": "同名动作",
+            "type": "taps",
+            "params": {
+              "button": "Y"
+            }
+          }
+        ]
+      },
+      "godot": {
+        "verdict": "reject",
+        "codes": ["duplicate_skill_name"],
+        "paths": ["skills[1].name"]
+      },
+      "python": {
+        "verdict": "reject",
+        "note": "parse_config 在所有技能解析完后检查名称重复"
+      },
+      "divergence": ""
+    },
+    {
+      "id": "json_syntax_error",
+      "text": "{\"skills\": [}",
+      "godot": {
+        "verdict": "reject",
+        "codes": ["json_syntax_error"],
+        "paths": ["$"]
+      },
+      "python": {
+        "verdict": "reject",
+        "note": "json.loads 抛 JSONDecodeError"
+      },
+      "divergence": ""
+    },
+    {
+      "id": "multi_error",
+      "data": {
+        "skills": [
+          {
+            "name": "多错甲",
+            "type": "taps",
+            "enabled": "false",
+            "params": {
+              "button": "X"
+            }
+          },
+          {
+            "name": "多错乙",
+            "type": "arcs"
+          },
+          {
+            "name": "多错丙",
+            "type": "taps",
+            "params": {
+              "button": "Y"
+            }
+          }
+        ],
+        "input": {
+          "invert": {
+            "rs_y": "true"
+          }
+        }
+      },
+      "godot": {
+        "verdict": "reject",
+        "codes": ["bool_expected", "skill_type_invalid", "invert_value_not_bool"],
+        "paths": ["skills[0].enabled", "skills[1].type", "$.input.invert.rs_y"]
+      },
+      "python": {
+        "verdict": "reject",
+        "note": "skills[1].type 先抛 ValueError；Python 不在同一份配置里收集多个错误"
+      },
+      "divergence": ""
     }
   ]
 }
