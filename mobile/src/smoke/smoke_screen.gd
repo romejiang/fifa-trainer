@@ -40,6 +40,29 @@ func _load_config() -> void:
 	if parsed is Dictionary:
 		_skill_count = (parsed.get("skills", []) as Array).size()
 	_header.text = "SKILL_COUNT = %d\n%s\n%s" % [_skill_count, LONGEST, SYMBOLS]
+	print("SMOKE READY skills=%d" % _skill_count)
+
+## 输入状态变化写入 Android 日志，供 adb logcat 直接分析。
+## 实测：Godot 4.7.2 安卓上 `_input` 收不到 InputEventJoypadButton（只轮询有效），
+## 所以这里每帧比对上一次的快照，变化才打印。前缀 SMOKE 便于 grep。
+var _prev_btn: Dictionary = {}
+var _prev_axis: Dictionary = {}
+
+func _log_changes(dev: int) -> void:
+	for btn in range(21):
+		var key := "%d:%d" % [dev, btn]
+		var now := Input.is_joy_button_pressed(dev, btn as JoyButton)
+		var prev: bool = _prev_btn.get(key, false)
+		if now != prev:
+			_prev_btn[key] = now
+			print("SMOKE BTN idx=%d down=%s dev=%d" % [btn, str(now), dev])
+	for axis in range(8):
+		var akey := "%d:%d" % [dev, axis]
+		var v := Input.get_joy_axis(dev, axis as JoyAxis)
+		var pv: float = _prev_axis.get(akey, 999.0)
+		if abs(v - pv) >= 0.25:
+			_prev_axis[akey] = v
+			print("SMOKE AXIS idx=%d val=%+.3f dev=%d" % [axis, v, dev])
 
 func _on_joy_changed(_device: int, _connected: bool) -> void:
 	_device_ids = Input.get_connected_joypads()
@@ -58,6 +81,7 @@ func _refresh_axes() -> void:
 		return
 	var out: PackedStringArray = []
 	for d in _device_ids:
+		_log_changes(d)
 		out.append("#%d  %s" % [d, Input.get_joy_name(d)])
 		for axis in range(8):
 			out.append("  axis %d = %+.3f" % [axis, Input.get_joy_axis(d, axis as JoyAxis)])
