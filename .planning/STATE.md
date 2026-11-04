@@ -3,16 +3,16 @@ gsd_state_version: "1.0"
 current_phase: 2
 current_phase_name: 安卓工具链 + 真机冒烟 APK
 status: executing
-stopped_at: Completed 02-04-PLAN.md（release keystore + 签名 APK + 闸门 B）
-last_updated: "2026-11-04T15:07:00.000Z"
+stopped_at: Completed 02-05-PLAN.md（BUILD.md + 干净 clone 重导出 + 真机验收表）；Phase 2 自动化收口，真机验收与密钥库备份留待人工
+last_updated: "2026-11-04T15:15:00.000Z"
 last_activity: 2026-11-04
-last_activity_desc: 02-04 complete — 26.8 MB v2+v3 签名 arm64 APK，闸门 B 与反例自测全绿
-state_head: 8e7c6e65dc59e2d491821dd61d11471f58b098d5
+last_activity_desc: 02-05 complete — 干净 clone 重导出 rc=0，device-smoke 无设备时 DEVICE_SMOKE_FAIL，验收表留白
+state_head: ae1ff50c85bc8b2a68e3d7d29cea7355876883e2
 progress:
   total_phases: 10
   completed_phases: 1
   total_plans: 10
-  completed_plans: 9
+  completed_plans: 10
   percent: 10
 ---
 
@@ -27,26 +27,26 @@ See: .planning/PROJECT.md (updated 2026-11-04)
 
 ## Current Position
 
-Phase: 2 (安卓工具链 + 真机冒烟 APK) — EXECUTING
-Plan: 4 of 5（已完成 02-01 / 02-02 / 02-03 / 02-04）
-Status: Executing Phase 2
-Last activity: 2026-11-04 — 02-04 完成：26,793,210 B 的 v2+v3 签名 arm64 APK，闸门 B 连跑两次全绿，反例自测 SELFTEST_OK
+Phase: 2 (安卓工具链 + 真机冒烟 APK) — AUTOMATION COMPLETE，等待真机人工验收
+Plan: 5 of 5（02-01 / 02-02 / 02-03 / 02-04 / 02-05 全部完成）
+Status: Phase 2 的自动化部分收口；成功标准 1/2/4/5 的人工项全部落在 mobile/ACCEPTANCE.md，留白
+Last activity: 2026-11-04 — 02-05 完成：BUILD.md 328 行八节、干净 clone 重导出 rc=0、device-smoke 无设备时 DEVICE_SMOKE_FAIL（正确行为）
 
 Progress: [█░░░░░░░░░] 10%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 9
+- Total plans completed: 10
 - Average duration: — min
-- Total execution time: 0.0 hours
+- Total execution time: 0.6 hours
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
 | 1 | 5 | - | - |
-| 2 | 4 | 29min | 7min |
+| 2 | 5 | 37min | 7min |
 
 **Recent Trend:**
 - Last 5 plans: —
@@ -66,6 +66,7 @@ Progress: [█░░░░░░░░░] 10%
 | Phase 2 P02 | 3min | 2 tasks | 9 files |
 | Phase 2 P03 | 4min | 3 tasks | 12 files |
 | Phase 2 P04 | 13min | 3 tasks | 4 files |
+| Phase 2 P05 | 8min | 3 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -131,6 +132,12 @@ Recent decisions affecting current work:
 - [Phase 2]: 口令守卫放在 doctor 之前：doctor 的 keystore 断言读同一个变量，放后面会先撞 doctor 的报错，误导成「密钥库坏了」
 - [Phase 2]: 反例的 canary 必须用「上游一次产出固定字节 + 下游读到底」（`od -An -N12`）：无限产出 + 按字节截断的管道在 pipefail 下会 SIGPIPE 让反例脚本自己死掉
 - [Phase 2]: 签名身份定死：包名 `com.fifaskill.trainer`、别名 `fifa-trainer`、`versionCode=1` / `versionName=0.1.0`；证书 SHA-256 `E1:84:1A:17:…:E0:46` 是 Phase 9 覆盖安装的可核对指纹
+- [Phase 2]: `BUILD.md` 只给入口不给断言：版本前缀 / SHA-512 / 密钥库默认值全在 `doctor.sh`，导出与四段校验全在 `gate-b.sh`，文档里再抄一份就是第二份会漂移的规范
+- [Phase 2]: `verify_clean_export.sh` 的入口守卫只判 `--untracked-files=no`（clone 只复制提交，未跟踪文件只能让 clone 失败，不可能让它假绿），clone 内的零漂移断言仍判全量 —— 两个范围不同是刻意的，注释里写明理由
+- [Phase 2]: 五个 Godot 边车在跑闸门**之前**逐个 `ls-files --error-unmatch` 点名：跑完再发现只会得到一条 `??`，读者的第一反应会去改 `.gitignore` 而不是补提交
+- [Phase 2]: `device-smoke.sh` 的工具缺失 / 无设备 / 装不上 / 起不来 / 5 秒内退出 / 空截图全部走同一条 `DEVICE_SMOKE_FAIL` 出口；`if ! pid=` 只出现一处，其余可能失败的赋值同样落在 `if` 里
+- [Phase 2]: `ACCEPTANCE.md` 明写动作名是**机械覆盖**（`make_font_subset.py` → `required_glyphs.txt` → `glyph_coverage.gd`）：首屏只显示 `SKILL_COUNT = 5`，不逐条列五个动作名，不写清会被当成成功标准 2 少测一半
+- [Phase 2]: Phase 2 的自动化部分收口，但 ROADMAP 的 Phase 2 复选框与 `INFRA-04` 都**不勾**：成功标准 1/2/4 需要两台不同 OEM + 真手柄，5 的两半需要人工备份与第二台机器；无设备时声称通过就是伪造信任点
 
 ### Pending Todos
 
@@ -139,9 +146,12 @@ None yet.
 ### Blockers/Concerns
 
 - Phase 2 / 4 之前需备齐 **2 台不同 OEM 手机 + Xbox 与 DualSense 手柄**；模拟器不能替代真机验证
+- **Phase 2 的人工验收全部未闭合，落点都在 `mobile/ACCEPTANCE.md`**：第 0 节四项前置条件、第 1 节两台 × 四项观察、第 4 节密钥库离线备份、第 5 节第二台干净机器重导出。`adb devices` 当前为空，`device-smoke.sh` 以 `DEVICE_SMOKE_FAIL` 退出（正确行为，不是缺陷）
 - 60 Hz 抽稀是否保住 `release_hold_ms = 120` 与 `global_cooldown_ms = 60` 尚未实测，由 Phase 5 的抽稀矩阵回答；在此之前不动任何阈值
 - 中文 UI 字体已定案（内嵌 Noto Sans SC 子集 + Noto Sans Symbols 2 fallback），无设备机器上的字形闸门已绿；
-  剩余风险是安卓真机是否按 FontVariation 的 fallbacks 渲染，由 02-05 真机验收表收口
+  剩余风险是安卓真机是否按 FontVariation 的 fallbacks 渲染 —— 判据已写进 `ACCEPTANCE.md` 第 1 节，等真机
+- 干净 clone 的首次 `--import` 观察到 1/5 的段错误（`reimport | NotoSansSC-Subset.ttf`），4 次复跑全绿；**不加重试**，
+  若在别的机器上高频率复现，先查 Godot 4.7.2 的字体导入线程崩溃，不要改闸门
 - `set_use_accumulated_input(false)` 在安卓上是否真的产生亚帧时间戳未验证（Phase 4 真机记录 `t_ms` 直方图）
 
 ## Deferred Items
@@ -154,6 +164,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-11-04T15:07:00.000Z
-Stopped at: Completed 02-04-PLAN.md（release keystore + 签名 APK + 闸门 B）
+Last session: 2026-11-04T15:15:00.000Z
+Stopped at: Completed 02-05-PLAN.md（BUILD.md + 干净 clone 重导出 + 真机验收表）；Phase 2 自动化收口，真机验收与密钥库备份留待人工
 Resume file: None

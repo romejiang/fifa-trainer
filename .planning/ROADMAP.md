@@ -80,7 +80,12 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] 02-04-PLAN.md — release keystore + 签名 APK + 闸门 B + 假绿反例 (completed 2026-11-04)
 
 **Wave 5** *(blocked on Wave 4 completion)*
-- [ ] 02-05-PLAN.md — BUILD.md + 干净 clone 重导出 + 真机验收表
+- [x] 02-05-PLAN.md — BUILD.md + 干净 clone 重导出 + 真机验收表 (completed 2026-11-04)
+
+> **状态：自动化部分已收口，Phase 2 仍未完成。** 闸门 A / B、反例自测、干净 clone 重导出全绿；
+> 成功标准 1/2/4（真机安装启动、两台不同 OEM 无豆腐、真机手柄轴）与 5 的人工两半
+> （密钥库离线备份、第二台机器重导出）全部落在 `mobile/ACCEPTANCE.md`，留白待填。
+> 无设备时不得勾选。
 
 **UI hint**: yes
 
