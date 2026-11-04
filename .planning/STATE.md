@@ -3,16 +3,16 @@ gsd_state_version: "1.0"
 current_phase: 3
 current_phase_name: 纯核心地基 — 几何 / 配置校验 / 无头运行 / 架构 lint
 status: executing
-stopped_at: Phase 3 plan 05 complete (坏配置语料 + 跨语言判定对等), ready for 03-06
-last_updated: "2026-11-04T19:56:30.000Z"
+stopped_at: Phase 3 plan 06 complete (user:// 稀疏覆盖层 + ConfigStore), 6/6 plans done, ready for verification
+last_updated: "2026-11-04T20:03:20.000Z"
 last_activity: 2026-11-05
-last_activity_desc: Phase 3 plan 05 complete
-state_head: 3302abf276fea674a10d282c0c6d14b1f6e0ff1b
+last_activity_desc: Phase 3 plan 06 complete
+state_head: 45a164685c173a78808fd7f4329e234a93712f17
 progress:
   total_phases: 10
   completed_phases: 2
   total_plans: 16
-  completed_plans: 15
+  completed_plans: 16
   percent: 20
 ---
 
@@ -29,17 +29,17 @@ See: .planning/PROJECT.md (updated 2026-11-04)
 
 Phase: 3 (纯核心地基 — 几何 / 配置校验 / 无头运行 / 架构 lint) — EXECUTING
 Plan: 6 of 6
-Status: Executing Phase 3
-Last activity: 2026-11-05 — 03-05 完成：坏配置语料 + 跨语言判定对等
+Status: Executing Phase 3 — all plans complete, awaiting verification
+Last activity: 2026-11-05 — 03-06 完成：`user://` 稀疏覆盖层 + ConfigStore
 
 Progress: [██░░░░░░░░] 20%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 15
+- Total plans completed: 16
 - Average duration: — min
-- Total execution time: 0.8 hours
+- Total execution time: 0.9 hours
 
 **By Phase:**
 
@@ -72,6 +72,7 @@ Progress: [██░░░░░░░░] 20%
 | Phase 3 P03 | 5min | 3 tasks | 21 files |
 | Phase 3 P04 | 7min | 3 tasks | 13 files |
 | Phase 3 P05 | 4min | 3 tasks | 6 files |
+| Phase 3 P06 | 3min | 3 tasks | 12 files |
 
 ## Accumulated Context
 
@@ -174,6 +175,14 @@ Recent decisions affecting current work:
 - [Phase 3]: 对 `python: accept` 的用例再跑 `build_detector()`：`start_angle` 数组这类「parse 通过、构造检测器才崩」的晚失败只有这里抓得到
 - [Phase 3]: 语料下限双层：`>= 4` 钉四个点名用例，`>= 16` 防「删掉大半语料仍通过」；唯一 id 断言让失败定位不失效
 - [Phase 3]: `button_mode_invalid` 必须带 `required_button`：Python 在 required_button 为 None 时提前返回，根本不看 button_mode
+- [Phase 3]: `user://` 目录名在任何用户数据产生之前定死为 `FifaSkillTrainer`（`use_custom_user_dir` + `custom_user_dir_name`）；发布后再改等于丢数据，Phase 9 覆盖安装依赖它不变
+- [Phase 3]: 覆盖层以 skill name 为键，只允许 `enabled` / `required_button` / `button_mode`；`params` 阈值永不覆盖，改了历史统计就不可比
+- [Phase 3]: 覆盖层的 schema / base 摘要 / 结构问题一律整体丢弃，不部分保留；丢弃后立刻删除 `overrides.json`，同一条提示最多打扰一次
+- [Phase 3]: base 摘要取当前 base 文件字节的 `FileAccess.get_sha256`，不读可能过期或被手改的 `.sha256` 边车；比较忽略大小写
+- [Phase 3]: 覆盖层写入必须 temp → flush → close → rename；rename 失败清理临时文件，成功后 `.tmp` 必须不存在
+- [Phase 3]: `load_config` 必须把 `merged.warnings` 追加进 `ConfigResult`：纯合并测试全绿而生产路径丢 warning 是本次明确防的假绿
+- [Phase 3]: 配置读盘先取长度再分配缓冲：超过 1 MiB 在内存分配之前拒绝；仍然按字节读，BOM 不会被 `get_file_as_string()` 静默剥掉
+- [Phase 3]: `save_overrides` 只接受 `user://` 目标与临时路径；`res://` 与绝对路径一律 `ERR_UNAUTHORIZED`，且不创建目录或文件
 
 ### Pending Todos
 

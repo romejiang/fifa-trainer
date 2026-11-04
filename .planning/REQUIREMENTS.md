@@ -47,7 +47,7 @@
 
 - [ ] **DATA-01**: 每动作累计尝试数与成功数
 - [ ] **DATA-02**: 每动作最近 N 次结果记录
-- [ ] **DATA-03**: 用户数据写入 `user://` 的稀疏覆盖层，绝不尝试修改 `res://` 内配置
+- [x] **DATA-03**: 用户数据写入 `user://` 的稀疏覆盖层，绝不尝试修改 `res://` 内配置
 
 ### 上手引导
 
@@ -152,7 +152,7 @@
 | FEEDBACK-06 | Phase 7 | Pending |
 | DATA-01 | Phase 8 | Pending |
 | DATA-02 | Phase 8 | Pending |
-| DATA-03 | Phase 3 | Pending |
+| DATA-03 | Phase 3 | Complete |
 | ONBOARD-01 | Phase 4 | Pending |
 | ONBOARD-02 | Phase 4 | Pending |
 | RESIL-01 | Phase 8 | Pending |
