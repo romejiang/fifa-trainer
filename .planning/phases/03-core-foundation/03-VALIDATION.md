@@ -45,14 +45,22 @@ created: "2026-11-05"
 
 | Task ID | Plan | Wave | Requirement | Threat Ref | Secure Behavior | Test Type | Automated Command | File Exists | Status |
 |---------|------|------|-------------|------------|-----------------|-----------|-------------------|-------------|--------|
-| 3-01-01 | 01 | 1 | RESIL-03 | T-03-01 | runner 失败时非零退出，不产生假绿 | script | `bash mobile/tools/test-core.sh`（含故意失败的自检） | ❌ W0 | ⬜ pending |
-| 3-01-02 | 01 | 1 | RESIL-03 | T-03-01 | 几何与 Python 参考逐向量一致 | unit | `bash mobile/tools/test-core.sh`（golden vectors） | ❌ W0 | ⬜ pending |
-| 3-02-01 | 02 | 2 | RESIL-02 | T-03-02 | 坏配置返回结构化错误而非崩溃 | unit | `bash mobile/tools/test-core.sh`（坏配置语料） | ❌ W0 | ⬜ pending |
-| 3-02-02 | 02 | 2 | RESIL-02 | T-03-02 | BOM 输入被识别（不经会剥 BOM 的字符串 API） | unit | `bash mobile/tools/test-core.sh` | ❌ W0 | ⬜ pending |
-| 3-03-01 | 03 | 3 | DATA-03 | T-03-03 | 覆盖层写入 `user://`，绝不改 `res://` | unit | `bash mobile/tools/test-core.sh` | ❌ W0 | ⬜ pending |
-| 3-03-02 | 03 | 3 | DATA-03 | T-03-03 | 原子写：临时文件 + rename，不产生半写文件 | unit | `bash mobile/tools/test-core.sh` | ❌ W0 | ⬜ pending |
-| 3-04-01 | 04 | 1 | INFRA-03 | T-03-04 | core 内禁用 token 机械禁绝，且不误报注释/字符串 | script | `python3 tools/lint_core_purity.py` | ❌ W0 | ⬜ pending |
-| 3-04-02 | 04 | 1 | INFRA-03 | T-03-04 | lint 有脏样例反例（必须变红） | script | `python3 tools/test_lint_core_purity.py` | ❌ W0 | ⬜ pending |
+| 3-01-01 | 01 | 1 | RESIL-03 | T-03-01 | 只在看到 `TESTS_DONE failures=0` 时判过，退出码不作判据 | script | `bash mobile/tools/test-core.sh`（含故意失败的自检） | ❌ W0 | ⬜ pending |
+| 3-01-02 | 01 | 1 | RESIL-03 | T-03-03 | 几何与 Python 参考逐向量一致，夹具可被 `--check` 抓手改 | unit | `bash mobile/tools/test-core.sh`（golden vectors） | ❌ W0 | ⬜ pending |
+| 3-02-01 | 02 | 2 | INFRA-03 | T-03-06 | core 内禁用 token 机械禁绝，且不误报注释/字符串 | script | `python3 tools/lint_core_purity.py mobile/src/core` | ❌ W0 | ⬜ pending |
+| 3-02-02 | 02 | 2 | INFRA-03 | T-03-08 | lint 有脏 canary 反例；扫不到文件退出 2 | script | `python3 tools/test_lint_core_purity.py` | ❌ W0 | ⬜ pending |
+| 3-03-01 | 03 | 2 | RESIL-02 | T-03-11 | 三张词汇表条目数与 Python 一致，布尔不当方向 | unit | `bash mobile/tools/test-core.sh`（vocabulary） | ❌ W0 | ⬜ pending |
+| 3-03-02 | 03 | 2 | RESIL-02 | T-03-12 | Pulse / Step / Skill 默认值与 Python 逐字段一致（含 `pattern` 一条 Pulse） | unit | `bash mobile/tools/test-core.sh`（models） | ❌ W0 | ⬜ pending |
+| 3-03-03 | 03 | 2 | RESIL-02 | T-03-12 | Input / Rumble / AppConfig 缺省对等，`enabled_skills()` 不泄漏 | unit | `bash mobile/tools/test-core.sh`（models） | ❌ W0 | ⬜ pending |
+| 3-04-01 | 04 | 3 | RESIL-02 | T-03-14 | BOM 在字节层被发现，坏字节给结构化错误 + 非空 fix_hint | unit | `bash mobile/tools/test-core.sh`（config_loader） | ❌ W0 | ⬜ pending |
+| 3-04-02 | 04 | 3 | RESIL-02 | T-03-15 | 类型严格化：字符串布尔 / null 数值 / 数组冒充标量 / 未知旋转方向早失败 | unit | `bash mobile/tools/test-core.sh`（config_validator） | ❌ W0 | ⬜ pending |
+| 3-04-03 | 04 | 3 | RESIL-02 | T-03-17 | 一次给全部独立错误；静默 clamp 变可见 warning 且上界照抄 Python | unit | `bash mobile/tools/test-core.sh`（config_validator） | ❌ W0 | ⬜ pending |
+| 3-05-01 | 05 | 4 | RESIL-02 | T-03-19 | 四个点名坏输入成为两端口径一致的契约 | unit | `bash mobile/tools/test-core.sh`（config_corpus） | ❌ W0 | ⬜ pending |
+| 3-05-02 | 05 | 4 | RESIL-02 | T-03-21 | 语料覆盖全规则族，且有规模下限防真空绿 | unit | `bash mobile/tools/test-core.sh`（config_corpus） | ❌ W0 | ⬜ pending |
+| 3-05-03 | 05 | 4 | RESIL-02 | T-03-20 | Python 侧走 `json.loads(str)`，分歧必须记录否则判红 | script | `python3 tools/check_config_parity.py` | ❌ W0 | ⬜ pending |
+| 3-06-01 | 06 | 5 | DATA-03 | T-03-23 | 覆盖层写入 `user://` 并合并生效，绝不写 `res://` | unit | `bash mobile/tools/test-core.sh`（config_store） | ❌ W0 | ⬜ pending |
+| 3-06-02 | 06 | 5 | DATA-03 | T-03-24 | 稀疏合并白名单与整体丢弃语义逐条钉死 | unit | `bash mobile/tools/test-core.sh`（overlay_merge） | ❌ W0 | ⬜ pending |
+| 3-06-03 | 06 | 5 | DATA-03 | T-03-25 | 原子写无残留；坏/过期覆盖层可恢复；warning 经 `load_config()` 抵达调用方 | unit | `bash mobile/tools/test-core.sh`（config_store） | ❌ W0 | ⬜ pending |
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
 
@@ -63,7 +71,7 @@ created: "2026-11-05"
 - [ ] `mobile/tools/test-core.sh` —— 带超时、完成哨兵、失败传播的 runner 驱动
 - [ ] `mobile/tests/core_runner.gd` —— `extends SceneTree` 的断言收集器（不 fail-fast）
 - [ ] `tools/lint_core_purity.py` —— `mobile/src/core/` 禁用 token 扫描器
-- [ ] `shared/golden/geometry_vectors.json` —— Python 侧生成的几何黄金向量
+- [ ] `mobile/tests/fixtures/geometry_golden.json` —— Python 侧生成的几何黄金向量（由 `tools/gen_geometry_golden.py` 产出）
 
 ---
 

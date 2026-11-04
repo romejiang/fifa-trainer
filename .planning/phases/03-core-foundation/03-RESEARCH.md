@@ -1725,32 +1725,40 @@ exclude_filter="build/*,tools/*.png,tests/*"
 
 ---
 
-## Open Questions
+## Open Questions (RESOLVED)
+
+> 每一条都已在计划阶段裁定，`RESOLVED` 行写明落地计划；不要再把它们当未决问题重开。
 
 1. **CI 策略：Godot-on-Linux 全量，还是 Python-only？**
    - What we know: Phase 1 D-09 把 CI 定为"唯一不可绕过的闸门"；Phase 1 deferred 明确说"移动端 GDScript 测试的 CI 归 Phase 2 之后"。
    - What's unclear: Linux 版 Godot 4.7.2 的 SHA-512 尚未记录（Phase 2 只记了 macOS 的）；CI 首次 `--import` 可能撞上字体导入的偶发 SIGSEGV（有界重试已能覆盖）。
    - Recommendation: **做全量**：新增 `.github/workflows/mobile-core.yml`，下载 Linux 版 Godot 4.7.2（SHA-512 从官方 `SHA512-SUMS.txt` 取并钉死），只调用 `bash mobile/tools/test-core.sh`（不在 CI 里重复任何检查逻辑）。若计划阶段要压缩范围，退而求其次：CI 只跑 `lint_core.py` + `gen_geometry_golden.py --check` + `check_config_parity.py`（纯 Python、零下载），GDScript 套件本地跑，并在 `mobile/README.md` 写明这个缺口。
+   - **RESOLVED — landing: 03-02（scope note）+ Phase 9。** Phase 3 不接 CI：`test-core.sh` 的前两步（sync + lint）以及 `gen_geometry_golden.py --check` / `check_config_parity.py` 都是纯 Python、零下载，将来任何 CI 直接调用即可；`.github/workflows/mobile-core.yml` 归 Phase 9（Phase 2 决策「CI 打发布包归 Phase 9」）。
 
 2. **严格性策略（A2/A3）是否要用户确认？**
    - What we know: 成功标准只点名 BOM / 字符串布尔 / null 数值 / `start_angle` 数组。
    - What's unclear: 数值字符串、未知 `direction`、静默 clamp 字段是否一并严格化。
    - Recommendation: 严格化 + `.expect.json` 显式记录 divergence；如果用户更想"与 Python 完全一致的接受面"，则撤回 A2/A3，只保留四条点名修复。
+   - **RESOLVED — landing: 03-04（严格化）+ 03-05（divergence 记录）。** 取严格化：字符串布尔、null 数值、`start_angle` 数组、字符串数值、未知 `params.direction` 在 GDScript 侧全部早失败；每一处与 Python 的差异写进 `config_corpus.json` 的 `divergence`，由 `check_config_parity.py` 强制。静默 clamp 改成可见 warning，且上界逐字照抄 Python（`calibration_ms` 0~3000，另两个 0~5000）。
 
 3. **错误屏是否进 Phase 3？**
    - What we know: RESIL-02 映射到 Phase 3；成功标准 3 只要求"结构化错误列表，可原样渲染成错误屏"。
    - Recommendation: 交付 `ConfigResult.to_text()` + headless 测试（必须）；再加一个最小 `error_screen.gd/.tscn` + 场景实例化测试（建议）。完整视觉留 Phase 7。
+   - **RESOLVED — landing: 03-04。** 取较小方案：交付 `ConfigResult.to_text()` + 无头断言（含 `fix_hint` 非空）；`src/ui/error_screen.gd` 的视觉与交互归 Phase 7。
 
 4. **`user://` 定名（A1）现在改还是等 Phase 4？**
    - Recommendation: 现在改。Phase 3 还没有任何用户数据，改动零成本；发布后再改会丢数据。
+   - **RESOLVED — landing: 03-06 Task 1。** 现在就写死 `config/use_custom_user_dir=true` 与 `config/custom_user_dir_name="FifaSkillTrainer"`，并在 `project.godot` 注释里说明不可再改。
 
 5. **`direction_name()` 是否移植？**
    - What we know: Python 用它做调试/UI 的"前/前右/右…"标签；Phase 3 的校验错误只需要 `direction_unknown`，不需要反向名。
    - Recommendation: 不移植。等 Phase 5/7 真正需要时再加，附黄金用例。
+   - **RESOLVED — landing: 03-03（scope note）。** 不移植；`direction_name()` 等 Phase 5/7 真正需要时再加，并附黄金用例。
 
 6. **`params` 里的未知键是否警告？**
    - What we know: Python 把未知 params 留在 `Skill.params`（开放 schema）；架构研究建议保持开放。
    - Recommendation: 不警告（保持开放 schema，未来检测器参数不需要改加载器）；只对**已知键的类型**严格校验。
+   - **RESOLVED — landing: 03-03 / 03-04。** 不警告，保持开放 schema；只对已知键做类型与范围校验，未知键原样留在 `Skill.params` 里。
 
 ---
 
