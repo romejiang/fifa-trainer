@@ -111,7 +111,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] 03-03-PLAN.md — 按键/方向词汇表 + 六个域对象（一个文件一个 `class_name`）
 
 **Wave 3** *(blocked on Wave 2 completion)*
-- [ ] 03-04-PLAN.md — bytes 入口（BOM）+ `ConfigResult` / `Array[ConfigError]` + 全量校验与可见 warning
+- [x] 03-04-PLAN.md — bytes 入口（BOM）+ `ConfigResult` / `Array[ConfigError]` + 全量校验与可见 warning
 
 **Wave 4** *(blocked on Wave 3 completion)*
 - [ ] 03-05-PLAN.md — 坏配置语料 + Python/GDScript 判定对等（分歧必须记录）

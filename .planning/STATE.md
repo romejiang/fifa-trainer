@@ -3,16 +3,16 @@ gsd_state_version: "1.0"
 current_phase: 3
 current_phase_name: 纯核心地基 — 几何 / 配置校验 / 无头运行 / 架构 lint
 status: executing
-stopped_at: Phase 3 plan 03 complete (键/方向词汇表 + 六个域对象), ready for 03-04
-last_updated: "2026-11-04T19:40:00.000Z"
+stopped_at: Phase 3 plan 04 complete (字节入口 + 结构化错误 + 全量校验), ready for 03-05
+last_updated: "2026-11-04T19:48:53.000Z"
 last_activity: 2026-11-05
-last_activity_desc: Phase 3 plan 03 complete
-state_head: be18bef92779618407d30515fea433761981a6d3
+last_activity_desc: Phase 3 plan 04 complete
+state_head: 17fc357e2932ddfc7d708c9b629c08ca821b4477
 progress:
   total_phases: 10
   completed_phases: 2
   total_plans: 16
-  completed_plans: 13
+  completed_plans: 14
   percent: 20
 ---
 
@@ -28,9 +28,9 @@ See: .planning/PROJECT.md (updated 2026-11-04)
 ## Current Position
 
 Phase: 3 (纯核心地基 — 几何 / 配置校验 / 无头运行 / 架构 lint) — EXECUTING
-Plan: 4 of 6
+Plan: 5 of 6
 Status: Executing Phase 3
-Last activity: 2026-11-05 — 03-03 完成：按键 / 方向词汇表 + 六个域对象
+Last activity: 2026-11-05 — 03-04 完成：字节入口 + 结构化错误 + 全量校验
 
 Progress: [██░░░░░░░░] 20%
 
@@ -70,6 +70,7 @@ Progress: [██░░░░░░░░] 20%
 | Phase 3 P01 | 13min | 2 tasks | 13 files |
 | Phase 3 P02 | 4min | 2 tasks | 5 files |
 | Phase 3 P03 | 5min | 3 tasks | 21 files |
+| Phase 3 P04 | 7min | 3 tasks | 13 files |
 
 ## Accumulated Context
 
@@ -158,6 +159,14 @@ Recent decisions affecting current work:
 - [Phase 3]: 域对象零校验零日志（只有字段与 `_init`）；`Skill.pattern` 默认一条 `Pulse`（对应 Python 的 `(Pulse(),)`），不是空数组
 - [Phase 3]: `InputConfig.axis_layout` / `button_names` 用 `Variant = null`：`null`（自动推断）与 `{}`（手动但为空）语义不同，禁止用空字典代替
 - [Phase 3]: `AppConfig` 不移植 `path` 字段：Godot 无 pathlib，来源路径归 `ConfigResult.source_path`，域对象不记录 I/O 痕迹
+- [Phase 3]: 配置入口只收 `PackedByteArray`，BOM 必须在解码前按 `bytes[0] == 0xEF` 判定；`get_file_as_string` 会剥 BOM，`JSON.parse_string` 会向 stderr 打 ERROR 且不给行号
+- [Phase 3]: 每条 `ConfigError` 自带 `json_path` + `code` + 中文 `message` + 中文 `fix_hint`；`fix_hint` 为空视为缺陷，两套套件各有一条遍历断言
+- [Phase 3]: `required_button: null` 是合法的「不需要修饰键」（真实配置 3/5 条这样写），绝不能被当成 `button_unknown`
+- [Phase 3]: `params.direction` 在移动端严格化到七种写法；Python 的静默落 `any` 不再保留，未知值启动前报 `direction_unknown`，分歧由 03-05 语料记录
+- [Phase 3]: `start_angle` 数组在校验期就报 `start_angle_not_scalar`，不留到 `ArcDetector` 构造才崩
+- [Phase 3]: clamp 上界逐字照 Python 且不统一：`calibration_ms` 0~3000、`idle_reset_ms` / `gesture_release_ms` 0~5000；统一会让 4000 在两端表现不同且语料永远发现不了
+- [Phase 3]: 静默 clamp 一律降级为 `SEVERITY_WARNING` 并带实际值与截断值；`deadzone` 这类不可截断的越界仍是 error
+- [Phase 3]: `type` 非法只跳过专项子树，技能级字段继续查；收集式校验保证一个坏字段不会让其余错误消失
 
 ### Pending Todos
 
@@ -184,6 +193,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-11-04T19:40:00.000Z
-Stopped at: Phase 3 plan 03 complete (键/方向词汇表 + 六个域对象), ready for 03-04
+Last session: 2026-11-04T19:48:53.000Z
+Stopped at: Phase 3 plan 04 complete (字节入口 + 结构化错误 + 全量校验), ready for 03-05
 Resume file: None
