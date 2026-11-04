@@ -41,8 +41,29 @@ if ! bash "$repo_root/mobile/tools/doctor.sh" godot; then
 fi
 
 echo "▸ 导入工程（生成 .godot/ 缓存，干净 clone 的第一次必须跑）…"
-if ! "$godot" --headless --path "$repo_root/mobile" --import >"$tmp/import.log" 2>&1; then
-    echo "✗ 工程导入失败（Godot --import），日志尾部：" >&2
+# Godot 4.7.2 在 macOS arm64 上导入 NotoSansSC 子集时会偶发 SIGSEGV（约 1/5，
+# 与字体内容无关，同一份文件重跑即可）。这里**只对导入这一步**做有界重试，
+# 且**只在信号终止时重试**（退出码 >= 128）；导入成功但内容不对、或任何断言失败，
+# 都不会被重试吞掉。重试次数会打印出来，不静默。
+import_rc=1
+for attempt in 1 2 3; do
+    set +e
+    "$godot" --headless --path "$repo_root/mobile" --import >"$tmp/import.log" 2>&1
+    import_rc=$?
+    set -e
+    if [ "$import_rc" -eq 0 ]; then
+        [ "$attempt" -gt 1 ] && echo "  · 导入第 ${attempt} 次成功（前一次被信号终止，Godot 已知偶发）"
+        break
+    fi
+    if [ "$import_rc" -lt 128 ]; then
+        echo "✗ 工程导入失败（Godot --import 退出码 ${import_rc}，不是信号终止，不重试），日志尾部：" >&2
+        tail -n 20 "$tmp/import.log" >&2
+        exit 1
+    fi
+    echo "  · 导入被信号终止（退出码 ${import_rc}），第 ${attempt}/3 次，重试…" >&2
+done
+if [ "$import_rc" -ne 0 ]; then
+    echo "✗ 工程导入连续 3 次被信号终止（Godot 已知偶发，但三次都撞上说明不是偶发），日志尾部：" >&2
     tail -n 20 "$tmp/import.log" >&2
     exit 1
 fi
