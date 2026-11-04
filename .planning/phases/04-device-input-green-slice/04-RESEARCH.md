@@ -636,7 +636,9 @@ python3 tools/gen_tap_golden.py --check    # 只比对，不写盘；不一致�
   "source": {
     "detectors": "desktop/padskills/detectors.py",
     "engine": "desktop/padskills/engine.py",
-    "sha256": { "detectors": "…", "engine": "…", "config": "…" }
+    "config": "desktop/padskills/config.py",
+    "skills_config": "shared/skills_config.json",
+    "sha256": { "detectors": "…", "engine": "…", "config": "…", "skills_config": "…" }
   },
   "meta": { "hz": 250, "step_ms": 4, "skill": "绿色搓射 Green Finesse" },
   "cases": [
@@ -668,7 +670,7 @@ python3 tools/gen_tap_golden.py --check    # 只比对，不写盘；不一致�
 }
 ```
 
-### 7. 用例清单（下限 14 条，覆盖 orchestrator 点名的全部场景）
+### 7. 用例清单（18 条 = 12 detector + 6 runtime，覆盖 orchestrator 点名的全部场景）
 
 | id | kind | 时间轴要点 | 期望 |
 |---|---|---|---|
@@ -685,10 +687,14 @@ python3 tools/gen_tap_golden.py --check    # 只比对，不写盘；不一致�
 | `det_first_frame_held_x` | detector | X 先按着，再按 RB | **不产**任何判定（`observe` 守卫） |
 | `det_release_hold_gate` | detector | 命中后 40 ms 再按；再松开 120 ms 后重新起手 | 第一段只 1 Hit，第二段正常起手 |
 | `rt_two_shots_500` | runtime | 两发间隔 500，两发之间留 700 ms 空档 | 2 Outcome（都 `ok`），`hits=2, attempts=2, group_hits=2` |
+| `rt_two_shots_1000` | runtime | 两发之间留 1000 ms 空档 | 同样 2 条 `ok`（成功标准 5 的上界） |
+| `rt_release_hold_rearm` | runtime | 锁满前与锁满后未武装各做一次 rising 按压；之后做一发合法 400–600 | 只有 2 条 Outcome、`hits=2`；无效按压不产判定 |
+| `rt_one_verdict_per_attempt` | runtime | 第一下之后松开 RB | 恰好 1 条 `hold_short`，后续 20 帧无第二条 |
+| `rt_layout_gate_blocks` | runtime | `layout_confirmed: false` + 完美的 450 ms 两下 | `outcomes: []`，五项 counters 全 0（移动端独有结构） |
 | `rt_gesture_lock` | runtime | 命中后 150 ms 锁定期内做一段「本来会报 too_fast」的按压；锁满后再做一发 | **只有 2 条 `ok`**（锁定期内检测器不被调用、失败不被 drain）—— 这条防止手势锁被写漏 |
-| （不占夹具）逐动作冷却 | unit | `cooldown_ms = 900` 的合成运行时，第二发命中落在第一发后约 520–600 ms | **只有 1 条 Outcome**、`suppressed == 0`——真实配置 450 ms 下该分支不可达（重新武装 120 + 最短间隔 400 = 520），不能拿真实时序冒充 |
+| （不占夹具）逐动作冷却 | unit | `cooldown_ms = 900` 的合成运行时，第二发命中落在第一发后约 670–870 ms | **只有 1 条 Outcome**、`suppressed == 0`——真实配置 450 ms 下该分支不可达（手势锁 150 + 重新武装 120 + 最短间隔 400 = 670），不能拿真实时序冒充 |
 
-补充断言（每条用例都查）：`cases.size() >= 14`、id 唯一、每个 `kind` 至少 5 条。规模下限的意义与 `test_config_corpus.gd:52-62` 相同：删掉大半语料不能让闸门变绿。
+补充断言（每条用例都查）：`kind == "detector"` 正好 12、`kind == "runtime"` 至少 6（合计 18）、id 唯一。规模下限的意义与 `test_config_corpus.gd:52-62` 相同：删掉大半语料不能让闸门变绿。
 
 ### 8. GDScript 无头回放
 

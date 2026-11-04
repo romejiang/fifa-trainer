@@ -1207,7 +1207,7 @@ func _check_scale(r, cases: Array) -> void:
 		r.check(ids.has(id), "语料必须包含点名用例 %s" % id)
 ```
 
-本套件的下限按 `04-RESEARCH.md:690`：`cases >= 14`、id 唯一、`kind == "detector"` 至少 5 条。哨兵行 `TAP_GOLDEN_DETECTOR cases=N mismatches=0` 必须在 `r.complete()` **之前**打印；`mismatches` 只统计实际比较过的差异数。
+本套件的下限按 `04-RESEARCH.md:690`：`kind == "detector"` 正好 12、`kind == "runtime"` 至少 6（合计 18）、id 唯一。哨兵行 `TAP_GOLDEN_DETECTOR cases=N mismatches=0` 必须在 `r.complete()` **之前**打印，N 是过滤后的 detector 条数；`mismatches` 只统计实际比较过的差异数。
 
 ---
 
@@ -1504,7 +1504,7 @@ check_red() {  # $1=用例名 $2=stub 路径 $3=日志里必须出现的失败�
 **必须追加的第 5 条反例：** 把 `mobile/tests/fixtures/tap_golden.json` 挪走 → `gen_tap_golden.py --check` 必须非零 → 闸门必须红，且日志含「缺少 … 黄金夹具」。实现上不能直接用 `make_stub`（它替换的是 Godot 可执行文件，而夹具检查在 Godot 之前）；正确做法是：
 - 在临时副本里运行闸门，或用 `TAP_GOLDEN_PATH` 可注入路径（若生成器支持 `--root`，可用一个缺少 `tests/fixtures/tap_golden.json` 的临时根）；
 - 断言日志含生成器自己的缺失提示，而不是 Godot 的失败。
-- 末尾 `SELFTEST_OK cases=6`（`:98` 当前是 `cases=5`）。
+- 末尾 `SELFTEST_OK cases=7`（`:98` 当前是 `cases=5`；04-02 加 fixture_missing → 6，04-04 加 joy_axis_canary → 7）。
 
 ---
 
