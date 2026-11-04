@@ -34,6 +34,11 @@ func _initialize() -> void:
 			var digest := FileAccess.get_sha256(CONFIG_PATH)
 			if sidecar != digest:
 				failures.append("sha256 不匹配: %s != %s" % [sidecar, digest])
+	# exclude_filter 的兜底：导出器是否与 String.matchn 同源尚未单独验证，
+	# 断言比信任过滤器便宜。若这条变红，先确认过滤器语义再改过滤器，不要删断言。
+	var test_runner := "res://tests/core_runner.gd"
+	if FileAccess.file_exists(test_runner):
+		failures.append("测试脚本进了包: " + test_runner)
 	if failures.is_empty():
 		print("PACK_OK skills=%d" % EXPECTED_SKILLS)
 		quit(0)
