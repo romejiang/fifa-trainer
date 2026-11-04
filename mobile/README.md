@@ -12,21 +12,28 @@ mobile/
 ├── export_presets.cfg         # Android 导出预设（包名 / versionCode / 架构 / 纹理格式）
 ├── assets/config/             # 配置只读副本 + .sha256，由 tools/sync_config.py 生成
 ├── assets/fonts/              # CJK 子集 + 符号 fallback 子集 + OFL 许可 + 字形清单
+├── src/core/                  # 零引擎依赖的纯 GDScript 层；边界由 tools/lint_core_purity.py 强制
 ├── src/smoke/                 # 验收面板；一次性证明配置进包、中文不豆腐、轴在动
-├── tools/                     # 三道闸门：doctor.sh / gate-a.sh / gate-b.sh（+ 反例与冒烟）
+├── tests/                     # 无头套件与夹具（不进 APK）
+├── docs/CORE.md               # 「零引擎依赖」的可执行定义与 lint 规则表
+├── tools/                     # 闸门与反例：doctor.sh / gate-a.sh / gate-b.sh / test-core.sh
 └── build/                     # 导出产物（gitignored）；不是源码，不要手改
 ```
 
 `assets/fonts/*.import` 与 `**/*.gd.uid` 是 Godot 的**导入边车**，属于提交物：`.import` 钉住导入参数与目标路径，`.uid` 钉住脚本 UID。它们不是缓存，**不要**加进 `.gitignore` —— 忽略它们的代价是每台机器重新抽签导入参数与资源 UID，产物随之漂移。
 
-## 三条入口命令
+## 四条入口命令
 
 ```bash
+bash mobile/tools/test-core.sh  # 纯核心闸门：lint + 黄金 + 无头测试（无需模板、无需设备）
 bash mobile/tools/gate-a.sh     # 闸门 A：配置真源 + 语法 + PCK 往返 + 字形覆盖（无需模板、无需设备）
 bash mobile/tools/gate-b.sh     # 闸门 B：闸门 A + release 导出 + 验签 / 对齐 / 包内容 / badging
 ```
 
-第三条是**人的动作**，脚本只能做前半段：
+前两条都是「不需要设备」的自动闸门，区别在验证对象：`test-core.sh` 验的是
+`src/core/` 这个零引擎依赖层（含架构边界 lint），`gate-a.sh` 验的是整个工程与打包往返。
+
+第四条是**人的动作**，脚本只能做前半段：
 
 ```bash
 bash mobile/tools/device-smoke.sh   # 装机 + 启动 + 进程存活 + 截图；视觉结论归人

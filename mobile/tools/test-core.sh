@@ -3,18 +3,19 @@
 #
 #   bash mobile/tools/test-core.sh
 #
-# 这一条命令同时证明六件事：配置副本与唯一真源一致、src/core 没有越出零引擎依赖
-# 边界、几何黄金夹具没有漂移、工程能被 headless 导入、几何套件逐向量与 Python
-# 参考一致、断言真的执行了。
+# 这一条命令同时证明六件事：配置副本与唯一真源一致、lint 的反例仍会变红、
+# src/core 没有越出零引擎依赖边界、几何黄金夹具没有漂移、工程能被 headless 导入、
+# 几何套件逐向量与 Python 参考一致且断言真的执行了。
 #
 # 为什么这个顺序不能换：配置校验必须第一步 —— 副本被手改时，测试会对着被改过的
-# 副本自洽地绿（与闸门 A 同源的假绿）。架构边界必须排在所有 Godot 调用之前 ——
-# 它是纯文本、毫秒级、零依赖的检查，没有理由等引擎装好；排在后面时，一条越界会
-# 被误读成某个测试的怪错误。黄金校验必须在 Godot 之前 —— 夹具被手改时，测试只是
-# 「与手改后的自己一致」。导入必须在跑测试之前 —— class_name 的全局缓存由导入
-# 生成，干净 clone 直接跑 --script 会 Could not find type，**而那种失败的退出码
-# 是 0**。最后的判据是 stdout 里的完成哨兵，不是 $?：解析失败与依赖编译失败都
-# 返回 0，只有脚本自己显式 quit(n) 才设置退出码。
+# 副本自洽地绿（与闸门 A 同源的假绿）。lint 的反例自测必须排在真 lint 之前 ——
+# 一条被写坏的规则会以「干净通过」的形式保护一切。架构边界必须排在所有 Godot
+# 调用之前 —— 它是纯文本、毫秒级、零依赖的检查，没有理由等引擎装好；排在后面时，
+# 一条越界会被误读成某个测试的怪错误。黄金校验必须在 Godot 之前 —— 夹具被手改时，
+# 测试只是「与手改后的自己一致」。导入必须在跑测试之前 —— class_name 的全局缓存
+# 由导入生成，干净 clone 直接跑 --script 会 Could not find type，**而那种失败的
+# 退出码是 0**。最后的判据是 stdout 里的完成哨兵，不是 $?：解析失败与依赖编译失败
+# 都返回 0，只有脚本自己显式 quit(n) 才设置退出码。
 #
 # 不要把 --check-only 塞进来当语法判据：4.7.2 对解析错误同样返回 0，只能看输出。
 # 本闸门的语法判据更强 —— runner 用 preload 拉起套件，preload / 编译失败会让
@@ -39,9 +40,17 @@ if ! python3 "$repo_root/tools/sync_config.py" --check; then
     exit 1
 fi
 
-# 第二步：架构边界。纯文本、毫秒级、零依赖，不需要 Godot —— 没有任何理由等引擎
+# 第二步：lint 的反例自测。必须先于真 lint —— 一条被写坏的规则会以「干净通过」的
+# 形式保护一切，后面的真扫描再绿也没有意义。
+echo "▸ 校验 lint 自身的反例（tools/test_lint_core_purity.py）…"
+if ! python3 "$repo_root/tools/test_lint_core_purity.py"; then
+    echo "  lint 的反例没变红：先修 lint 或它的自测，不要绕过。" >&2
+    exit 1
+fi
+
+# 第三步：架构边界。纯文本、毫秒级、零依赖，不需要 Godot —— 没有任何理由等引擎
 # 装好才跑。这是 INFRA-03 唯一被机械强制的边界，定义见 mobile/docs/CORE.md。
-echo "▸ 校验 src/core 的架构边界…"
+echo "▸ 校验 src/core 的架构边界（tools/lint_core_purity.py）…"
 if ! python3 "$repo_root/tools/lint_core_purity.py" "$repo_root/mobile/src/core"; then
     echo "  core 不允许出现 Input. / Time. / Node / FileAccess / print(；把 I/O 与时钟推到 src/app/，把值作为参数传进来。见 mobile/docs/CORE.md" >&2
     exit 1
