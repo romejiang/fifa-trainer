@@ -113,4 +113,15 @@ else
     echo "  · 日志里没有签名命令行（导出在签名前就失败了），口令仍然没有出现"
 fi
 
+# 场景 C：缺口令时闸门 B 必须以非零退出。
+# 这条断言存在的理由是一个真实发生过的假绿：gate-b.sh 原先用 `: "${VAR:?}"` 守口令，
+# 而 `:?` 展开失败在 EXIT trap 里看到的 `$?` 是 0，trap 的 `rm -rf` 成功就把退出码洗成 0，
+# 于是「没有口令」反而通过了闸门。任何人把守卫改回 `:?`，这条会立刻变红。
+if env -u GODOT_ANDROID_KEYSTORE_RELEASE_PASSWORD bash "$repo_root/mobile/tools/gate-b.sh" > "$tmp/nopass.log" 2>&1; then
+    echo "SELFTEST_FAIL 缺口令时 gate-b.sh 竟然以 0 退出（假绿）" >&2
+    sed 's/^/    /' "$tmp/nopass.log" >&2
+    exit 1
+fi
+echo "  ✓ 缺口令时 gate-b.sh 非零退出（无假绿）"
+
 echo "SELFTEST_OK"

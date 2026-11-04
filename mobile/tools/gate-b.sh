@@ -47,7 +47,15 @@ keystore_alias="${FIFA_KEYSTORE_ALIAS:-fifa-trainer}"
 # 口令守卫必须早于 doctor：doctor 的 keystore 断言读的是同一个变量，
 # 守卫放在后面时最先撞到的会是 doctor 的报错，读者会误以为是密钥库坏了。
 # 消息里只写变量名与文档章节，绝不写值。
-: "${GODOT_ANDROID_KEYSTORE_RELEASE_PASSWORD:?缺 release 口令：按 mobile/BUILD.md 第四节从密码管理器取出后 export 到当前 shell}"
+#
+# 必须用显式 if + exit 1，不能用 `: "${VAR:?msg}"`：本脚本有 `trap ... EXIT`，
+# 而 `:?` 展开失败是 bash 的特例 —— 它在 EXIT trap 里看到的 `$?` 仍是 0，
+# 于是 trap 的 `rm -rf` 成功会把整个脚本的退出码洗成 0，缺口令反而「通过」闸门。
+# 这个假绿在 2026-11-04 实测复现过（rc=0 且只打印守卫消息），不要再改回 `:?`。
+if [ -z "${GODOT_ANDROID_KEYSTORE_RELEASE_PASSWORD:-}" ]; then
+    echo "✗ 缺 release 口令：按 mobile/BUILD.md 第四节从密码管理器取出后 export 到当前 shell" >&2
+    exit 1
+fi
 # 有人用 `VAR=... bash gate-b.sh` 这样传 —— 不 export 的话子进程收不到。
 export GODOT_ANDROID_KEYSTORE_RELEASE_PASSWORD
 
