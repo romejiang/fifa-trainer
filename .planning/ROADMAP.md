@@ -16,7 +16,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 
 - [x] **Phase 1: 仓库拆分 + 配置单一真源 + 桌面回归闸门** - `desktop/` + `mobile/` + `shared/`，桌面 230 项检查全绿，配置漂移可被脚本抓住 (completed 2026-11-04)
 - [x] **Phase 2: 安卓工具链 + 真机冒烟 APK** - 签名 APK 能装能启动，中文不豆腐，`*.json` 真进包，能读到手柄原始轴 (completed 2026-11-05)
-- [ ] **Phase 3: 纯核心地基** - 几何 / 领域模型 / 配置校验 / 无头运行 / 架构 lint，零引擎依赖
+- [x] **Phase 3: 纯核心地基** - 几何 / 领域模型 / 配置校验 / 无头运行 / 架构 lint，零引擎依赖 (completed 2026-11-05)
 - [ ] **Phase 4: 设备输入层 + 绿色搓射竖切** - 引导式配对、轴探测、校准、布局确认，真机上产出第一次判定
 - [ ] **Phase 5: 全动作判定对等性** - 三类检测器 + 引擎仲裁 1:1 移植，5 个动作黄金向量逐条一致，抽稀不漂移
 - [ ] **Phase 6: 训练循环** - 10 次一组、免触摸自动推进、待触发/冷却可见、暂停恢复
@@ -102,7 +102,7 @@ Decimal phases appear between their surrounding integers in numeric order.
   4. `src/core/` 架构 lint 在出现 `Input.` / `Time.` / `Node` / `FileAccess` / `print(` 时非零退出，干净时零退出
   5. 用户修改写进 `user://` 稀疏覆盖层；base 配置 hash 变化时覆盖层被丢弃并提示，运行期绝不尝试写 `res://`
 
-**Plans**: 6 plans, 5 waves
+**Plans**: 6/6 plans complete, 5 waves
 **Wave 1**
 - [x] 03-01-PLAN.md — 无头 runner + 几何黄金对等 + 完成哨兵（含四种假绿反例）
 
@@ -250,7 +250,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 →
 |-------|----------------|--------|-----------|
 | 1. 仓库拆分 + 配置单一真源 + 桌面回归闸门 | 5/5 | Complete    | 2026-11-04 |
 | 2. 安卓工具链 + 真机冒烟 APK | 5/5 | Complete    | 2026-11-05 |
-| 3. 纯核心地基 | 6/6 | In progress | - |
+| 3. 纯核心地基 | 6/6 | Complete    | 2026-11-05 |
 | 4. 设备输入层 + 绿色搓射竖切 | 0/0 | Not started | - |
 | 5. 全动作判定对等性 | 0/0 | Not started | - |
 | 6. 训练循环 | 0/0 | Not started | - |
