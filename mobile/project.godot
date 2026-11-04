@@ -1,0 +1,19 @@
+; 唯一的工程定义。config_version=5 是 4.7.2 的当前值（core/config/project_settings.h）。
+; 不要用 4.8 打开本工程：4.8 会静默改写本文件，把 config/features 升到 "4.8"，
+; 那正是 P-01（版本锁死 4.7.2-stable）要防的漂移。注视这里的 "4.7" 就是哨兵。
+config_version=5
+
+[application]
+
+config/name="FIFA 花式动作练习器"
+run/main_scene="res://src/smoke/smoke_screen.tscn"
+config/features=PackedStringArray("4.7", "GL Compatibility")
+
+[rendering]
+
+; GL Compatibility 把 minSdk 压回 24（Vulkan 路径强制 29，见 P-03）。
+renderer/rendering_method="gl_compatibility"
+renderer/rendering_method.mobile="gl_compatibility"
+; 这一行缺了，安卓导出会直接失败：导出器要求 ETC2/ASTC 纹理压缩可导入
+; （RESEARCH P1，本机先失败后加上该键才成功）。
+textures/vram_compression/import_etc2_astc=true
