@@ -24,17 +24,21 @@ how: |
   或手工：
     adb install -r mobile/build/fifa-trainer.apk
     adb shell monkey -p com.fifaskill.trainer -c android.intent.category.LAUNCHER 1
-result: partial — Motorola XT2175-2 (ZY22F5FXX9) 通过：DEVICE_SMOKE_OK、SKILL_COUNT=5、进程存活；第二台不同 OEM 待测
+result: pass（用户明确豁免第二台设备）— Motorola XT2175-2 (ZY22F5FXX9)：`DEVICE_SMOKE_OK`、`SKILL_COUNT=5`、进程存活、截图非黑屏。用户 2026-11-05 明确表示「先不用考虑第二台手机，这一台搞定就行」，故「两台不同 OEM」按单台验收。
 
 ### 2. 中文与符号不豆腐
 expected: 「起点错了：注意从左摇杆朝向的哪个方位起手。」完整无豆腐；`° ± → ✓ ✗` 全部为字形；负号为 ASCII 短横
 how: 在**两台不同品牌**手机上逐字比对首屏第二、三行
-result: partial — Motorola XT2175-2 截图逐字确认：中文完整、`° ± → ✓ ✗` 全部为字形、负号为 ASCII `-`（截图 mobile/build/device-smoke-ZY22F5FXX9.png）；第二台不同 OEM 待测
+result: pass（同上豁免）— Motorola XT2175-2 截图逐字确认：`起点错了：注意从左摇杆朝向的哪个方位起手。` 完整无豆腐；`° ± → ✓ ✗` 全部为字形；负号为 ASCII `-`。截图 `mobile/build/device-smoke-ZY22F5FXX9.png`。
 
 ### 3. 蓝牙手柄原始轴实时变化
 expected: 配对并唤醒手柄后，推动右摇杆至少有两个 axis 数值实时变化
 how: 系统蓝牙里配对 Xbox 或 DualSense → 打开 App → 推右摇杆
-result: pass — Xbox Series X Controller 已配对。右摇杆推右：axis 2 由 -0.008 → -1.000，axis 3 -0.061；buttons 行显示 0, 9（A + LB），证明轴与按钮两个通道都通。**关键发现**：安卓上右摇杆 X 轴符号与桌面 SDL 相反（右 = -1.000）；扳机静止值首次读数 -1.000、交互后 +0.000 不稳定。两条均已记入 Phase 4 输入适配的必做项。
+result: pass — Xbox Series X Controller。**logcat 逐事件证据（91 条）**：A/B/X/Y = `idx 0/1/2/3`；LB/RB = `idx 9/10`；A+LB 同按出现 `idx=0 true` + `idx=9 true`；左摇杆 `axis 0/1`、右摇杆 `axis 2/3`；扳机 `axis 4/5` 范围约 `-0.86 ~ +1.00`。
+**关键发现（Phase 4 必做）**：
+1. 安卓上右摇杆推右得到 `axis 2 = -1.000`，与桌面 SDL 的「右为正」相反 —— 必须做符号归一；
+2. 扳机静止值不稳定（首次 -1.000，交互后 0.000），范围也不规整 —— 必须做静止值校准；
+3. Godot 4.7.2 安卓上 `_input` **收不到** `InputEventJoypadButton`，只有轮询 `Input.is_joy_button_pressed` 有效 —— Phase 4 的输入层必须走轮询或事件+轮询混合。
 
 ### 4. 密钥库离线备份与恢复演练
 expected: `mobile/ACCEPTANCE.md` §4 的四行字段全部有可核对内容；两处备份不同址/不同设备；口令与 keystore 分开存放
@@ -54,10 +58,10 @@ result: pass — `DEVICE_SMOKE_OK serial=ZY22F5FXX9 package=com.fifaskill.traine
 ## Summary
 
 total: 6
-passed: 2
-partial: 2
+passed: 4
+partial: 0
 issues: 0
-pending: 2
+pending: 2（§4 keystore 备份、§5 第二台机器重导出 —— 用户另行安排）
 skipped: 0
 blocked: 0
 
