@@ -107,7 +107,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] 03-01-PLAN.md — 无头 runner + 几何黄金对等 + 完成哨兵（含四种假绿反例）
 
 **Wave 2** *(blocked on Wave 1 completion)*
-- [ ] 03-02-PLAN.md — 架构 lint（`Input.` / `Time.` / `Node` / `FileAccess` / `print(`）+ `CORE.md` 边界契约
+- [x] 03-02-PLAN.md — 架构 lint（`Input.` / `Time.` / `Node` / `FileAccess` / `print(`）+ `CORE.md` 边界契约
 - [ ] 03-03-PLAN.md — 按键/方向词汇表 + 六个域对象（一个文件一个 `class_name`）
 
 **Wave 3** *(blocked on Wave 2 completion)*
@@ -250,7 +250,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 →
 |-------|----------------|--------|-----------|
 | 1. 仓库拆分 + 配置单一真源 + 桌面回归闸门 | 5/5 | Complete    | 2026-11-04 |
 | 2. 安卓工具链 + 真机冒烟 APK | 5/5 | Complete    | 2026-11-05 |
-| 3. 纯核心地基 | 1/6 | In progress | - |
+| 3. 纯核心地基 | 2/6 | In progress | - |
 | 4. 设备输入层 + 绿色搓射竖切 | 0/0 | Not started | - |
 | 5. 全动作判定对等性 | 0/0 | Not started | - |
 | 6. 训练循环 | 0/0 | Not started | - |

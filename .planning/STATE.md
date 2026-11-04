@@ -3,16 +3,16 @@ gsd_state_version: "1.0"
 current_phase: 3
 current_phase_name: 纯核心地基 — 几何 / 配置校验 / 无头运行 / 架构 lint
 status: executing
-stopped_at: Phase 3 plan 01 complete (geometry golden + headless core gate), ready for 03-02
-last_updated: "2026-11-04T19:20:04.000Z"
+stopped_at: Phase 3 plan 02 complete (core purity lint + CORE.md), ready for 03-03
+last_updated: "2026-11-04T19:32:00.000Z"
 last_activity: 2026-11-05
-last_activity_desc: Phase 3 plan 01 complete
-state_head: 2868beb842d0fdf2a130e34e8b98f1091b129577
+last_activity_desc: Phase 3 plan 02 complete
+state_head: fa18e24b4097bc02e71c72d710b052dd08126720
 progress:
   total_phases: 10
   completed_phases: 2
   total_plans: 16
-  completed_plans: 11
+  completed_plans: 12
   percent: 20
 ---
 
@@ -28,9 +28,9 @@ See: .planning/PROJECT.md (updated 2026-11-04)
 ## Current Position
 
 Phase: 3 (纯核心地基 — 几何 / 配置校验 / 无头运行 / 架构 lint) — EXECUTING
-Plan: 2 of 6
+Plan: 3 of 6
 Status: Executing Phase 3
-Last activity: 2026-11-05 — 03-01 完成：几何黄金对等 + 无头核心闸门
+Last activity: 2026-11-05 — 03-02 完成：架构边界 lint + CORE.md 可执行定义
 
 Progress: [██░░░░░░░░] 20%
 
@@ -68,6 +68,7 @@ Progress: [██░░░░░░░░] 20%
 | Phase 2 P04 | 13min | 3 tasks | 4 files |
 | Phase 2 P05 | 8min | 3 tasks | 6 files |
 | Phase 3 P01 | 13min | 2 tasks | 13 files |
+| Phase 3 P02 | 4min | 2 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -145,6 +146,10 @@ Recent decisions affecting current work:
 - [Phase 3]: `core_runner.gd` 用内嵌 Reporter + 显式 `preload` 字典；不许改成运行时扫描目录（目录消失会「零套件、零失败」地绿），套件必须 `complete()`
 - [Phase 3]: 闸门反例 stub 必须按 `--script` 参数分支：导入步骤没有看门狗，挂死型 stub 若对导入也 sleep 会先挂死自测脚本
 - [Phase 3]: 看门狗子 shell 必须把 stdout/stderr 重定向到 /dev/null：否则 `test-core.sh | tail` / `$(...)` 会一直等到 sleep 睡满才 EOF，闸门自己变成「永远等下去」
+- [Phase 3]: 架构 lint 用两档剥离：`strip_code` 剥注释+字符串（INFRA-03 五条硬规则），`strip_comments` 只剥注释（仅 `outer_layer_dep`）；字符串被空格化后依赖路径规则永远不可能命中
+- [Phase 3]: lint 目标不存在或零个 `.gd` 一律 rc=2 + `LINT_INVALID`：路径写错时返回 0 等于自动通过
+- [Phase 3]: lint 反例自测必须先于真扫描：写坏的规则会以「干净通过」保护一切；步骤横幅带脚本名，让「先于 Godot」可被 grep 机械验证
+- [Phase 3]: lint 只扫 `mobile/src/core`；`tests/` 允许 print/printerr，不把测试的日志需求当边界违规
 
 ### Pending Todos
 
@@ -171,6 +176,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-11-04T19:20:04.000Z
-Stopped at: Phase 3 plan 01 complete (geometry golden + headless core gate), ready for 03-02
+Last session: 2026-11-04T19:32:00.000Z
+Stopped at: Phase 3 plan 02 complete (core purity lint + CORE.md), ready for 03-03
 Resume file: None
