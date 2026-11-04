@@ -8,6 +8,11 @@ config_version=5
 config/name="FIFA 花式动作练习器"
 run/main_scene="res://src/smoke/smoke_screen.tscn"
 config/features=PackedStringArray("4.7", "GL Compatibility")
+; user:// 的目录名必须在产生任何用户数据之前定死。发布之后再改等于把老用户的
+; user:// 换成一个空目录（覆盖安装会丢配置）；Phase 9 的覆盖安装依赖它保持不变。
+; 显示名仍是上面的中文 config/name —— 那是应用名，不是目录名。
+config/use_custom_user_dir=true
+config/custom_user_dir_name="FifaSkillTrainer"
 
 [gui]
 
