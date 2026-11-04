@@ -8,8 +8,8 @@ updated: 2026-11-04T16:20:00Z
 
 ## Current Test
 
-number: 1
-name: 两台不同 OEM 手机装机并启动到首屏
+number: 3
+name: 蓝牙手柄原始轴实时变化
 expected: |
   安装成功、启动到验收屏；Header 第一行显示 SKILL_COUNT = 5（不是 0 / -1 / 配置缺失）
 awaiting: user response
@@ -24,12 +24,12 @@ how: |
   或手工：
     adb install -r mobile/build/fifa-trainer.apk
     adb shell monkey -p com.fifaskill.trainer -c android.intent.category.LAUNCHER 1
-result: [pending]
+result: partial — Motorola XT2175-2 (ZY22F5FXX9) 通过：DEVICE_SMOKE_OK、SKILL_COUNT=5、进程存活；第二台不同 OEM 待测
 
 ### 2. 中文与符号不豆腐
 expected: 「起点错了：注意从左摇杆朝向的哪个方位起手。」完整无豆腐；`° ± → ✓ ✗` 全部为字形；负号为 ASCII 短横
 how: 在**两台不同品牌**手机上逐字比对首屏第二、三行
-result: [pending]
+result: partial — Motorola XT2175-2 截图逐字确认：中文完整、`° ± → ✓ ✗` 全部为字形、负号为 ASCII `-`（截图 mobile/build/device-smoke-ZY22F5FXX9.png）；第二台不同 OEM 待测
 
 ### 3. 蓝牙手柄原始轴实时变化
 expected: 配对并唤醒手柄后，推动右摇杆至少有两个 axis 数值实时变化
@@ -55,10 +55,13 @@ result: [pending]
 
 total: 6
 passed: 0
+partial: 2
 issues: 0
-pending: 6
+pending: 4
 skipped: 0
 blocked: 0
+
+**已有真机证据：** Motorola XT2175-2（Android，序列号 ZY22F5FXX9）—— 安装、启动、`SKILL_COUNT=5`、中文与 `° ± → ✓ ✗` 均通过。缺第二台不同 OEM 手机以闭合 SC2 的「两台」要求。
 
 ## Gaps
 
