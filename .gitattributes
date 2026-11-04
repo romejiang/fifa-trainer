@@ -9,3 +9,9 @@
 *.spec text eol=lf
 *.sha256 text eol=lf
 *.txt text eol=lf
+*.gd text eol=lf
+*.tscn text eol=lf
+*.tres text eol=lf
+*.cfg text eol=lf
+*.godot text eol=lf
+*.ttf binary
