@@ -118,9 +118,29 @@ if [[ -z "$package_name" ]]; then
 fi
 
 activity="$(printf '%s\n' "$badging" | sed -n "s/^launchable-activity: name='\([^']*\)'.*/\1/p" | head -n 1)" || activity=""
+
+# Godot 4.7.2 的模板把启动入口写成 **activity-alias**（`com.godot.game.GodotAppLauncher`
+# 指向 `com.godot.game.GodotApp`），而 `aapt2 dump badging` 对 activity-alias 不输出
+# `launchable-activity` 行 —— 只看 badging 会得出「这个包没有可启动入口」的错误结论，
+# 并在 adb install 之前就失败。这里的兜底：直接从 AndroidManifest.xml 的 xmltree 里
+# 找带 android.intent.category.LAUNCHER 的 activity / activity-alias 的 name。
 if [[ -z "$activity" ]]; then
-    echo "DEVICE_SMOKE_FAIL 从 badging 解析不出 launchable-activity" >&2
-    echo "  badging 里缺少 launchable-activity: name='…'，说明这个包没有可启动的入口。" >&2
+    tree="$("$aapt2" dump xmltree "$apk" --file AndroidManifest.xml 2>/dev/null)" || tree=""
+    if [[ -n "$tree" ]]; then
+        activity="$(printf '%s\n' "$tree" | awk '
+            /^[[:space:]]*E: activity(-alias)? / { grab=1; next }
+            grab && /android:name\(0x01010003\)=/ {
+                if (match($0, /="[^"]*"/)) { name=substr($0, RSTART+2, RLENGTH-3) }
+                grab=0; next
+            }
+            /android.intent.category.LAUNCHER/ { if (name != "") { print name; exit } }
+        ' | head -n 1)"
+    fi
+fi
+
+if [[ -z "$activity" ]]; then
+    echo "DEVICE_SMOKE_FAIL 解析不出启动入口（badging 无 launchable-activity，xmltree 里也没有带 LAUNCHER 的 activity）" >&2
+    echo "  这不是「包不可启动」的证明：先跑 aapt2 dump xmltree 看 AndroidManifest.xml 里是否有 MAIN/LAUNCHER。" >&2
     exit 1
 fi
 
