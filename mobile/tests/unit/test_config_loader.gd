@@ -89,8 +89,11 @@ func _check_empty(r) -> void:
 func _check_invalid_utf8(r) -> void:
 	var result := ConfigLoader.parse_bytes(PackedByteArray([0xFF, 0xFE, 0x7B]), "<invalid-utf8>")
 	r.check(not result.ok(), "非法 UTF-8 必须失败")
-	# 具体落在 invalid_utf8 还是 json_syntax_error 取决于 get_string_from_utf8 的实现，
-	# 这里只断言「被拒绝了，而且给了一条可读错误」。
+	# 必须是 invalid_utf8，不能退化成 json_syntax_error：后者会让用户去查括号，
+	# 而真正的问题是文件编码。get_string_from_utf8 会把坏字节替换成 U+FFFD 并照常
+	# 返回，所以加载器必须先做字节往返校验（见 config_loader.gd 的注释）。
+	r.check(result.has_code(&"invalid_utf8"),
+		"非法 UTF-8 必须是 invalid_utf8（实际 %s）" % _describe(result))
 	r.check(not result.errors.is_empty(), "非法 UTF-8 至少要报告一条错误")
 	_check_all_error_text(r, "非法 UTF-8", result)
 

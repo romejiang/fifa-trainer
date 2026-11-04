@@ -41,10 +41,12 @@ static func decode_bytes(bytes: PackedByteArray, source_path := "") -> Dictionar
 		return _failure(ConfigError.new(ROOT_PATH, &"file_empty",
 			"配置文件的字节数为 0，没有任何内容",
 			"确认文件没有被清空；也可以运行同步脚本重新生成副本。"))
+	# Godot 的 get_string_from_utf8() **不报错**：遇到非法字节序列时它把坏字节
+	# 替换成 U+FFFD 并照常返回字符串（2026-11 实测）。所以不能靠「解出来是空串」
+	# 判断编码错误 —— 那样这条分支永远不可达，用户拿到的会是误导性的 JSON 语法错误。
+	# 可靠做法是往返比对：合法 UTF-8 解码后再编码必然逐字节相同。
 	var text := bytes.get_string_from_utf8()
-	if text.is_empty():
-		# get_string_from_utf8 在遇到非法序列时返回空串；字节非空却解不出文本，
-		# 说明文件不是 UTF-8，而不是「内容为空」。
+	if text.is_empty() or text.to_utf8_buffer() != bytes:
 		return _failure(ConfigError.new(ROOT_PATH, &"invalid_utf8",
 			"配置文件的字节不是合法的 UTF-8，无法解码成文本",
 			"用支持 UTF-8 的编辑器另存为 UTF-8；不要用 GBK / Latin-1 保存。"))
