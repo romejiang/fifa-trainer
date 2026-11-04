@@ -18,6 +18,9 @@ func run(r) -> void:
 	_check_pulse(r)
 	_check_step(r)
 	_check_skill(r)
+	_check_input_config(r)
+	_check_rumble_config(r)
+	_check_app_config(r)
 	r.complete()
 
 
@@ -83,3 +86,62 @@ func _check_skill(r) -> void:
 	double.pattern = [Pulse.new(0.5, 0.0, 60), Pulse.new(0.5, 0.0, 60)]
 	r.check(double.rumble_summary() == "2 连震",
 		"两条 Pulse 的 rumble_summary（实际 %s）" % double.rumble_summary())
+
+
+func _check_input_config(r) -> void:
+	# 12 个字段逐个断言 —— 漏一个就等于有一个默认值没人钉住。
+	var cfg := InputConfig.new()
+	r.check(cfg.poll_hz == 250, "InputConfig.poll_hz 默认 250（实际 %d）" % cfg.poll_hz)
+	r.eq_float(cfg.deadzone, 0.08, TOL, "InputConfig.deadzone 默认 0.08")
+	r.eq_float(cfg.ls_facing_threshold, 0.35, TOL, "InputConfig.ls_facing_threshold 默认 0.35")
+	r.eq_float(cfg.initial_facing_deg, 0.0, TOL, "InputConfig.initial_facing_deg 默认 0.0")
+	r.eq_float(cfg.trigger_threshold, 0.35, TOL, "InputConfig.trigger_threshold 默认 0.35")
+	r.check(cfg.joystick_index == 0, "InputConfig.joystick_index 默认 0（实际 %d）" % cfg.joystick_index)
+	r.check(typeof(cfg.axis_layout) == TYPE_NIL,
+		"InputConfig.axis_layout 默认 null（不是空字典；实际 %s）" % str(cfg.axis_layout))
+	r.check(cfg.invert.is_empty(), "InputConfig.invert 默认空字典")
+	r.check(typeof(cfg.button_names) == TYPE_NIL,
+		"InputConfig.button_names 默认 null（不是空字典；实际 %s）" % str(cfg.button_names))
+	r.check(cfg.calibration_ms == 250, "InputConfig.calibration_ms 默认 250（实际 %d）" % cfg.calibration_ms)
+	r.check(cfg.idle_reset_ms == 250, "InputConfig.idle_reset_ms 默认 250（实际 %d）" % cfg.idle_reset_ms)
+	r.check(cfg.gesture_release_ms == 150,
+		"InputConfig.gesture_release_ms 默认 150（实际 %d）" % cfg.gesture_release_ms)
+
+
+func _check_rumble_config(r) -> void:
+	var cfg := RumbleConfig.new()
+	r.check(cfg.enabled == true, "RumbleConfig.enabled 默认 true")
+	r.check(cfg.backend == &"auto", "RumbleConfig.backend 默认 auto（实际 %s）" % str(cfg.backend))
+	r.check(cfg.startup_test == true, "RumbleConfig.startup_test 默认 true")
+	r.eq_float(cfg.startup_test_strength, 0.55, TOL, "RumbleConfig.startup_test_strength 默认 0.55")
+	r.check(cfg.startup_test_ms == 160, "RumbleConfig.startup_test_ms 默认 160（实际 %d）" % cfg.startup_test_ms)
+
+
+func _check_app_config(r) -> void:
+	var app := AppConfig.new()
+	r.check(app.global_cooldown_ms == 60,
+		"AppConfig.global_cooldown_ms 默认 60（实际 %d）" % app.global_cooldown_ms)
+	r.check(app.skills.is_empty(), "AppConfig.skills 默认空数组")
+	r.check(app.input != null, "AppConfig.input 必须是 InputConfig 实例")
+	r.check(app.rumble != null, "AppConfig.rumble 必须是 RumbleConfig 实例")
+
+	# enabled_skills()：过滤掉 disabled，且返回的必须是副本。
+	app.skills.append(_named_skill("第一个", true))
+	app.skills.append(_named_skill("第二个", true))
+	app.skills.append(_named_skill("第三个", false))
+	var enabled := app.enabled_skills()
+	r.check(enabled.size() == 2, "enabled_skills() 只保留 enabled 的两条（实际 %d）" % enabled.size())
+	r.check(enabled[0].name == "第一个" and enabled[1].name == "第二个",
+		"enabled_skills() 保持原有顺序并跳过 disabled")
+	# 清空返回值不能影响 AppConfig 内部的 skills —— 泄漏引用的典型症状。
+	enabled.clear()
+	r.check(app.skills.size() == 3,
+		"enabled_skills() 必须返回新数组（清空返回值后内部仍有 %d 条）" % app.skills.size())
+
+
+func _named_skill(skill_name: String, is_enabled: bool) -> Skill:
+	var skill := Skill.new()
+	skill.name = skill_name
+	skill.enabled = is_enabled
+	return skill
+
