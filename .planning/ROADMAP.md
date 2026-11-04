@@ -15,7 +15,7 @@
 Decimal phases appear between their surrounding integers in numeric order.
 
 - [x] **Phase 1: 仓库拆分 + 配置单一真源 + 桌面回归闸门** - `desktop/` + `mobile/` + `shared/`，桌面 230 项检查全绿，配置漂移可被脚本抓住 (completed 2026-11-04)
-- [ ] **Phase 2: 安卓工具链 + 真机冒烟 APK** - 签名 APK 能装能启动，中文不豆腐，`*.json` 真进包，能读到手柄原始轴
+- [x] **Phase 2: 安卓工具链 + 真机冒烟 APK** - 签名 APK 能装能启动，中文不豆腐，`*.json` 真进包，能读到手柄原始轴 (completed 2026-11-05)
 - [ ] **Phase 3: 纯核心地基** - 几何 / 领域模型 / 配置校验 / 无头运行 / 架构 lint，零引擎依赖
 - [ ] **Phase 4: 设备输入层 + 绿色搓射竖切** - 引导式配对、轴探测、校准、布局确认，真机上产出第一次判定
 - [ ] **Phase 5: 全动作判定对等性** - 三类检测器 + 引擎仲裁 1:1 移植，5 个动作黄金向量逐条一致，抽稀不漂移
@@ -66,7 +66,7 @@ Decimal phases appear between their surrounding integers in numeric order.
   4. 连上蓝牙手柄推动右摇杆时，屏幕上的原始轴数值实时变化，证明输入通道在真机可达
   5. `mobile/BUILD.md` 记录精确版本（Godot 4.7.2-stable / 导出模板 4.7.2.stable / JDK 17 / build-tools 36.1.0），release keystore 已生成并离线备份，另一台干净机器按文档能重导出
 
-**Plans**: 5 plans
+**Plans**: 5/5 plans complete
 **Wave 1**
 - [x] 02-01-PLAN.md — 工具链自举 + `doctor.sh` 六项断言（引擎钉死 4.7.2-stable）(completed 2026-11-04)
 
@@ -233,7 +233,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 →
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. 仓库拆分 + 配置单一真源 + 桌面回归闸门 | 5/5 | Complete    | 2026-11-04 |
-| 2. 安卓工具链 + 真机冒烟 APK | 4/5 | In progress | - |
+| 2. 安卓工具链 + 真机冒烟 APK | 5/5 | Complete    | 2026-11-05 |
 | 3. 纯核心地基 | 0/0 | Not started | - |
 | 4. 设备输入层 + 绿色搓射竖切 | 0/0 | Not started | - |
 | 5. 全动作判定对等性 | 0/0 | Not started | - |
