@@ -134,7 +134,28 @@ Decimal phases appear between their surrounding integers in numeric order.
   4. 布局建议（Xbox / PlayStation）自动给出，但必须用户按键确认后才进入练习，未确认不前进一步
   5. 在真机上做一次绿色搓射，屏幕产出且仅产出一次判定并显示成功或失败原因；快速连做两次得到两次独立判定（事件流保住了帧内反转）
 
-**Plans**: TBD
+**Plans**: 7 plans, 7 waves
+**Wave 1**
+- [ ] 04-01-PLAN.md — tap 检测器逐行移植 + Python 生成黄金夹具 + `TAP_GOLDEN_DETECTOR` 哨兵（成功标准 1）
+
+**Wave 2** *(blocked on Wave 1 completion)*
+- [ ] 04-02-PLAN.md — `TapRuntime` 引擎子集（冷却 / 手势锁 / 单槽失败 / 分组）+ `layout_confirmed` 硬门 + `TAP_GOLDEN_RUNTIME` + 闸门第 5 条反例
+
+**Wave 3** *(blocked on Wave 2 completion)*
+- [ ] 04-03-PLAN.md — 轴探针 / 校准 / `DeviceProfile` / 复用门（纯逻辑，含 raw → 0/90/180/270 接缝断言）
+
+**Wave 4** *(blocked on Wave 3 completion)*
+- [ ] 04-04-PLAN.md — `PadStateBuffer` + `PadSampler`（事件优先 + 每帧对账）+ `ProfileStore` 原子写 + lint 扩到 `src/input/`
+
+**Wave 5** *(blocked on Wave 4 completion)*
+- [ ] 04-05-PLAN.md — `OnboardingFlow` 纯状态机 + 组合根 + 引导屏 S1–S11 + 字形闭世界断言
+
+**Wave 6** *(blocked on Wave 5 completion)*
+- [ ] 04-06-PLAN.md — 练习屏 + 结果横幅 + 无设备 60 Hz 集成竖切 + `ACCEPTANCE.md` 第 6 节
+
+**Wave 7** *(blocked on Wave 6 completion)*
+- [ ] 04-07-PLAN.md — 签名 APK + 真机 D0–D6 清单（`checkpoint:human-verify`，无设备不得勾选）
+
 **UI hint**: yes
 
 ### Phase 5: 全动作判定对等性 — 三类检测器 + 引擎仲裁 + 抽稀矩阵
@@ -251,7 +272,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 →
 | 1. 仓库拆分 + 配置单一真源 + 桌面回归闸门 | 5/5 | Complete    | 2026-11-04 |
 | 2. 安卓工具链 + 真机冒烟 APK | 5/5 | Complete    | 2026-11-05 |
 | 3. 纯核心地基 | 6/6 | Complete    | 2026-11-05 |
-| 4. 设备输入层 + 绿色搓射竖切 | 0/0 | Not started | - |
+| 4. 设备输入层 + 绿色搓射竖切 | 0/7 | Planned | - |
 | 5. 全动作判定对等性 | 0/0 | Not started | - |
 | 6. 训练循环 | 0/0 | Not started | - |
 | 7. 反馈呈现 | 0/0 | Not started | - |
