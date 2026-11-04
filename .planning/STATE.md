@@ -3,16 +3,16 @@ gsd_state_version: "1.0"
 current_phase: 3
 current_phase_name: 纯核心地基 — 几何 / 配置校验 / 无头运行 / 架构 lint
 status: executing
-stopped_at: Phase 2 complete, ready to plan Phase 3
-last_updated: "2026-11-04T19:10:52.922Z"
+stopped_at: Phase 3 plan 01 complete (geometry golden + headless core gate), ready for 03-02
+last_updated: "2026-11-04T19:20:04.000Z"
 last_activity: 2026-11-05
-last_activity_desc: Phase 2 complete, transitioned to Phase 3
-state_head: "0bdbb6e29083db80b4c77133f283e9df95a4d68e"
+last_activity_desc: Phase 3 plan 01 complete
+state_head: 16b67469688252d014d4a1511a631ef94542ca77
 progress:
   total_phases: 10
   completed_phases: 2
   total_plans: 16
-  completed_plans: 10
+  completed_plans: 11
   percent: 20
 ---
 
@@ -23,14 +23,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-11-04)
 
 **Core value:** 用真手柄、在任何地方都能练，判定准、反馈看得懂。
-**Current focus:** Phase 2 — 安卓工具链 + 真机冒烟 APK
+**Current focus:** Phase 3 — 纯核心地基 — 几何 / 配置校验 / 无头运行 / 架构 lint
 
 ## Current Position
 
-Phase: 3 (纯核心地基 — 几何 / 配置校验 / 无头运行 / 架构 lint) — READY TO EXECUTE
-Plan: Not started
-Status: Ready to execute
-Last activity: 2026-11-05 — Phase 2 complete, transitioned to Phase 3
+Phase: 3 (纯核心地基 — 几何 / 配置校验 / 无头运行 / 架构 lint) — EXECUTING
+Plan: 2 of 6
+Status: Executing Phase 3
+Last activity: 2026-11-05 — 03-01 完成：几何黄金对等 + 无头核心闸门
 
 Progress: [██░░░░░░░░] 20%
 
@@ -67,6 +67,7 @@ Progress: [██░░░░░░░░] 20%
 | Phase 2 P03 | 4min | 3 tasks | 12 files |
 | Phase 2 P04 | 13min | 3 tasks | 4 files |
 | Phase 2 P05 | 8min | 3 tasks | 6 files |
+| Phase 3 P01 | 9min | 2 tasks | 13 files |
 
 ## Accumulated Context
 
@@ -138,6 +139,11 @@ Recent decisions affecting current work:
 - [Phase 2]: `device-smoke.sh` 的工具缺失 / 无设备 / 装不上 / 起不来 / 5 秒内退出 / 空截图全部走同一条 `DEVICE_SMOKE_FAIL` 出口；`if ! pid=` 只出现一处，其余可能失败的赋值同样落在 `if` 里
 - [Phase 2]: `ACCEPTANCE.md` 明写动作名是**机械覆盖**（`make_font_subset.py` → `required_glyphs.txt` → `glyph_coverage.gd`）：首屏只显示 `SKILL_COUNT = 5`，不逐条列五个动作名，不写清会被当成成功标准 2 少测一半
 - [Phase 2]: Phase 2 的自动化部分收口，但 ROADMAP 的 Phase 2 复选框与 `INFRA-04` 都**不勾**：成功标准 1/2/4 需要两台不同 OEM + 真手柄，5 的两半需要人工备份与第二台机器；无设备时声称通过就是伪造信任点
+- [Phase 3]: 几何黄金夹具放 `mobile/tests/fixtures/` 而非 `shared/`：唯一消费者是 GDScript 测试，Python 侧只是生成器；放 shared 等于给生成物再造一份要同步的副本
+- [Phase 3]: `signed_delta` 固化 `[-180, 180)`（`signed_delta(0,180) == -180`）；黄金向量 + 精确断言一起钉死端点，禁止按 Python 文档字符串「修正」成 +180
+- [Phase 3]: 核心闸门的唯一判据是 `^TESTS_DONE failures=0$` + `^TESTS_ASSERTIONS=0$` 拦截 + 看门狗；退出码 0 永不单独作判据，也刻意不加 `--check-only`（对解析错误同样返回 0）
+- [Phase 3]: `core_runner.gd` 用内嵌 Reporter + 显式 `preload` 字典；不许改成运行时扫描目录（目录消失会「零套件、零失败」地绿），套件必须 `complete()`
+- [Phase 3]: 闸门反例 stub 必须按 `--script` 参数分支：导入步骤没有看门狗，挂死型 stub 若对导入也 sleep 会先挂死自测脚本
 
 ### Pending Todos
 
@@ -164,6 +170,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-11-04T15:15:00.000Z
-Stopped at: Phase 2 complete, ready to plan Phase 3
+Last session: 2026-11-04T19:20:04.000Z
+Stopped at: Phase 3 plan 01 complete (geometry golden + headless core gate), ready for 03-02
 Resume file: None
