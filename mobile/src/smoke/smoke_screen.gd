@@ -61,4 +61,14 @@ func _refresh_axes() -> void:
 		out.append("#%d  %s" % [d, Input.get_joy_name(d)])
 		for axis in range(8):
 			out.append("  axis %d = %+.3f" % [axis, Input.get_joy_axis(d, axis as JoyAxis)])
+		# 按钮通道也要证明：Phase 4 的修饰键（A/B/X/Y、LB/RB）全部依赖它。
+		# 只列「当前按下的索引」而不是全部 32 个，屏幕才不会被按钮刷屏。
+		# 这里刻意用 ASCII 文案，避免给字体子集新增字形、把字形闸门弄红。
+		var pressed: PackedStringArray = []
+		for btn in range(21):
+			if Input.is_joy_button_pressed(d, btn as JoyButton):
+				pressed.append(str(btn))
+		out.append("  buttons: " + (", ".join(pressed) if pressed.size() > 0 else "-"))
+	out.append("")
+	out.append("  stick/trigger -> axis; A/B/X/Y/LB/RB -> buttons")
 	_axes.text = "\n".join(out)
