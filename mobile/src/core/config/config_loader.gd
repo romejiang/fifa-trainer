@@ -14,9 +14,6 @@ extends RefCounted
 ## 不能直接用「已经校验过」的结果。
 
 const ROOT_PATH := "$"
-const BOM_0 := 0xEF
-const BOM_1 := 0xBB
-const BOM_2 := 0xBF
 
 
 ## 字节 → 已校验的 ConfigResult。
