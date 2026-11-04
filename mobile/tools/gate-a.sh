@@ -49,12 +49,22 @@ fi
 
 # 语法检查必须逐个指名文件失败：一个脚本里有错时，只说「语法检查失败」
 # 等于把定位工作留给下一个人。
+#
+# 注意：Godot 4.7.2 的 `--check-only --script` 对「解析失败」和「文件不存在」
+# 都返回退出码 0（实测：坏脚本只打 SCRIPT ERROR，rc 仍是 0）。所以判据必须是
+# **输出里没有错误行**，不能看退出码 —— 否则语法错会一路绿到 APK。
+# 这是 2026-11-04 代码审查抓到的假绿，别改回 `if ! out=$(...)`。
 check_script() {
     local script="$1" out
     if ! out="$("$godot" --headless --path "$repo_root/mobile" \
             --check-only --script "$script" 2>&1)"; then
         echo "✗ 脚本语法检查失败：${script}" >&2
         printf '%s\n' "$out" >&2
+        exit 1
+    fi
+    if printf '%s\n' "$out" | grep -qE 'SCRIPT ERROR|Parse Error|Failed to load script|Can.t load script|File not found'; then
+        echo "✗ 脚本语法检查失败：${script}（Godot 退出码为 0，但输出里有错误）" >&2
+        printf '%s\n' "$out" | grep -E 'SCRIPT ERROR|Parse Error|Failed to load script|Can.t load script|File not found' | head -10 >&2
         exit 1
     fi
     echo "  ✓ ${script}"

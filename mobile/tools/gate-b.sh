@@ -111,9 +111,23 @@ if ! grep -qF 'Verified using v2 scheme (APK Signature Scheme v2): true' "$tmp/s
     fi
     exit 1
 fi
-if ! grep -F 'certificate SHA-256 digest' "$tmp/sign.txt" | sed 's/^/  · /'; then
-    echo "  （apksigner 输出里没有证书摘要行）" >&2
+# 证书指纹必须与发布密钥逐位一致。
+# 只验「有 v2 签名」是不够的：任何人都能用一把新密钥重签同一个包，apksigner 照样
+# 说 v2 true —— 但同一包名换了签名密钥，安卓会拒绝覆盖安装，用户只能卸载重装、
+# user:// 数据全丢。这正是本阶段定义为「不可逆事故」的那一类。
+# 下面是 2026-11-04 生成发布密钥库时记录的公开发布证书指纹（小写、无冒号）。
+readonly EXPECTED_CERT_SHA256="e1841a17bda43307cdfc8e9e757c672a6a91b7fd60ea86e715afd461ba32e046"
+actual_cert="$(grep -F 'certificate SHA-256 digest' "$tmp/sign.txt" | head -1 | awk '{print $NF}' | tr -d ':' | tr 'A-F' 'a-f')"
+if [ -z "$actual_cert" ]; then
+    echo "✗ apksigner 输出里没有证书摘要行，无法确认这个包是发布密钥签的" >&2
+    exit 1
 fi
+if [ "$actual_cert" != "$EXPECTED_CERT_SHA256" ]; then
+    echo "✗ 签名证书不是发布密钥：期望 ${EXPECTED_CERT_SHA256:0:16}… 实际 ${actual_cert:0:16}…" >&2
+    echo "  用别的密钥签出的包无法覆盖安装到已发布版本上。" >&2
+    exit 1
+fi
+echo "  ✓ 证书指纹与发布密钥一致（${EXPECTED_CERT_SHA256:0:16}…）"
 
 echo "▸ 校验 16 KB 页对齐…"
 if ! "$bt/zipalign" -c -P 16 -v 4 "$out" > "$tmp/align.txt" 2>&1; then

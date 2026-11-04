@@ -79,7 +79,7 @@ grep 'java_sdk_path' "$HOME/Library/Application Support/Godot/editor_settings-4.
 curl -fL -o /tmp/godot472.zip \
   https://github.com/godotengine/godot/releases/download/4.7.2-stable/Godot_v4.7.2-stable_macos.universal.zip
 
-echo '38aa16e5bba2083941fc5b3e54be0089bd4cc35e32415f5b9fd9a8a6a7b9818255d44532ea8ef94b5aef56c4b407c2d634fa4f657e4ebe681ebbf59b7ac69ca  /tmp/godot472.zip' | shasum -a 512 -c -
+echo '38aa16e5bba2083941fc5b3e54be0089bd4cc35e32415f5b9fd9a8a6a7b9818255d44532ea8ef94b5aef56c4b407c2d634fa4f657e4ebe681ebbf59b7bac69ca  /tmp/godot472.zip' | shasum -a 512 -c -
 
 mkdir -p "$HOME/Applications"
 unzip -q -o /tmp/godot472.zip -d /tmp/godot472
@@ -141,11 +141,23 @@ xattr -dr com.apple.quarantine "$HOME/Applications/Godot-4.7.2.app"
 `KEYSTORE_ALIAS` **逐字相同**。改一处就要改两处，否则会出现「doctor 说密钥库好、
 闸门却拿另一把钥匙去签」。
 
-**口令永远不落盘。** 从密码管理器取出后 export 到当前 shell：
+**口令不进仓库、不进日志、不进任何构建产物。** 本机把它放在仓库外的
+`~/.fifa-trainer/credentials.sh`（`600`，只有本用户可读）—— 这确实是一次「落盘」，
+但落的是仓库外、权限收紧的本地凭据文件，与「写进配置 / 日志 / APK」是两件事；
+后三者任意一件发生都等于泄露，前者只等于「拿到这台电脑的人能拿到口令」。
+更严格的做法是在需要构建时从密码管理器临时 export，用完即关：
 
 ```bash
-set -a; . "$HOME/.fifa-trainer/credentials.sh"; set +a   # 本机做法：口令在脚本里，脚本在仓库外
+# 本机做法：口令在仓库外的 600 文件里，由脚本 source 进来
+set -a; . "$HOME/.fifa-trainer/credentials.sh"; set +a
+
+# 更严格的做法：手工从密码管理器取出，当前 shell 用完即弃（不写任何文件）
+# export GODOT_ANDROID_KEYSTORE_RELEASE_PASSWORD='<从密码管理器复制>'
 ```
+
+无论用哪种方式，**这两条底线不变**：口令不写进仓库里的任何文件；口令不写进
+任何会被提交、上传或粘贴到聊天里的地方。`credentials.sh` 与 `release.keystore`
+必须一起离线备份（见 `ACCEPTANCE.md` §4）—— 备份的是「能不能继续发版」。
 
 `keytool` 一律用 `-storepass:env GODOT_ANDROID_KEYSTORE_RELEASE_PASSWORD` 读口令，
 命令行里不出现值：
