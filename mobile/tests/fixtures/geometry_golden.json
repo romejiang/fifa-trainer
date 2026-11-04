@@ -1,0 +1,201 @@
+{
+  "angle_diff": [
+    {
+      "expected": 180.0,
+      "from": 0.0,
+      "to": 180.0
+    },
+    {
+      "expected": 90.0,
+      "from": 0.0,
+      "to": 90.0
+    },
+    {
+      "expected": 20.0,
+      "from": 350.0,
+      "to": 10.0
+    },
+    {
+      "expected": 90.0,
+      "from": 270.0,
+      "to": 0.0
+    },
+    {
+      "expected": 20.0,
+      "from": 10.0,
+      "to": 350.0
+    },
+    {
+      "expected": 0.0,
+      "from": 45.0,
+      "to": 45.0
+    }
+  ],
+  "angle_of": [
+    {
+      "expected": 0.0,
+      "name": "center",
+      "x": 0.0,
+      "y": 0.0
+    },
+    {
+      "expected": 0.0,
+      "name": "up",
+      "x": 0.0,
+      "y": -1.0
+    },
+    {
+      "expected": 45.0,
+      "name": "upright",
+      "x": 0.7071067811865475,
+      "y": -0.7071067811865475
+    },
+    {
+      "expected": 90.0,
+      "name": "right",
+      "x": 1.0,
+      "y": 0.0
+    },
+    {
+      "expected": 135.0,
+      "name": "downright",
+      "x": 0.7071067811865475,
+      "y": 0.7071067811865475
+    },
+    {
+      "expected": 180.0,
+      "name": "down",
+      "x": 0.0,
+      "y": 1.0
+    },
+    {
+      "expected": 225.0,
+      "name": "downleft",
+      "x": -0.7071067811865475,
+      "y": 0.7071067811865475
+    },
+    {
+      "expected": 270.0,
+      "name": "left",
+      "x": -1.0,
+      "y": 0.0
+    },
+    {
+      "expected": 315.0,
+      "name": "upleft",
+      "x": -0.7071067811865475,
+      "y": -0.7071067811865475
+    }
+  ],
+  "magnitude": [
+    {
+      "expected": 0.0,
+      "x": 0.0,
+      "y": 0.0
+    },
+    {
+      "expected": 1.0,
+      "x": 0.0,
+      "y": -1.0
+    },
+    {
+      "expected": 1.0,
+      "x": 0.7071067811865475,
+      "y": -0.7071067811865475
+    },
+    {
+      "expected": 1.0,
+      "x": 1.0,
+      "y": 0.0
+    },
+    {
+      "expected": 1.0,
+      "x": 0.7071067811865475,
+      "y": 0.7071067811865475
+    },
+    {
+      "expected": 1.0,
+      "x": 0.0,
+      "y": 1.0
+    },
+    {
+      "expected": 1.0,
+      "x": -0.7071067811865475,
+      "y": 0.7071067811865475
+    },
+    {
+      "expected": 1.0,
+      "x": -1.0,
+      "y": 0.0
+    },
+    {
+      "expected": 1.0,
+      "x": -0.7071067811865475,
+      "y": -0.7071067811865475
+    }
+  ],
+  "meta": {
+    "python_geometry_sha256": "0b3a21603fabefa58150b5cdbf0854e09e71f4b056c35a9761e30401c3c7e7c7"
+  },
+  "norm_deg": [
+    {
+      "expected": 270.0,
+      "input": -90.0
+    },
+    {
+      "expected": 0.0,
+      "input": 360.0
+    },
+    {
+      "expected": 0.0,
+      "input": -0.0
+    },
+    {
+      "expected": 359.999999999999,
+      "input": -1e-12
+    },
+    {
+      "expected": 0.5,
+      "input": 720.5
+    }
+  ],
+  "schema_version": 1,
+  "signed_delta": [
+    {
+      "expected": -180.0,
+      "from": 0.0,
+      "to": 180.0
+    },
+    {
+      "expected": -179.0,
+      "from": 0.0,
+      "to": 181.0
+    },
+    {
+      "expected": 20.0,
+      "from": 350.0,
+      "to": 10.0
+    },
+    {
+      "expected": -20.0,
+      "from": 10.0,
+      "to": 350.0
+    },
+    {
+      "expected": 90.0,
+      "from": 270.0,
+      "to": 0.0
+    },
+    {
+      "expected": -90.0,
+      "from": 0.0,
+      "to": 270.0
+    },
+    {
+      "expected": 0.0,
+      "from": 45.0,
+      "to": 45.0
+    }
+  ],
+  "source": "desktop/padskills/geometry.py"
+}
