@@ -21,10 +21,10 @@ affects: [03-02, 03-03, 03-04, 03-05, 03-06, phase-5-detectors]
 actuals:
   tokens: 8670
   tasks: 2
-  commits: 2
+  commits: 3
 
 plan_head_before: 175ed719760de568037d8271463528b5a57fc662
-plan_head_after: 16b67469688252d014d4a1511a631ef94542ca77
+plan_head_after: 2868beb842d0fdf2a130e34e8b98f1091b129577
 
 tech-stack:
   added: []
@@ -115,7 +115,7 @@ coverage:
         status: pass
     human_judgment: false
 
-duration: 9min
+duration: 13min
 completed: 2026-11-05
 status: complete
 ---
@@ -126,9 +126,9 @@ status: complete
 
 ## Performance
 
-- **Duration:** 9 min
+- **Duration:** 13 min
 - **Started:** 2026-11-05T03:10:57+08:00（= 2026-11-04T19:10:57Z，plan 基线提交时刻）
-- **Completed:** 2026-11-05T03:20:04+08:00（= 2026-11-04T19:20:04Z）
+- **Completed:** 2026-11-05T03:25:31+08:00（= 2026-11-04T19:25:31Z）
 - **Tasks:** 2
 - **Files modified:** 13（11 新建、2 修改）
 
@@ -146,6 +146,7 @@ status: complete
 
 1. **Task 1: 一条链跑通「Python 参考 → 生成夹具 → GDScript 实现 → 无头断言」** — `3e67333` (feat)
 2. **Task 2: 闸门收成一条命令，并用四个 stub 证明四种假绿都会变红** — `16b6746` (feat)
+3. **Task 2 修复：看门狗重定向自身 stdio，避免管道被 sleep 握住** — `2868beb` (fix)
 
 **Plan metadata:** 见本次最终 docs 提交（SUMMARY / STATE / ROADMAP）
 
@@ -194,10 +195,18 @@ status: complete
 - **Verification:** `grep -c` = 1；`bash mobile/tools/gate-a.sh` 仍 `PACK_OK skills=5` 且无 `PACK_FAIL`。
 - **Committed in:** `16b6746`（Task 2 提交）
 
+**3. [Rule 1 - Bug] 看门狗子 shell 继承 stdout，管道调用会被 sleep 拖住**
+- **Found during:** 最终验收（`bash mobile/tools/test-core.sh | tail -4` 超过 180s 未返回）
+- **Issue:** 看门狗 `( sleep 180; kill … ) &` 继承了脚本的 stdout。脚本结束、`kill "$watcher"` 杀掉子 shell 后，`sleep 180` 仍持有管道写端；调用方一旦用管道或 `$(...)` 捕获输出，就要等到睡满才收到 EOF —— 脚本本身 3 秒就跑完了，外层却像挂死。这正是本计划要防的「把失败伪装成永远等下去」的同构问题，只是发生在闸门自己身上。
+- **Fix:** 看门狗的 stdout/stderr 全部重定向到 `/dev/null`，关闭继承链；判定逻辑与超时时长不变。
+- **Files modified:** mobile/tools/test-core.sh
+- **Verification:** `bash mobile/tools/test-core.sh | tail -4` 3.35s 返回并含 `TESTS_DONE failures=0`；`bash mobile/tools/test-core-selftest.sh` 仍 `SELFTEST_OK cases=5`（挂死反例依旧变红）。
+- **Committed in:** `2868beb`（Task 2 修复提交）
+
 ---
 
-**Total deviations:** 2 auto-fixed（均为「机械验收与实现形状」的差异，无行为变化）
-**Impact on plan:** 无功能/安全影响；两处都保留了原判据的强度，未删除或放宽任何断言。
+**Total deviations:** 3 auto-fixed（2 处机械验收形状差异 + 1 处看门狗管道 bug）
+**Impact on plan:** 无功能/安全影响；三处都保留了原判据的强度，未删除或放宽任何断言。
 
 ## Issues Encountered
 
@@ -226,5 +235,5 @@ None — 本计划未引入威胁模型之外的新表面；新增的网络/文�
 ## Self-Check: PASSED
 
 - 10 个交付文件全部存在。
-- 两个任务提交 `3e67333` / `16b6746` 均为 HEAD 祖先；`plan_head_before..HEAD` 实测 2 个提交，与 `actuals.commits` 一致。
-- `bash mobile/tools/test-core.sh`、`bash mobile/tools/test-core-selftest.sh`、`bash mobile/tools/gate-a.sh`、`bash tools/check_desktop.sh` 在本次执行中全部通过。
+- 三个提交 `3e67333` / `16b6746` / `2868beb` 均为 HEAD 祖先；`plan_head_before..HEAD` 实测 3 个代码提交，与 `actuals.commits` 一致。
+- `bash mobile/tools/test-core.sh`（含管道调用形态）、`bash mobile/tools/test-core-selftest.sh`、`bash mobile/tools/gate-a.sh`、`bash tools/check_desktop.sh` 在本次执行中全部通过。

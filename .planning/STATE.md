@@ -7,7 +7,7 @@ stopped_at: Phase 3 plan 01 complete (geometry golden + headless core gate), rea
 last_updated: "2026-11-04T19:20:04.000Z"
 last_activity: 2026-11-05
 last_activity_desc: Phase 3 plan 01 complete
-state_head: 16b67469688252d014d4a1511a631ef94542ca77
+state_head: 2868beb842d0fdf2a130e34e8b98f1091b129577
 progress:
   total_phases: 10
   completed_phases: 2
@@ -67,7 +67,7 @@ Progress: [██░░░░░░░░] 20%
 | Phase 2 P03 | 4min | 3 tasks | 12 files |
 | Phase 2 P04 | 13min | 3 tasks | 4 files |
 | Phase 2 P05 | 8min | 3 tasks | 6 files |
-| Phase 3 P01 | 9min | 2 tasks | 13 files |
+| Phase 3 P01 | 13min | 2 tasks | 13 files |
 
 ## Accumulated Context
 
@@ -144,6 +144,7 @@ Recent decisions affecting current work:
 - [Phase 3]: 核心闸门的唯一判据是 `^TESTS_DONE failures=0$` + `^TESTS_ASSERTIONS=0$` 拦截 + 看门狗；退出码 0 永不单独作判据，也刻意不加 `--check-only`（对解析错误同样返回 0）
 - [Phase 3]: `core_runner.gd` 用内嵌 Reporter + 显式 `preload` 字典；不许改成运行时扫描目录（目录消失会「零套件、零失败」地绿），套件必须 `complete()`
 - [Phase 3]: 闸门反例 stub 必须按 `--script` 参数分支：导入步骤没有看门狗，挂死型 stub 若对导入也 sleep 会先挂死自测脚本
+- [Phase 3]: 看门狗子 shell 必须把 stdout/stderr 重定向到 /dev/null：否则 `test-core.sh | tail` / `$(...)` 会一直等到 sleep 睡满才 EOF，闸门自己变成「永远等下去」
 
 ### Pending Todos
 
