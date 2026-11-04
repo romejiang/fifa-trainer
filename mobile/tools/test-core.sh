@@ -3,9 +3,10 @@
 #
 #   bash mobile/tools/test-core.sh
 #
-# 这一条命令同时证明六件事：配置副本与唯一真源一致、lint 的反例仍会变红、
-# src/core 没有越出零引擎依赖边界、几何黄金夹具没有漂移、工程能被 headless 导入、
-# 几何套件逐向量与 Python 参考一致且断言真的执行了。
+# 这一条命令同时证明七件事：配置副本与唯一真源一致、lint 的反例仍会变红、
+# src/core 没有越出零引擎依赖边界、几何黄金夹具没有漂移、配置判定在
+# Python/GDScript 两侧一致且分歧已记录、工程能被 headless 导入、核心套件
+# 逐条与 Python 参考一致且断言真的执行了。
 #
 # 为什么这个顺序不能换：配置校验必须第一步 —— 副本被手改时，测试会对着被改过的
 # 副本自洽地绿（与闸门 A 同源的假绿）。lint 的反例自测必须排在真 lint 之前 ——
@@ -59,6 +60,16 @@ fi
 echo "▸ 校验几何黄金夹具未漂移…"
 if ! python3 "$repo_root/tools/gen_geometry_golden.py" --check; then
     echo "  运行 python3 tools/gen_geometry_golden.py 重新生成黄金夹具后再试。" >&2
+    exit 1
+fi
+
+# 第四步：跨语言配置判定对等。纯 Python、不需要 Godot，越早失败越省时间；
+# 而且必须排在任何 Godot 调用之前 ——「两端语义分叉」比「某一端自己红了」
+# 更需要先知道。它只校验 Python 侧判定与语料一致、且每处分歧都有记录；
+# GDScript 侧由 config_corpus 套件在最后一步判。
+echo "▸ 校验配置判定在两端一致…"
+if ! python3 "$repo_root/tools/check_config_parity.py"; then
+    echo "  某条语料的 Python 判定与记录不符，或两侧判定不同却没有 divergence 记录；先看 stderr 里的 PARITY_FAIL。" >&2
     exit 1
 fi
 
@@ -131,4 +142,4 @@ if grep -qE '^TESTS_ASSERTIONS=0$' "$tmp/tests.log"; then
     exit 1
 fi
 
-echo "✓ 核心闸门通过：配置一致、边界干净、黄金未漂移、几何套件全绿"
+echo "✓ 核心闸门通过：配置一致、边界干净、黄金未漂移、两端判定对等、核心套件全绿"

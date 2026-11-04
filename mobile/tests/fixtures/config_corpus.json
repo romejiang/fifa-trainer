@@ -443,6 +443,7 @@
           {
             "name": "坏按钮模式",
             "type": "taps",
+            "required_button": "RB",
             "button_mode": "some"
           }
         ]
@@ -454,7 +455,7 @@
       },
       "python": {
         "verdict": "reject",
-        "note": "_parse_required_buttons 的 mode 白名单只有 all / any"
+        "note": "required_button 存在时才会校验 button_mode；无 required_button 时 Python 直接返回默认 all"
       },
       "divergence": ""
     },
