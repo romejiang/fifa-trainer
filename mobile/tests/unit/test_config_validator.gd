@@ -18,6 +18,9 @@ func run(r) -> void:
 	_check_real_config(r)
 	_check_minimal_valid(r)
 	_check_rejections(r)
+	_check_multi_error(r)
+	_check_subtree_skip(r)
+	_check_warnings(r)
 	r.complete()
 
 
@@ -190,6 +193,134 @@ func _check_rejections(r) -> void:
 	r.check(_count_code(duplicate_result.errors, &"duplicate_skill_name") == 1,
 		"两个同名动作应报 1 条 duplicate_skill_name（实际 %d）"
 			% _count_code(duplicate_result.errors, &"duplicate_skill_name"))
+
+
+# ---------------------------------------------------------------------------
+# 收集式与 warning（Task 3）
+# ---------------------------------------------------------------------------
+
+## ① 三个互不相关的错误必须一次给全，且 to_text() 正好三行。
+func _check_multi_error(r) -> void:
+	var data := _base_sequence()
+	# 先复制第二个动作再改第一个，否则第二个会继承 enabled 的坏值，多报一条 bool_expected。
+	var second: Dictionary = (_first_skill(data) as Dictionary).duplicate(true)
+	second["name"] = "测试序列二"
+	var second_params: Dictionary = second["params"]
+	second_params["max_duration_ms"] = 200
+	(data["skills"] as Array).append(second)
+	_first_skill(data)["enabled"] = "false"
+	data["input"] = {"invert": {"rs_y": "true"}}
+
+	var result := ConfigValidator.validate(data, "<multi>")
+	r.check(result.errors.size() == 3,
+		"三个互不相关的错误必须一次给全（实际 %d 条：%s）"
+			% [result.errors.size(), _codes(result)])
+	var expected_paths: Array[String] = [
+		"skills[0].enabled", "skills[1].params.max_duration_ms", "$.input.invert.rs_y",
+	]
+	var actual_paths: Dictionary = {}
+	for error in result.errors:
+		actual_paths[error.json_path] = true
+	for path in expected_paths:
+		r.check(actual_paths.has(path),
+			"多错误必须包含路径 %s（实际 %s）" % [path, _paths(result.errors)])
+	var lines := result.to_text().split("\n")
+	r.check(lines.size() == 3, "to_text() 必须正好 3 行（实际 %d 行）" % lines.size())
+	var text := result.to_text()
+	r.check(text.contains("bool_expected") and text.contains("max_not_greater_than_min")
+		and text.contains("invert_value_not_bool"),
+		"to_text() 三行必须各自带自己的 code（实际 %s）" % text)
+	r.check(not result.ok(), "有 error 时 ok() 必须为假")
+
+
+## ② type 非法只跳过专项检查，不能吞掉技能级字段的检查。
+func _check_subtree_skip(r) -> void:
+	var data := _base_arc()
+	_first_skill(data)["type"] = "nope"
+	_first_skill(data)["cooldown_ms"] = -5
+	var result := ConfigValidator.validate(data, "<skip>")
+	r.check(result.has_code(&"skill_type_invalid"), "type 非法必须报 skill_type_invalid")
+	r.check(result.has_code(&"negative_value"),
+		"type 非法不能吞掉 cooldown_ms 的检查（实际 %s）" % _codes(result))
+	r.check(result.errors.size() == 1 and result.errors[0].code == &"skill_type_invalid",
+		"type 非法只应产生 1 条 error（实际 %s）" % _codes(result))
+	r.check(result.warnings.size() == 1 and result.warnings[0].code == &"negative_value",
+		"cooldown_ms 负数必须是 1 条 warning（实际 %d 条）" % result.warnings.size())
+
+
+## ③④⑤⑥ 静默 clamp → 可见 warning；不可截断的越界仍是 error。
+func _check_warnings(r) -> void:
+	_check_poll_hz_warning(r)
+	_check_deadzone_stays_error(r)
+	_check_clamp_upper_bounds(r)
+	_check_other_max_clamps(r)
+
+
+func _check_poll_hz_warning(r) -> void:
+	var data := _base_arc()
+	(data["input"] as Dictionary)["poll_hz"] = 5000
+	var result := ConfigValidator.validate(data, "<warn>")
+	r.check(result.ok(), "poll_hz 越界是 warning，不能阻止启动（实际 %s）" % _text(result))
+	r.check(result.warnings.size() == 1,
+		"poll_hz 应只产生 1 条 warning（实际 %d 条）" % result.warnings.size())
+	if not result.warnings.is_empty():
+		r.check(result.warnings[0].code == &"out_of_range",
+			"poll_hz 的 warning code 必须是 out_of_range（实际 %s）" % result.warnings[0].code)
+	r.check(result.config.input.poll_hz == 1000,
+		"poll_hz 5000 必须被截断到 1000（实际 %d）" % result.config.input.poll_hz)
+
+
+func _check_deadzone_stays_error(r) -> void:
+	var data := _base_arc()
+	(data["input"] as Dictionary)["deadzone"] = 1.5
+	var result := ConfigValidator.validate(data, "<warn>")
+	r.check(not result.ok(), "deadzone 1.5 必须让配置失败，不能降级成 warning")
+	r.check(result.warnings.is_empty(), "deadzone 越界不能进 warnings（实际 %d 条）" % result.warnings.size())
+	r.check(result.has_code(&"out_of_range"), "deadzone 越界必须是 out_of_range error")
+
+
+## ⑤ calibration_ms 的上界是 3000，idle_reset_ms 是 5000 —— 两个值不能统一。
+## 4000 对 calibration 越界、对 idle 合法，所以只能有 1 条 warning；6000 才越过 idle 的 5000。
+func _check_clamp_upper_bounds(r) -> void:
+	var within := _base_arc()
+	var within_input: Dictionary = within["input"]
+	within_input["calibration_ms"] = 4000
+	within_input["idle_reset_ms"] = 4000
+	var within_result := ConfigValidator.validate(within, "<warn>")
+	r.check(within_result.ok(), "calibration/idle 越界是 warning（实际 %s）" % _text(within_result))
+	r.check(within_result.warnings.size() == 1,
+		"4000 只越过 calibration 的 3000，应只有 1 条 warning（实际 %d 条：%s）"
+			% [within_result.warnings.size(), _codes(within_result)])
+	r.check(within_result.config.input.calibration_ms == 3000,
+		"calibration_ms 上界必须是 3000（实际 %d）" % within_result.config.input.calibration_ms)
+	r.check(within_result.config.input.idle_reset_ms == 4000,
+		"idle_reset_ms 4000 仍在 0~5000 内（实际 %d）" % within_result.config.input.idle_reset_ms)
+
+	var beyond := _base_arc()
+	(beyond["input"] as Dictionary)["idle_reset_ms"] = 6000
+	var beyond_result := ConfigValidator.validate(beyond, "<warn>")
+	r.check(beyond_result.warnings.size() == 1,
+		"idle_reset_ms 6000 应产生 1 条 warning（实际 %d 条）" % beyond_result.warnings.size())
+	r.check(beyond_result.config.input.idle_reset_ms == 5000,
+		"idle_reset_ms 上界必须是 5000（实际 %d）" % beyond_result.config.input.idle_reset_ms)
+
+
+## ⑥ 另外三个 max() 型静默截断：startup_test_ms / duration_ms / gap_ms。
+func _check_other_max_clamps(r) -> void:
+	var data := _base_arc()
+	var rumble: Dictionary = data["rumble"]
+	rumble["startup_test_ms"] = 0
+	_first_skill(data)["rumble"] = {"pattern": [{"duration_ms": 0, "gap_ms": -5}]}
+	var result := ConfigValidator.validate(data, "<warn>")
+	r.check(result.ok(), "下界截断是 warning，不能阻止启动（实际 %s）" % _text(result))
+	r.check(result.warnings.size() == 3,
+		"应产生 3 条 warning（实际 %d 条：%s）" % [result.warnings.size(), _codes(result)])
+	r.check(result.config.rumble.startup_test_ms == 10,
+		"startup_test_ms 下界必须是 10（实际 %d）" % result.config.rumble.startup_test_ms)
+	r.check(result.config.skills[0].pattern[0].duration_ms == 1,
+		"duration_ms 下界必须是 1（实际 %d）" % result.config.skills[0].pattern[0].duration_ms)
+	r.check(result.config.skills[0].pattern[0].gap_ms == 0,
+		"gap_ms 下界必须是 0（实际 %d）" % result.config.skills[0].pattern[0].gap_ms)
 
 
 # ---------------------------------------------------------------------------

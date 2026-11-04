@@ -35,9 +35,14 @@ static func validate(data: Variant, source_path := "") -> ConfigResult:
 
 	var root: Dictionary = data
 	var app := AppConfig.new()
-	app.skills = _validate_skills(root.get("skills"), result.errors)
-	app.input = _validate_input(root.get("input"), ROOT_PATH + ".input", result.errors)
-	app.rumble = _validate_rumble(root.get("rumble"), ROOT_PATH + ".rumble", result.errors)
+	# 收集式：三条独立分支各查各的，任何一条失败都不会吞掉另外两条。
+	app.skills = _validate_skills(root.get("skills"), result.errors, result.warnings)
+	app.input = _validate_input(
+		root.get("input"), ROOT_PATH + ".input", result.errors, result.warnings)
+	app.rumble = _validate_rumble(
+		root.get("rumble"), ROOT_PATH + ".rumble", result.errors, result.warnings)
+	app.global_cooldown_ms = _read_global_cooldown(
+		root, result.errors, result.warnings)
 	if result.errors.is_empty():
 		result.config = app
 	return result
@@ -47,7 +52,8 @@ static func validate(data: Variant, source_path := "") -> ConfigResult:
 # 结构
 # ---------------------------------------------------------------------------
 
-static func _validate_skills(raw: Variant, out: Array[ConfigError]) -> Array[Skill]:
+static func _validate_skills(raw: Variant, out: Array[ConfigError],
+		warnings: Array[ConfigError]) -> Array[Skill]:
 	var skills: Array[Skill] = []
 	if typeof(raw) != TYPE_ARRAY:
 		_fail(out, ROOT_PATH + ".skills", &"skills_not_array",
@@ -61,14 +67,15 @@ static func _validate_skills(raw: Variant, out: Array[ConfigError]) -> Array[Ski
 			"把要练的动作写进 skills 数组，或从默认配置里复制一段。")
 		return skills
 	for index in items.size():
-		var skill := _validate_skill(items[index], index, out)
+		var skill := _validate_skill(items[index], index, out, warnings)
 		if skill != null:
 			skills.append(skill)
 	_report_duplicate_names(skills, out)
 	return skills
 
 
-static func _validate_skill(raw: Variant, index: int, out: Array[ConfigError]) -> Skill:
+static func _validate_skill(raw: Variant, index: int, out: Array[ConfigError],
+		warnings: Array[ConfigError]) -> Skill:
 	var path := "skills[%d]" % index
 	if typeof(raw) != TYPE_DICTIONARY:
 		_fail(out, path, &"skill_not_object",
@@ -81,15 +88,16 @@ static func _validate_skill(raw: Variant, index: int, out: Array[ConfigError]) -
 	var raw_kind: Variant = dict.get("type", null)
 	if typeof(raw_kind) == TYPE_STRING:
 		kind = str(raw_kind).strip_edges().to_lower()
-	if not KINDS.has(kind):
+	var kind_ok := KINDS.has(kind)
+	if not kind_ok:
 		_fail(out, path + ".type", &"skill_type_invalid",
 			"type 必须是 'arc'、'sequence' 或 'taps'，收到 %s" % _preview(raw_kind),
 			"改成三种之一；拼写和大小写都要对。")
-		# 只跳过依赖 type 的子树：外层继续下一个动作。
-		return null
+		# 只跳过依赖 type 的子树：name / enabled / required_button / cooldown_ms /
+		# rumble 等技能级字段必须照查 —— 一个坏 type 不该让其余错误从屏幕上消失。
 
 	var skill := Skill.new()
-	skill.kind = StringName(kind)
+	skill.kind = StringName(kind) if kind_ok else &""
 	skill.raw = dict
 
 	var skill_name := "未命名动作 #%d" % (index + 1)
@@ -105,7 +113,16 @@ static func _validate_skill(raw: Variant, index: int, out: Array[ConfigError]) -
 
 	skill.enabled = _read_boolean(dict, "enabled", true, path, out)
 	skill.relative_to_ls = _read_boolean(dict, "relative_to_ls", false, path, out)
-	skill.cooldown_ms = int(_read_number(dict, "cooldown_ms", 400.0, path, out))
+
+	# Python 的 `max(0, int(...))` 是静默截断；移动端把它变成可见 warning，
+	# 用户知道值被改过，而不是「我写了 -5，程序却按 0 跑」。
+	var cooldown := _read_number(dict, "cooldown_ms", 400.0, path, out)
+	if dict.has("cooldown_ms") and _is_number(dict["cooldown_ms"]) and cooldown < 0.0:
+		_warn(warnings, path + ".cooldown_ms", &"negative_value",
+			"cooldown_ms (%s) 不能是负数，已按 0 使用" % _fmt(cooldown),
+			"改成 0 或更大的毫秒数；负数会被截断成 0。")
+		cooldown = 0.0
+	skill.cooldown_ms = int(cooldown)
 	skill.required_buttons = _read_required_buttons(dict, path, out)
 	skill.button_mode = _read_button_mode(dict, path, out)
 
@@ -128,7 +145,7 @@ static func _validate_skill(raw: Variant, index: int, out: Array[ConfigError]) -
 			params = params_dict.duplicate(true)
 	skill.params = params
 
-	if params_ok:
+	if params_ok and kind_ok:
 		if kind == "sequence":
 			_validate_sequence(skill, path, out)
 		elif kind == "arc":
@@ -137,7 +154,7 @@ static func _validate_skill(raw: Variant, index: int, out: Array[ConfigError]) -
 			_validate_taps(skill, path, out)
 		_check_modifier_cross(skill, path, out)
 
-	skill.pattern = _read_pattern(dict.get("rumble"), path, out)
+	skill.pattern = _read_pattern(dict.get("rumble"), path, out, warnings)
 	return skill
 
 
@@ -417,7 +434,8 @@ static func _validate_common_timing(params: Dictionary, params_path: String,
 # input / rumble
 # ---------------------------------------------------------------------------
 
-static func _validate_input(raw: Variant, path: String, out: Array[ConfigError]) -> InputConfig:
+static func _validate_input(raw: Variant, path: String, out: Array[ConfigError],
+		warnings: Array[ConfigError]) -> InputConfig:
 	var cfg := InputConfig.new()
 	if typeof(raw) == TYPE_NIL:
 		return cfg
@@ -435,15 +453,19 @@ static func _validate_input(raw: Variant, path: String, out: Array[ConfigError])
 		dict, "trigger_threshold", cfg.trigger_threshold, path, out)
 	cfg.initial_facing_deg = _read_number(
 		dict, "initial_facing_deg", cfg.initial_facing_deg, path, out)
-	cfg.poll_hz = int(_read_number(dict, "poll_hz", float(cfg.poll_hz), path, out))
-	cfg.joystick_index = int(_read_number(
-		dict, "joystick_index", float(cfg.joystick_index), path, out))
-	cfg.calibration_ms = int(_read_number(
-		dict, "calibration_ms", float(cfg.calibration_ms), path, out))
-	cfg.idle_reset_ms = int(_read_number(
-		dict, "idle_reset_ms", float(cfg.idle_reset_ms), path, out))
-	cfg.gesture_release_ms = int(_read_number(
-		dict, "gesture_release_ms", float(cfg.gesture_release_ms), path, out))
+	# 五个静默 clamp 逐一降级为可见 warning。上界逐字照 desktop/padskills/config.py:691-702：
+	# poll_hz 30~1000、calibration_ms 0~3000、idle_reset_ms / gesture_release_ms 0~5000。
+	# 千万不要把 calibration_ms 统一成 5000 —— 那样 4000 在移动端被接受、桌面版却被截到 3000。
+	cfg.poll_hz = int(_clamped_int(dict, "poll_hz", float(cfg.poll_hz),
+		path, out, warnings, 30.0, 1000.0))
+	cfg.joystick_index = int(_clamped_int(dict, "joystick_index", float(cfg.joystick_index),
+		path, out, warnings, 0.0, -1.0))
+	cfg.calibration_ms = int(_clamped_int(dict, "calibration_ms", float(cfg.calibration_ms),
+		path, out, warnings, 0.0, 3000.0))
+	cfg.idle_reset_ms = int(_clamped_int(dict, "idle_reset_ms", float(cfg.idle_reset_ms),
+		path, out, warnings, 0.0, 5000.0))
+	cfg.gesture_release_ms = int(_clamped_int(dict, "gesture_release_ms",
+		float(cfg.gesture_release_ms), path, out, warnings, 0.0, 5000.0))
 
 	if dict.has("axis_layout"):
 		var layout: Variant = dict["axis_layout"]
@@ -496,7 +518,8 @@ static func _validate_input(raw: Variant, path: String, out: Array[ConfigError])
 	return cfg
 
 
-static func _validate_rumble(raw: Variant, path: String, out: Array[ConfigError]) -> RumbleConfig:
+static func _validate_rumble(raw: Variant, path: String, out: Array[ConfigError],
+		warnings: Array[ConfigError]) -> RumbleConfig:
 	var cfg := RumbleConfig.new()
 	if typeof(raw) == TYPE_NIL:
 		return cfg
@@ -541,8 +564,16 @@ static func _validate_rumble(raw: Variant, path: String, out: Array[ConfigError]
 
 	cfg.startup_test_strength = _clamp01_field(
 		dict, "startup_test_strength", cfg.startup_test_strength, path, out)
-	cfg.startup_test_ms = int(_read_number(
-		dict, "startup_test_ms", float(cfg.startup_test_ms), path, out))
+	# 启动自检太短等于没有：Python `max(10, int(...))` 静默截断，这里同样改成
+	# 可见 warning，下界 10 是 config.py:744 的硬值。
+	var startup_ms := _read_number(
+		dict, "startup_test_ms", float(cfg.startup_test_ms), path, out)
+	if dict.has("startup_test_ms") and _is_number(dict["startup_test_ms"]) and startup_ms < 10.0:
+		_warn(warnings, path + ".startup_test_ms", &"out_of_range",
+			"startup_test_ms (%s) 小于 10，已按 10 使用" % _fmt(startup_ms),
+			"改成 10 或更大的毫秒数；太短的自检用户感觉不到。")
+		startup_ms = 10.0
+	cfg.startup_test_ms = int(startup_ms)
 
 	return cfg
 
@@ -552,7 +583,8 @@ static func _validate_rumble(raw: Variant, path: String, out: Array[ConfigError]
 # ---------------------------------------------------------------------------
 
 ## null → 一条默认 Pulse；单对象 / 数组 / {pattern: [...]} 三种形状归一。
-static func _read_pattern(raw: Variant, path: String, out: Array[ConfigError]) -> Array[Pulse]:
+static func _read_pattern(raw: Variant, path: String, out: Array[ConfigError],
+		warnings: Array[ConfigError]) -> Array[Pulse]:
 	var pulses: Array[Pulse] = []
 	if typeof(raw) == TYPE_NIL:
 		pulses.append(Pulse.new())
@@ -595,8 +627,20 @@ static func _read_pattern(raw: Variant, path: String, out: Array[ConfigError]) -
 		var item_dict: Dictionary = item
 		var low := _clamp01_field(item_dict, "low", 0.8, item_path, out)
 		var high := _clamp01_field(item_dict, "high", 0.0, item_path, out)
+		# 下界同上：Python 用 max(1, ...) / max(0, ...) 静默截断（config.py:522-523），
+		# 移动端让用户看得见「0 被按 1 用了」。
 		var duration := int(_read_number(item_dict, "duration_ms", 120.0, item_path, out))
+		if item_dict.has("duration_ms") and _is_number(item_dict["duration_ms"]) and duration < 1:
+			_warn(warnings, item_path + ".duration_ms", &"out_of_range",
+				"duration_ms (%s) 小于 1，已按 1 使用" % _fmt(float(duration)),
+				"改成 1 或更大的毫秒数；0 毫秒的震动等于没有。")
+			duration = 1
 		var gap := int(_read_number(item_dict, "gap_ms", 0.0, item_path, out))
+		if item_dict.has("gap_ms") and _is_number(item_dict["gap_ms"]) and gap < 0:
+			_warn(warnings, item_path + ".gap_ms", &"negative_value",
+				"gap_ms (%s) 不能是负数，已按 0 使用" % _fmt(float(gap)),
+				"改成 0 或更大的毫秒数。")
+			gap = 0
 		pulses.append(Pulse.new(low, high, duration, gap))
 	if pulses.is_empty():
 		pulses.append(Pulse.new())
@@ -671,6 +715,64 @@ static func _clamp01_field(dict: Dictionary, key: String, fallback: float,
 			"改成 0.0 到 1.0 之间的数；这是比例，不是百分比。")
 		return fallback
 	return value
+
+
+## 可截断的整数字段：越界不报 error，而是 warning + 应用截断值。
+## max_value < min_value 表示「只有下界」（joystick_index），负数用 negative_value。
+static func _clamped_int(dict: Dictionary, key: String, fallback: float,
+		path: String, out: Array[ConfigError], warnings: Array[ConfigError],
+		min_value: float, max_value: float) -> int:
+	if not dict.has(key):
+		return int(fallback)
+	var raw: Variant = dict[key]
+	if not _is_number(raw):
+		_fail(out, path + "." + key, &"number_expected",
+			"%s 必须是数字，收到 %s" % [key, _preview(raw)],
+			"写成不带引号的整数，例如 250。")
+		return int(fallback)
+	var value := float(raw)
+	if value >= min_value and (max_value < min_value or value <= max_value):
+		return int(value)
+
+	var clamped := min_value
+	var code := &"out_of_range"
+	var message := ""
+	var fix_hint := ""
+	if max_value < min_value:
+		code = &"negative_value"
+		message = "%s (%s) 不能是负数，已按 %s 使用" % [key, _fmt(value), _fmt(min_value)]
+		fix_hint = "改成 %s 或更大的整数。" % _fmt(min_value)
+	elif value > max_value:
+		clamped = max_value
+		message = "%s (%s) 超出 %s~%s，已按 %s 使用" % [
+			key, _fmt(value), _fmt(min_value), _fmt(max_value), _fmt(clamped)]
+		fix_hint = "改成 %s~%s 之间的值。" % [_fmt(min_value), _fmt(max_value)]
+	else:
+		message = "%s (%s) 超出 %s~%s，已按 %s 使用" % [
+			key, _fmt(value), _fmt(min_value), _fmt(max_value), _fmt(clamped)]
+		fix_hint = "改成 %s~%s 之间的值。" % [_fmt(min_value), _fmt(max_value)]
+	_warn(warnings, path + "." + key, code, message, fix_hint)
+	return int(clamped)
+
+
+## global_cooldown_ms 同属「可截断」：Python 的 max(0, ...) 变成可见 warning。
+static func _read_global_cooldown(root: Dictionary, out: Array[ConfigError],
+		warnings: Array[ConfigError]) -> int:
+	if not root.has("global_cooldown_ms"):
+		return 60
+	var raw: Variant = root["global_cooldown_ms"]
+	if not _is_number(raw):
+		_fail(out, ROOT_PATH + ".global_cooldown_ms", &"number_expected",
+			"global_cooldown_ms 必须是数字，收到 %s" % _preview(raw),
+			"写成不带引号的毫秒数，例如 60。")
+		return 60
+	var value := float(raw)
+	if value < 0.0:
+		_warn(warnings, ROOT_PATH + ".global_cooldown_ms", &"negative_value",
+			"global_cooldown_ms (%s) 不能是负数，已按 0 使用" % _fmt(value),
+			"改成 0 或更大的毫秒数。")
+		return 0
+	return int(value)
 
 
 ## 方向值 → 角度（float）；失败返回 null。布尔单独给 direction_is_bool。
@@ -763,6 +865,12 @@ static func _is_number(value: Variant) -> bool:
 static func _fail(out: Array[ConfigError], path: String, code: StringName,
 		message: String, fix_hint: String) -> void:
 	out.append(ConfigError.new(path, code, message, fix_hint))
+
+
+## warning 与 error 走同一个对象，只是 severity 不同：它不阻止启动，但必须可见。
+static func _warn(warnings: Array[ConfigError], path: String, code: StringName,
+		message: String, fix_hint: String) -> void:
+	warnings.append(ConfigError.new(path, code, message, fix_hint, ConfigError.SEVERITY_WARNING))
 
 
 ## 把任意 JSON 值变成可读短串（含实际值），错误消息里必须让用户看到收到的是什么。
