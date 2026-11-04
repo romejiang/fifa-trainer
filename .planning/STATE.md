@@ -3,16 +3,16 @@ gsd_state_version: "1.0"
 current_phase: 3
 current_phase_name: 纯核心地基 — 几何 / 配置校验 / 无头运行 / 架构 lint
 status: executing
-stopped_at: Phase 3 plan 04 complete (字节入口 + 结构化错误 + 全量校验), ready for 03-05
-last_updated: "2026-11-04T19:48:53.000Z"
+stopped_at: Phase 3 plan 05 complete (坏配置语料 + 跨语言判定对等), ready for 03-06
+last_updated: "2026-11-04T19:56:30.000Z"
 last_activity: 2026-11-05
-last_activity_desc: Phase 3 plan 04 complete
-state_head: 17fc357e2932ddfc7d708c9b629c08ca821b4477
+last_activity_desc: Phase 3 plan 05 complete
+state_head: 3302abf276fea674a10d282c0c6d14b1f6e0ff1b
 progress:
   total_phases: 10
   completed_phases: 2
   total_plans: 16
-  completed_plans: 14
+  completed_plans: 15
   percent: 20
 ---
 
@@ -28,18 +28,18 @@ See: .planning/PROJECT.md (updated 2026-11-04)
 ## Current Position
 
 Phase: 3 (纯核心地基 — 几何 / 配置校验 / 无头运行 / 架构 lint) — EXECUTING
-Plan: 5 of 6
+Plan: 6 of 6
 Status: Executing Phase 3
-Last activity: 2026-11-05 — 03-04 完成：字节入口 + 结构化错误 + 全量校验
+Last activity: 2026-11-05 — 03-05 完成：坏配置语料 + 跨语言判定对等
 
 Progress: [██░░░░░░░░] 20%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 13
+- Total plans completed: 15
 - Average duration: — min
-- Total execution time: 0.7 hours
+- Total execution time: 0.8 hours
 
 **By Phase:**
 
@@ -71,6 +71,7 @@ Progress: [██░░░░░░░░] 20%
 | Phase 3 P02 | 4min | 2 tasks | 5 files |
 | Phase 3 P03 | 5min | 3 tasks | 21 files |
 | Phase 3 P04 | 7min | 3 tasks | 13 files |
+| Phase 3 P05 | 4min | 3 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -167,6 +168,12 @@ Recent decisions affecting current work:
 - [Phase 3]: clamp 上界逐字照 Python 且不统一：`calibration_ms` 0~3000、`idle_reset_ms` / `gesture_release_ms` 0~5000；统一会让 4000 在两端表现不同且语料永远发现不了
 - [Phase 3]: 静默 clamp 一律降级为 `SEVERITY_WARNING` 并带实际值与截断值；`deadzone` 这类不可截断的越界仍是 error
 - [Phase 3]: `type` 非法只跳过专项子树，技能级字段继续查；收集式校验保证一个坏字段不会让其余错误消失
+- [Phase 3]: 跨语言语料是唯一契约：同一份 JSON 用例被 GDScript 与 Python 各判一次，期望值只存在语料里，两侧都不许有第二份
+- [Phase 3]: 故意分歧必须带非空 `divergence` + `python.note`；判定一致却还留着 divergence 也判红（记录已过时才需要删除）
+- [Phase 3]: Python 侧基线只走 `json.loads(text)`；先 encode 再交给 json.loads 会按 `utf-8-sig` 接受 BOM，把基线本身弄错
+- [Phase 3]: 对 `python: accept` 的用例再跑 `build_detector()`：`start_angle` 数组这类「parse 通过、构造检测器才崩」的晚失败只有这里抓得到
+- [Phase 3]: 语料下限双层：`>= 4` 钉四个点名用例，`>= 16` 防「删掉大半语料仍通过」；唯一 id 断言让失败定位不失效
+- [Phase 3]: `button_mode_invalid` 必须带 `required_button`：Python 在 required_button 为 None 时提前返回，根本不看 button_mode
 
 ### Pending Todos
 
@@ -193,6 +200,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-11-04T19:48:53.000Z
-Stopped at: Phase 3 plan 04 complete (字节入口 + 结构化错误 + 全量校验), ready for 03-05
+Last session: 2026-11-04T19:56:30.000Z
+Stopped at: Phase 3 plan 05 complete (坏配置语料 + 跨语言判定对等), ready for 03-06
 Resume file: None

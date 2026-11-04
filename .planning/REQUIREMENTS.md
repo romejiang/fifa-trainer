@@ -57,7 +57,7 @@
 ### 韧性
 
 - [ ] **RESIL-01**: 切后台 / 回前台不产生误判（前台时间与墙钟时间分离）
-- [ ] **RESIL-02**: 配置校验失败显示错误屏并给出可操作信息，而非 `push_error` 或静默降级
+- [x] **RESIL-02**: 配置校验失败显示错误屏并给出可操作信息，而非 `push_error` 或静默降级
 - [x] **RESIL-03**: 核心代码可在无场景树、无手柄的环境下无头运行，由回放源驱动
 
 ### 仓库与构建
@@ -156,7 +156,7 @@
 | ONBOARD-01 | Phase 4 | Pending |
 | ONBOARD-02 | Phase 4 | Pending |
 | RESIL-01 | Phase 8 | Pending |
-| RESIL-02 | Phase 3 | Pending |
+| RESIL-02 | Phase 3 | Complete |
 | RESIL-03 | Phase 3 | Complete |
 | INFRA-01 | Phase 1 | Complete |
 | INFRA-02 | Phase 1 | Complete |

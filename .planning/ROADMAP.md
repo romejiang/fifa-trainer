@@ -114,7 +114,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] 03-04-PLAN.md — bytes 入口（BOM）+ `ConfigResult` / `Array[ConfigError]` + 全量校验与可见 warning
 
 **Wave 4** *(blocked on Wave 3 completion)*
-- [ ] 03-05-PLAN.md — 坏配置语料 + Python/GDScript 判定对等（分歧必须记录）
+- [x] 03-05-PLAN.md — 坏配置语料 + Python/GDScript 判定对等（分歧必须记录）
 
 **Wave 5** *(blocked on Wave 4 completion)*
 - [ ] 03-06-PLAN.md — `user://` 稀疏覆盖层 + `ConfigStore` 原子写 + `user://` 定名
@@ -250,7 +250,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 →
 |-------|----------------|--------|-----------|
 | 1. 仓库拆分 + 配置单一真源 + 桌面回归闸门 | 5/5 | Complete    | 2026-11-04 |
 | 2. 安卓工具链 + 真机冒烟 APK | 5/5 | Complete    | 2026-11-05 |
-| 3. 纯核心地基 | 2/6 | In progress | - |
+| 3. 纯核心地基 | 5/6 | In progress | - |
 | 4. 设备输入层 + 绿色搓射竖切 | 0/0 | Not started | - |
 | 5. 全动作判定对等性 | 0/0 | Not started | - |
 | 6. 训练循环 | 0/0 | Not started | - |
