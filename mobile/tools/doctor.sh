@@ -239,7 +239,7 @@ assert_keystore() {
     if [ -z "${GODOT_ANDROID_KEYSTORE_RELEASE_PASSWORD:-}" ]; then
         echo "✗ keystore 口令未在环境变量 GODOT_ANDROID_KEYSTORE_RELEASE_PASSWORD 中" >&2
         echo "  只报告变量名，不读取、不打印任何口令值。" >&2
-        echo "  修法: 从密码管理器取出发布口令，在本命令前 export GODOT_ANDROID_KEYSTORE_RELEASE_PASSWORD=<口令>；不要写进任何文件。" >&2
+        echo "  修法: 从密码管理器取出发布口令，先 export 变量 GODOT_ANDROID_KEYSTORE_RELEASE_PASSWORD（口令只留在环境里，不要写进任何文件）。" >&2
         return 1
     fi
 

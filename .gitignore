@@ -18,6 +18,12 @@ mobile/.godot/
 mobile/build/
 mobile/export/
 *.apk
+# apksigner 的 v4 签名旁文件（RESEARCH P11）：分发时只拷 .apk
+*.idsig
+# release / debug 密钥库永远不进仓库（T-02-10）
+*.keystore
+# keytool 的另一种扩展名，与 .keystore 同等对待
+*.jks
 
 # Local logs / screenshots
 *.log
