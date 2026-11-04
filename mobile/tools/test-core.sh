@@ -78,7 +78,10 @@ run_with_timeout() {
     local out="$1"; shift
     "$@" >"$out" 2>&1 &
     local pid=$!
-    ( sleep "$secs"; kill -TERM "$pid" 2>/dev/null; sleep 2; kill -KILL "$pid" 2>/dev/null ) &
+    # 看门狗的 stdout/stderr 必须重定向掉：它继承了调用方的 fd，若调用方把
+    # 本脚本的 stdout 接进管道（`test-core.sh | tail` / `$(...)`），看门狗里的
+    # sleep 会一直握着管道写端 —— 脚本本身早已退出，管道却要等到睡满才 EOF。
+    ( sleep "$secs"; kill -TERM "$pid" 2>/dev/null; sleep 2; kill -KILL "$pid" 2>/dev/null ) >/dev/null 2>&1 &
     local watcher=$!
     local rc=0
     wait "$pid" || rc=$?
