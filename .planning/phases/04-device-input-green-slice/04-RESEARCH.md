@@ -62,7 +62,7 @@
 | E13 | 失败单槽：`_drain_failures` 只取**配置顺序第一个**有 pending 的 skill，其余 pending 被丢弃；失败使 `attempts += 1` | `[VERIFIED: desktop/padskills/engine.py:332-353]` | HIGH |
 | E14 | `GROUP_SIZE = 10`；命中才 `group_hits += 1`，满 10 清 0 并 `groups_done += 1` | `[VERIFIED: desktop/padskills/engine.py:93, 296-301]` | HIGH |
 | E15 | `_buttons_ok`：无要求键 → True；`button_mode == "any"` → any；否则 all | `[VERIFIED: desktop/padskills/engine.py:387-393]` | HIGH |
-| E16 | 死区公式：`m = hypot(x,y)`；`m <= dz or m == 0` → `(0,0)`；否则 `scaled = min(1.0, (m-dz)/(1-dz))`，`x/m*scaled, y/m*scaled`（**不钳制 magnitude**） | `[VERIFIED: desktop/padskills/input_source.py:328-334]` | HIGH |
+| E16 | 死区公式：`m = hypot(x,y)`；`m <= dz or m == 0` → `(0,0)`；否则 `scaled = min(1.0, (m-dz)/(1-dz))`，`x/m*scaled, y/m*scaled`（输出长度 = `scaled` ≤ 1.0；角度不变） | `[VERIFIED: desktop/padskills/input_source.py:328-334]` | HIGH |
 | E17 | 扳机归一：`rest < -0.05` 时 `(value - rest) / (1 - rest)` 再 clamp 到 0..1；否则直接 clamp | `[VERIFIED: desktop/padskills/input_source.py:539-547]` | HIGH |
 | E18 | `AxisLayout.trigger_rest` 默认 `-1.0`（双极），探针判 `rest[lt_axis].mean < -0.4` 才留 `-1.0`，否则 `0.0` | `[VERIFIED: desktop/padskills/input_source.py:132, 288-291]` | HIGH |
 | E19 | 角度约定：0°=上、90°=右、顺时针、`[0,360)`；`x==0 and y==0 → 0.0`；`norm_deg(rad_to_deg(atan2(x, -y)))` | `[VERIFIED: mobile/src/core/geometry.gd:38-45]` | HIGH |
@@ -445,7 +445,7 @@ static func deadzone(x: float, y: float, dz: float) -> Vector2:
 两条必须保留的性质：
 
 - **角度不变**：乘的是标量 `scaled`，方向不动。
-- **magnitude 不钳制到 1.0**：斜向推到底时原始 `m` 可达 ~1.41，`scaled` 被钳到 1.0 后返回向量的长度仍是 ~1.41。`Input.get_vector()` 会把结果钳到 1.0 并用圆形死区 —— 同一个物理位置会在不同点越过 `enter_threshold: 0.72`，这是 PITFALLS C8 的原始缺陷。**禁止**用 `Input.get_vector()` / `InputMap` 替代。
+- **输出长度 = `scaled` ≤ 1.0**：`x/m` 与 `y/m` 是单位向量，乘上 `scaled` 后长度就是 `scaled`；斜向推到底 `(1.0, 1.0)` 的 `m ≈ 1.4142`，`scaled` 被 `minf(1.0, …)` 封顶到 1.0，返回 `(0.7071, 0.7071)`、长度 **1.0**（先前写成「长度仍约 1.41」是笔误，公式本身不可能产出大于 1 的长度）。`Input.get_vector()` 用另一套圆形死区与钳制规则，同一个物理位置会在不同点越过 `enter_threshold: 0.72`，这是 PITFALLS C8 的原始缺陷。**禁止**用 `Input.get_vector()` / `InputMap` 替代。
 
 ### 4. 坏校准的检测（要在屏幕上说出来，不能只是「存了」）
 
@@ -685,7 +685,8 @@ python3 tools/gen_tap_golden.py --check    # 只比对，不写盘；不一致�
 | `det_first_frame_held_x` | detector | X 先按着，再按 RB | **不产**任何判定（`observe` 守卫） |
 | `det_release_hold_gate` | detector | 命中后 40 ms 再按；再松开 120 ms 后重新起手 | 第一段只 1 Hit，第二段正常起手 |
 | `rt_two_shots_500` | runtime | 两发间隔 500，两发之间留 700 ms 空档 | 2 Outcome（都 `ok`），`hits=2, attempts=2, group_hits=2` |
-| `rt_cooldown_swallow` | runtime | 第二发的命中时刻落在上一发命中后 < 450 ms | **只有 1 条 Outcome**（第二发被静默丢弃，`suppressed` 不变）—— 这条用来防后人「顺手修好」它 |
+| `rt_gesture_lock` | runtime | 命中后 150 ms 锁定期内做一段「本来会报 too_fast」的按压；锁满后再做一发 | **只有 2 条 `ok`**（锁定期内检测器不被调用、失败不被 drain）—— 这条防止手势锁被写漏 |
+| （不占夹具）逐动作冷却 | unit | `cooldown_ms = 900` 的合成运行时，第二发命中落在第一发后约 520–600 ms | **只有 1 条 Outcome**、`suppressed == 0`——真实配置 450 ms 下该分支不可达（重新武装 120 + 最短间隔 400 = 520），不能拿真实时序冒充 |
 
 补充断言（每条用例都查）：`cases.size() >= 14`、id 唯一、每个 `kind` 至少 5 条。规模下限的意义与 `test_config_corpus.gd:52-62` 相同：删掉大半语料不能让闸门变绿。
 
@@ -976,7 +977,7 @@ core (纯)  ←── input (引擎绑定)  ←── ui (场景/Control)
 | R5 | 400/600 边界在 60 Hz 轮询下有 ±16.7 ms 量化 | 边界尝试偶发误判 | UI 文案引导到 450–500；真机记录分布；**不动阈值**（Phase 5 抽稀矩阵统一裁决） | 否 |
 | R6 | DualSense 的按钮索引是否与 Xbox 一致 | 若不一致，`X`/`□` 文案与索引对不上 | S11 的按键确认页会实测索引；不符则记录 `button_index_ok: false` 并提示 | 否 |
 | R7 | `Frame` 等 `class_name` 撞名 | 解析期报错，Wave 1 就暴露 | 第一个 Wave 先跑 `--import`；撞名改名（成本一次性） | 否 |
-| R8 | 冷却静默丢弃命中（`cooldown_ms = 450`） | 用户做完动作却**没有任何判定**，看起来像漏判 | 这是桌面版既有行为，**不修**（修了就破坏对等）；用夹具 `rt_cooldown_swallow` 把它钉成已知行为；UX 层的「冷却可见」归 Phase 6（LOOP-03） | 否 |
+| R8 | 冷却静默丢弃命中（`cooldown_ms = 450`） | 用户做完动作却**没有任何判定**，看起来像漏判 | 这是桌面版既有行为，**不修**（修了就破坏对等）；用 `cooldown_ms = 900` 的合成运行时断言把它钉成已知行为（真实 450 ms 下该分支不可达）；UX 层的「冷却可见」归 Phase 6（LOOP-03） | 否 |
 | R9 | 手势锁在 tap 场景锁 150 ms（rs_mag≈0） | 命中后 150 ms 内所有 detector 不更新 | 与桌面一致；夹具 `rt_two_shots_500` 已覆盖；写进计划备注防「优化」 | 否 |
 | R10 | 安卓上 `get_joy_guid()` 可能是空串或非 SDL 格式 | profile key 退化为名字；两只同名手柄共享 key | 复用门兜底（实测不符即重探）；key 里保留 `name:` 前缀显式区分来源 | 否 |
 | R11 | `agile_event_flushing` 被误开 | 事件重新被帧边界量化，M2 指标退化 | 研究结论写进计划：**必须保持 false**；`project.godot` 不写该键 | 否 |

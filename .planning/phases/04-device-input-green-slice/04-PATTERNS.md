@@ -713,7 +713,7 @@ return sign * normalized
 
 **红线：**
 - **禁止** `Input.get_vector()` / `InputMap` 替代死区（`04-RESEARCH.md:448`）：`get_vector` 会把 magnitude 钳到 1.0 并用圆形死区，斜向推到底时不同位置会越过 `enter_threshold`。
-- 死区**不钳制 magnitude**：`scaled` 被钳到 1.0 后，斜向返回向量长度仍可达 ~1.41。
+- 死区输出长度 = `scaled` ≤ 1.0：斜向 `(1,1)` 返回 `(0.7071, 0.7071)`、长度 1.0（`x/m` 是单位向量，乘 `scaled` 后长度就是 `scaled`）。
 - `scale <= 0` 由上游（探针）拒绝，core 不写除零兜底（`04-RESEARCH.md:417`）。
 - 符号最后乘；`sign = +1` = 推右/推下得正（与 `geometry.gd` 的 SDL 约定一致）。
 - 调用顺序固定：`raw → 符号/中点/量程 → deadzone → Geometry.angle_of / Geometry.magnitude`（`04-RESEARCH.md:462`）。`geometry.gd` **一行都不改**。
@@ -1218,7 +1218,7 @@ func _check_scale(r, cases: Array) -> void:
 **差异：**
 - 只消费 `kind == "runtime"` 的用例；`runtime.tick(frame)` → `pop_outcomes()` 累积；最后比对 `outcomes` 与 `counters`。
 - `counters` 至少含 `hits` / `attempts` / `group_hits` / `groups_done` / `suppressed`（`04-RESEARCH.md:667`）。
-- 必须包含 `rt_two_shots_500`（两发独立）与 `rt_cooldown_swallow`（第二发被冷却静默吞掉、只有 1 条 Outcome）——后者是防止后人「顺手修好」冷却的钉子。
+- 必须包含 `rt_two_shots_500`（两发独立）与 `rt_gesture_lock`（锁定期内 0 条额外 Outcome）；逐动作冷却用 `cooldown_ms = 900` 的合成运行时断言（真实 450 ms 下分支不可达）。这两条是防止后人「顺手修好」冷却/锁的钉子。
 - 额外硬断言：`layout_confirmed == false` 时 `tick()` 不产任何 Outcome（成功标准 4）。
 - 哨兵 `TAP_GOLDEN_RUNTIME cases=N mismatches=0`。
 
@@ -1833,11 +1833,11 @@ func to_text() -> String:
 2. **`Frame.buttons` 用 `Dictionary`**（canonical_name → true），并写进 `CORE.md`；不要两套表示并存。
 3. **`on_idle()` 在 `TapDetector` 是 no-op**；基类默认 `reset()`，子类必须覆盖成空。
 4. **失败单槽是覆盖写**，不是队列；`TapRuntime` 每次 tick 最多 drain 一条（配置顺序第一个 owner）。
-5. **冷却吞掉命中时静默 `continue`**，不记 Outcome；`rt_cooldown_swallow` 夹具就是防止后人「修好」它。
+5. **冷却吞掉命中时静默 `continue`**，不记 Outcome；`_check_skill_cooldown_silent`（`cooldown_ms = 900` 的合成运行时）就是防止后人「修好」它 —— 真实配置 450 ms 下重新武装 + 最短间隔 = 520 ms，逐动作冷却分支不可达。
 6. **`layout_confirmed == false` 不产任何 Outcome**，是 `TapRuntime` 的第一道早退，不是 UI 自觉。
 7. **`reset()` 产 `hold_short`，`abandon()` 静默**；两者不可合并。
 8. **窗口包含端点、超时严格大于**；`timeout_grace_ms` 不被配置校验器检查，必须 `max(0.0, ...)`。
-9. **死区不用 `Input.get_vector()`，不钳制 magnitude**。
+9. **死区不用 `Input.get_vector()`；角度不变、输出长度 = `scaled` ≤ 1.0**。
 10. **profile 复用门只看实测 `(axis, sign)` 逐项相等**；key 命中不足以复用，绝不部分应用。
 11. **不存 device index**（官方明确顺序不稳定）；只存 `device_name` / `device_guid` / `axes` / `calibration` / `quality` / `layout` / `layout_confirmed` / `probed_at_iso`。
 12. **字体是闭世界**：`src/ui/**` 每个 `.gd` / `.tscn` 都必须登记进 `CHAR_SOURCES`，并由机械断言钉住；先登记再上屏。
