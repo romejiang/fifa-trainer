@@ -4,10 +4,10 @@ current_phase: 2
 current_phase_name: 安卓工具链 + 真机冒烟 APK
 status: executing
 stopped_at: Phase 1 complete, ready to plan Phase 2
-last_updated: "2026-11-03T22:45:21.561Z"
+last_updated: "2026-11-04T10:14:00.000Z"
 last_activity: 2026-11-04
-last_activity_desc: Phase 1 complete, transitioned to Phase 2
-state_head: 49726344bba5e5463a56f894df856d5c5310e100
+last_activity_desc: 02-01 complete — doctor.sh 六项宿主断言 + 引擎装到仓库外
+state_head: 292e9c9a8fc03d1907745b46c65bb81fbbfc2bad
 progress:
   total_phases: 10
   completed_phases: 1
@@ -23,21 +23,21 @@ progress:
 See: .planning/PROJECT.md (updated 2026-11-04)
 
 **Core value:** 用真手柄、在任何地方都能练，判定准、反馈看得懂。
-**Current focus:** Phase 1 — 仓库拆分 + 配置单一真源 + 桌面回归闸门
+**Current focus:** Phase 2 — 安卓工具链 + 真机冒烟 APK
 
 ## Current Position
 
-Phase: 2 (安卓工具链 + 真机冒烟 APK) — READY TO EXECUTE
-Plan: Not started
-Status: Ready to execute
-Last activity: 2026-11-04 — Phase 1 complete, transitioned to Phase 2
+Phase: 2 (安卓工具链 + 真机冒烟 APK) — EXECUTING
+Plan: 2 of 5
+Status: Executing Phase 2
+Last activity: 2026-11-04 — 02-01 完成：doctor.sh 六项断言，Godot 4.7.2-stable 装在仓库外
 
 Progress: [█░░░░░░░░░] 10%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 5
+- Total plans completed: 6
 - Average duration: — min
 - Total execution time: 0.0 hours
 
@@ -46,6 +46,7 @@ Progress: [█░░░░░░░░░] 10%
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
 | 1 | 5 | - | - |
+| 2 | 1 | 9min | 9min |
 
 **Recent Trend:**
 - Last 5 plans: —
@@ -61,6 +62,7 @@ Progress: [█░░░░░░░░░] 10%
 | Phase 1 P3 | 2min | 2 tasks | 4 files |
 | Phase 1 P4 | 2min | 2 tasks | 3 files |
 | Phase 1 P5 | 2min | 2 tasks | 2 files |
+| Phase 2 P01 | 9min | 2 tasks | 1 file |
 
 ## Accumulated Context
 
@@ -101,6 +103,12 @@ Recent decisions affecting current work:
 - [Phase 1]: 反例第 4 步除 --check 变绿外追加 git status --porcelain 为空，证明还原彻底且 clone 未被前次运行弄脏
 - [Phase 1]: 反例把原始报错行打进日志；断言必须是「出现被点名文件」而非「出现不一致」，避免 pipefail 下 grep 空匹配静默退出
 - [Phase 1]: 验证脚本零复制：不写死 230、不写死测试路径，只调 check_desktop.sh 与 sync_config.py
+- [Phase 2]: `4.7.2.stable.` 只允许在 `mobile/tools/doctor.sh` 的 `readonly GODOT_VERSION_PREFIX` 定义一次；其它脚本一律调 `doctor.sh <断言名>`
+- [Phase 2]: Godot 装仓库外 `$HOME/Applications/Godot-4.7.2.app`（官方 zip + SHA-512 `38aa16e5…b7ac69ca`），170 MB 二进制永不进 git
+- [Phase 2]: `doctor.sh` 的 jdk 断言显式解析 JDK 17（JAVA_HOME 若不是 17 则退到 `~/.sdkman/candidates/java/17.0.12-oracle`），系统默认 JDK 25 一概不动
+- [Phase 2]: 留空只跑 godot/template/jdk/sdk/keystore 五项构建断言；`device` 只在点名时运行且 0 台 fail-visible
+- [Phase 2]: keystore 口令只从 `GODOT_ANDROID_KEYSTORE_RELEASE_PASSWORD` 读、只经 `keytool -storepass:env` 传给 keytool；输出只出现变量名
+- [Phase 2]: bash 3.2 的 UTF-8 解析缺陷：变量紧邻全角标点必须写 `${VAR}`，否则变量名会吞掉半个汉字
 
 ### Pending Todos
 
@@ -123,6 +131,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-11-03T20:42:00.000Z
-Stopped at: Phase 1 complete, ready to plan Phase 2
+Last session: 2026-11-04T10:14:00.000Z
+Stopped at: Completed 02-01-PLAN.md（doctor.sh 六项断言；Godot 4.7.2-stable 已装在仓库外）
 Resume file: None

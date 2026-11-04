@@ -68,7 +68,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 
 **Plans**: 5 plans
 **Wave 1**
-- [ ] 02-01-PLAN.md — 工具链自举 + `doctor.sh` 六项断言（引擎钉死 4.7.2-stable）
+- [x] 02-01-PLAN.md — 工具链自举 + `doctor.sh` 六项断言（引擎钉死 4.7.2-stable）(completed 2026-11-04)
 
 **Wave 2** *(blocked on Wave 1 completion)*
 - [ ] 02-02-PLAN.md — 最小 Godot 工程 + PCK 往返 + 闸门 A
@@ -228,7 +228,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 →
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. 仓库拆分 + 配置单一真源 + 桌面回归闸门 | 5/5 | Complete    | 2026-11-04 |
-| 2. 安卓工具链 + 真机冒烟 APK | 0/5 | Planned | - |
+| 2. 安卓工具链 + 真机冒烟 APK | 1/5 | In progress | - |
 | 3. 纯核心地基 | 0/0 | Not started | - |
 | 4. 设备输入层 + 绿色搓射竖切 | 0/0 | Not started | - |
 | 5. 全动作判定对等性 | 0/0 | Not started | - |
