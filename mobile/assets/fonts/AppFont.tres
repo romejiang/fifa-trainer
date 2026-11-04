@@ -1,0 +1,12 @@
+; 双字体：base 是 CJK 主字体，fallbacks 补 Noto Sans SC 没有的 ✗。
+; 两者缺一不可 —— 成功标准 2 写死 ✓ ✗，而 SC 恰好没有 ✗（02-RESEARCH §P6）。
+; 系统兜底默认开着，但验收由 mobile/tools/glyph_coverage.gd 在关闭兜底后断言；
+; 换句话说：这份资源负责「渲染时够用」，闸门负责「不靠系统字体也够用」。
+[gd_resource type="FontVariation" format=3]
+
+[ext_resource type="FontFile" path="res://assets/fonts/NotoSansSC-Subset.ttf" id="1_sc"]
+[ext_resource type="FontFile" path="res://assets/fonts/NotoSansSymbols2-Subset.ttf" id="2_sym"]
+
+[resource]
+base_font = ExtResource("1_sc")
+fallbacks = Array[Font]([ExtResource("2_sym")])

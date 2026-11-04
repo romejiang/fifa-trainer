@@ -3,15 +3,19 @@
 #
 #   bash mobile/tools/gate-a.sh
 #
-# 这一条命令同时证明五件事：配置副本与唯一真源一致、引擎版本落在允许的前缀下、
+# 这一条命令同时证明七件事：配置副本与唯一真源一致、引擎版本落在允许的前缀下、
 # 工程能被 headless 导入、两个 GDScript 语法通过、导出的 PCK 里真的能读出
-# 5 条动作与匹配的 sha256。
+# 5 条动作与匹配的 sha256、字形清单与源文件一致、关闭系统兜底后全部必需字形
+# 仍能渲染。
 #
 # 为什么这个顺序不能换：配置校验必须是第一步 —— 副本被手改时 load_config() 会
 # 静默回退到内置默认配置，PCK 闸门照样能解析出 5 条动作并报绿，那是一个
 # 「配置真的进包了」的假绿（T-02-04）。版本断言只调 doctor.sh godot：版本号
 # 在整个仓库里只有一处定义，本脚本里只出现安装路径，不出现版本断言。最后读包
 # 那一步刻意不带工程目录参数，否则 res:// 指回源码而不是导出物（T-02-06）。
+# 字形两步的顺序同理不能倒：字形闸门只比对「清单 vs 子集」，它看不见「源文件
+# 里新加了汉字、清单还没重生成」；那种情况下清单自洽、子集自洽，闸门照旧
+# GLYPH_OK，屏幕上却是豆腐。--check 是补上「清单 vs 源文件」这条边的唯一一步。
 
 set -euo pipefail
 
@@ -88,5 +92,33 @@ case "$pack_out" in
         ;;
 esac
 
+# 字形必须走两步，且顺序不能反：
+#   1) --check 比对「清单 vs 源文件」——源文件里新加了一个汉字而清单没重生成时，
+#      清单与子集仍然彼此自洽，字形闸门照旧 GLYPH_OK，屏幕上却是豆腐。这一步
+#      只读、不调用字体工具、毫秒级，是把这条边补上的唯一办法。
+#   2) 字形闸门比对「清单 vs 子集」——在关闭系统兜底的前提下逐字符断言。
+glyph_tool="tools/make_font_subset.py"
+echo "▸ 校验字形清单与源文件一致…"
+if ! python3 "$repo_root/$glyph_tool" --check; then
+    echo "✗ 字形清单与源文件不一致：运行 python3 $glyph_tool 重新生成" >&2
+    exit 1
+fi
+
+echo "▸ 关闭系统兜底后逐字符断言字形…"
+if ! glyph_out="$("$godot" --headless --path "$repo_root/mobile" --script res://tools/glyph_coverage.gd 2>&1)"; then
+    printf '%s\n' "$glyph_out" >&2
+    echo "✗ 字形闸门失败：清单里的字符在 AppFont（含 fallback）里渲染不出来" >&2
+    exit 1
+fi
+printf '%s\n' "$glyph_out"
+case "$glyph_out" in
+    *GLYPH_OK*)
+        ;;
+    *)
+        echo "✗ 字形闸门没有给出 GLYPH_OK 标记：${glyph_out}" >&2
+        exit 1
+        ;;
+esac
+
 echo "· PCK 留在 $repo_root/mobile/build/verify.pck 供人工检查（mobile/build/ 已被忽略）"
-echo "✓ 闸门 A 通过：配置一致、脚本语法通过、PCK 内含 5 条动作"
+echo "✓ 闸门 A 通过：配置一致、脚本语法通过、PCK 内含 5 条动作、全部必需字形可渲染"

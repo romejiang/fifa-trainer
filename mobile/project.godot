@@ -9,6 +9,13 @@ config/name="FIFA 花式动作练习器"
 run/main_scene="res://src/smoke/smoke_screen.tscn"
 config/features=PackedStringArray("4.7", "GL Compatibility")
 
+[gui]
+
+; 双字体的唯一入口：base = Noto Sans SC 子集，fallbacks = 符号子集（提供 ✗）。
+; 资源本身由 tools/make_font_subset.py 的产物拼成，闸门 A 会在关闭系统兜底后
+; 逐字符断言这份设置真的够用（T-02-09）。
+theme/custom_font="res://assets/fonts/AppFont.tres"
+
 [rendering]
 
 ; GL Compatibility 把 minSdk 压回 24（Vulkan 路径强制 29，见 P-03）。
