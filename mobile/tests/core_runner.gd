@@ -44,6 +44,7 @@ class Reporter extends RefCounted:
 
 const SUITES := {
 	"geometry": preload("res://tests/unit/test_geometry.gd"),
+	"models": preload("res://tests/unit/test_models.gd"),
 	"vocabulary": preload("res://tests/unit/test_vocabulary.gd"),
 }
 
