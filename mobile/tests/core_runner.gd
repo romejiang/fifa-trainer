@@ -51,6 +51,7 @@ const SUITES := {
 	"geometry": preload("res://tests/unit/test_geometry.gd"),
 	"models": preload("res://tests/unit/test_models.gd"),
 	"overlay_merge": preload("res://tests/unit/test_overlay_merge.gd"),
+	"pad_sampler": preload("res://tests/unit/test_pad_sampler.gd"),
 	"tap_detector": preload("res://tests/unit/test_tap_detector.gd"),
 	"tap_runtime": preload("res://tests/unit/test_tap_runtime.gd"),
 	"vocabulary": preload("res://tests/unit/test_vocabulary.gd"),
