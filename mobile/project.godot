@@ -6,13 +6,24 @@ config_version=5
 [application]
 
 config/name="FIFA 花式动作练习器"
-run/main_scene="res://src/smoke/smoke_screen.tscn"
+run/main_scene="res://src/ui/main.tscn"
 config/features=PackedStringArray("4.7", "GL Compatibility")
 ; user:// 的目录名必须在产生任何用户数据之前定死。发布之后再改等于把老用户的
 ; user:// 换成一个空目录（覆盖安装会丢配置）；Phase 9 的覆盖安装依赖它保持不变。
 ; 显示名仍是上面的中文 config/name —— 那是应用名，不是目录名。
 config/use_custom_user_dir=true
 config/custom_user_dir_name="FifaSkillTrainer"
+
+[display]
+
+; 横屏固定写出来防漂移（默认已是 0）：手机/平板架在手边时不需要转屏。
+window/handheld/orientation=0
+; 练习时屏幕不能熄；最终承诺在 Phase 7 的反馈闭环里收口。
+window/energy_saving/keep_screen_on=true
+; 基准视口 1280x720，canvas_items 让 px 在不同 DPI 上语义稳定（RESEARCH §3）。
+window/size/viewport_width=1280
+window/size/viewport_height=720
+window/stretch/mode="canvas_items"
 
 [gui]
 

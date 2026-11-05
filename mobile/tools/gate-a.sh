@@ -4,7 +4,8 @@
 #   bash mobile/tools/gate-a.sh
 #
 # 这一条命令同时证明七件事：配置副本与唯一真源一致、引擎版本落在允许的前缀下、
-# 工程能被 headless 导入、两个 GDScript 语法通过、导出的 PCK 里真的能读出
+# 工程能被 headless 导入、每个存在的 GDScript 语法通过（三个 UI 脚本存在即检查，
+# 04-06 之后三个都必须存在）、导出的 PCK 里真的能读出
 # 5 条动作与匹配的 sha256、字形清单与源文件一致、关闭系统兜底后全部必需字形
 # 仍能渲染。
 #
@@ -91,9 +92,21 @@ check_script() {
     echo "  ✓ ${script}"
 }
 
-echo "▸ 检查两个 GDScript 的语法…"
-check_script "res://src/smoke/smoke_screen.gd"
-check_script "res://tools/check_pack.gd"
+echo "▸ 检查每个存在的 GDScript 的语法…"
+# 三个 UI 脚本守卫式检查：本波次执行时 practice_screen.gd 还不存在（04-06 才创建），
+# 无条件检查会让闸门在中间波次变红。守卫不是永久豁免：04-06 的验收要求三个文件
+# 全部存在，且输出里出现各自的 ✓ 行 —— 那才证明它们真的被编译过，而不是被跳过。
+# 判据一个字都不放宽（见 check_script 的注释：Godot 对解析错误也返回 0）。
+for script in \
+    "res://src/smoke/smoke_screen.gd" \
+    "res://tools/check_pack.gd" \
+    "res://src/ui/main.gd" \
+    "res://src/ui/onboarding_screen.gd" \
+    "res://src/ui/practice_screen.gd"; do
+    if [ -f "$repo_root/mobile/${script#res://}" ]; then
+        check_script "$script"
+    fi
+done
 
 # 产物路径必须是绝对路径：--path 之后，传给 Godot 的相对路径锚点是工程目录，
 # 写成相对会落到 mobile/mobile/build/ 下（RESEARCH P2 / T-02-05）。

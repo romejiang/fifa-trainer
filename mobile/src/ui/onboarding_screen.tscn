@@ -1,0 +1,90 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/ui/onboarding_screen.gd" id="1_onboarding"]
+
+[node name="OnboardingScreen" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+script = ExtResource("1_onboarding")
+
+[node name="Title" type="Label" parent="."]
+unique_name_in_owner = true
+layout_mode = 0
+offset_left = 48.0
+offset_top = 24.0
+offset_right = 1040.0
+offset_bottom = 104.0
+theme_override_font_sizes/font_size = 40
+
+[node name="Step" type="Label" parent="."]
+unique_name_in_owner = true
+layout_mode = 0
+offset_left = 1040.0
+offset_top = 24.0
+offset_right = 1232.0
+offset_bottom = 104.0
+horizontal_alignment = 2
+theme_override_font_sizes/font_size = 32
+
+[node name="Body" type="Label" parent="."]
+unique_name_in_owner = true
+layout_mode = 0
+offset_left = 48.0
+offset_top = 112.0
+offset_right = 1232.0
+offset_bottom = 232.0
+autowrap_mode = 2
+theme_override_font_sizes/font_size = 28
+
+[node name="BigHint" type="Label" parent="."]
+unique_name_in_owner = true
+layout_mode = 0
+offset_left = 48.0
+offset_top = 236.0
+offset_right = 1232.0
+offset_bottom = 360.0
+autowrap_mode = 2
+theme_override_font_sizes/font_size = 72
+
+[node name="Hint" type="Label" parent="."]
+unique_name_in_owner = true
+layout_mode = 0
+offset_left = 48.0
+offset_top = 368.0
+offset_right = 1232.0
+offset_bottom = 472.0
+autowrap_mode = 2
+theme_override_font_sizes/font_size = 28
+
+[node name="Meter" type="ProgressBar" parent="."]
+unique_name_in_owner = true
+layout_mode = 0
+offset_left = 48.0
+offset_top = 480.0
+offset_right = 1232.0
+offset_bottom = 520.0
+max_value = 18.0
+value = 0.0
+show_percentage = false
+
+[node name="Options" type="Label" parent="."]
+unique_name_in_owner = true
+layout_mode = 0
+offset_left = 48.0
+offset_top = 532.0
+offset_right = 1232.0
+offset_bottom = 640.0
+autowrap_mode = 2
+theme_override_font_sizes/font_size = 32
+
+[node name="Footer" type="Label" parent="."]
+unique_name_in_owner = true
+layout_mode = 0
+offset_left = 48.0
+offset_top = 648.0
+offset_right = 1232.0
+offset_bottom = 704.0
+autowrap_mode = 2
+theme_override_font_sizes/font_size = 28
