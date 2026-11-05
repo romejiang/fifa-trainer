@@ -20,8 +20,13 @@ extends RefCounted
 ## 序列化必须存在，将来多档案（例如一人一手柄）不需要改 schema。
 ##
 ## `probed_at_iso` 只承载字符串：墙钟由外层填（core 不读 Time.），排障用，不参与判定。
+##
+## **schema v2（D-06）**：本阶段补上左摇杆的轴对、符号与校准。`ProfileStore.load_all()`
+## 对非法条目是整份丢弃，所以升版会删掉全部 v1 档案 —— 用户需要重走一次设置页
+## （约 20 秒）。这是一次性代价，比「进练习后四个 `relative_to_ls` 动作全无反应」
+## 便宜得多。版本号不能悄悄回退：回退会让已写入的 v2 档案被旧版拒绝。
 
-const SCHEMA_VERSION := 1
+const SCHEMA_VERSION := 2
 const LAYOUT_XBOX := &"xbox"
 const LAYOUT_PLAYSTATION := &"playstation"
 ## 校准半量程的下限直接复用 `Calibration.MIN_SCALE`（0.5）：低于它是「只推到一半
@@ -58,12 +63,16 @@ static func make_key(device_guid: String, device_name: String) -> String:
 
 ## 这份档案能不能直接进练习（不比较本次观测值）。
 ##
-## 五种「看起来有档案、其实不能用」的情况都在这里被拦下：没有 rs 映射、没有校准、
+## 「看起来有档案、其实不能用」的情况都在这里被拦下：没有 rs 映射、没有**左摇杆**
+## 映射（`ls = -1` 的 04 阶段档案会让四个 `relative_to_ls` 技能静默失效）、没有校准、
 ## 没有确认过布局、校准是默认值（半量程 < 0.5 或中点越界）、量程从未推满
-## （`quality.range_ready` 缺失或不为 true）。组合根与 `can_reuse()` 共用这一扇门，
+## （`quality.range_ready` 缺失或不为 true）、左摇杆从未确认
+## （`quality.ls_ready` 缺失或不为 true）。组合根与 `can_reuse()` 共用这一扇门，
 ## 避免两处各写一份判定后分叉。
 func can_enter_practice() -> bool:
 	if axes == null or not axes.has_rs():
+		return false
+	if not axes.has_ls():
 		return false
 	if calibration == null:
 		return false
@@ -77,7 +86,9 @@ func can_enter_practice() -> bool:
 		return false
 	if absf(calibration.center_y) > MAX_CALIBRATION_CENTER:
 		return false
-	return _range_ready_marker()
+	if not _range_ready_marker():
+		return false
+	return _ls_ready_marker()
 
 
 ## 复用门：先过 `can_enter_practice()`，再要求四个 index+sign 逐项相等。
@@ -103,6 +114,16 @@ func can_reuse(observed_rs_x_index: int, observed_rs_x_sign: int,
 ## 两者都必须拒绝 —— 那是「默认校准」唯一的可机械识别的痕迹。
 func _range_ready_marker() -> bool:
 	var marker: Variant = quality.get("range_ready")
+	return typeof(marker) == TYPE_BOOL and bool(marker)
+
+
+## 左摇杆的保存时事实标记：`quality.ls_ready` 必须是布尔 true。
+##
+## 与 `_range_ready_marker()` 同构，对应 T-05-19 / T-05-20：04 阶段的档案要么没有
+## 这个键（`ls = -1`），要么它不是布尔；两者都必须拒绝。`has_ls()` 另守一条边 ——
+## 有人手工把 `ls_ready` 写成 true 但 ls 索引仍是 -1 时，自相矛盾的档案不能放行。
+func _ls_ready_marker() -> bool:
+	var marker: Variant = quality.get("ls_ready")
 	return typeof(marker) == TYPE_BOOL and bool(marker)
 
 
