@@ -3,16 +3,16 @@ gsd_state_version: "1.0"
 current_phase: 4
 current_phase_name: 设备输入层 + 绿色搓射竖切
 status: executing
-stopped_at: Completed 04-02-PLAN.md
-last_updated: "2026-11-05T09:38:00.000Z"
+stopped_at: Completed 04-03-PLAN.md
+last_updated: "2026-11-05T10:04:34.000Z"
 last_activity: 2026-11-05
-last_activity_desc: 04-02 TapRuntime 引擎子集 + 布局硬门 + 运行时回放完成
-state_head: ea99cadd18b9379d515239c4274dcd6846f4ba06
+last_activity_desc: 04-03 轴探针 + 校准 + DeviceProfile + 复用门完成
+state_head: 89f56a80e3c12e501739719f0fd00b91df680dd7
 progress:
   total_phases: 10
   completed_phases: 3
   total_plans: 23
-  completed_plans: 18
+  completed_plans: 19
   percent: 31
 ---
 
@@ -28,9 +28,9 @@ See: .planning/PROJECT.md (updated 2026-11-04)
 ## Current Position
 
 Phase: 4 (设备输入层 + 绿色搓射竖切) — EXECUTING
-Plan: 3 of 7
+Plan: 4 of 7
 Status: Executing Phase 4
-Last activity: 2026-11-05 — 04-02 TapRuntime 引擎子集 + 布局硬门 + 运行时回放完成
+Last activity: 2026-11-05 — 04-03 轴探针 + 校准 + DeviceProfile + 复用门完成
 
 Progress: [███░░░░░░░] 31%
 
@@ -76,6 +76,7 @@ Progress: [███░░░░░░░] 31%
 | Phase 3 P06 | 3min | 3 tasks | 12 files |
 | Phase 4 P01 | 5min | 2 tasks | 16 files |
 | Phase 4 P02 | 10min | 3 tasks | 12 files |
+| Phase 4 P03 | 22min | 2 tasks | 11 files |
 
 ## Accumulated Context
 
@@ -200,6 +201,16 @@ Recent decisions affecting current work:
 - [Phase 4]: 结构断言必须展开成逐帧 4ms 时间轴；稀疏变化点会让手势锁 / 重新武装的计时器永远等不到阈值
 - [Phase 4]: 新增的反向断言都要做一次变异验证（删锁 / 删门 / 改 suppressed），证明它真的会因为缺陷变红，而不是真空绿
 - [Phase 4]: `TAP_GOLDEN_RUNTIME cases=6 mismatches=0` 与 `TAP_GOLDEN_DETECTOR` 并列做正向哨兵；第 5 条反例 fixture_missing 用 sha256 证明夹具原样还原
+- [Phase 4]: 轴映射的索引与符号分成两个字段：`-1` 既是合法符号又是未映射哨兵，合并成「带符号索引」后无法区分
+- [Phase 4]: 校准在原始轴空间测量（`raw_rs` 不乘符号），符号只在 `normalize` 的最后一步施加；顺序是「先减中点 → 再除量程 → 最后乘符号」
+- [Phase 4]: 死区逐字移植桌面 `_deadzone`：`scaled = minf(1.0, …)` 让输出长度恒等于 `scaled` ≤ 1.0，斜向 (1,1) 是 (0.7071, 0.7071) 而不是 1.41
+- [Phase 4]: 探针的 `rs_y` 只能来自「向下」步，禁止用「向上取反」推导；上下接线反了必须被 `validate_cross` 在探针阶段抓住
+- [Phase 4]: `evaluate_step` 返回有符号 `delta`；`validate_cross` 只消费 `axis/sign/separation`，不重算 —— 两边各写一份键名会在 `_check_evaluate_feeds_cross` 立刻变红
+- [Phase 4]: `low_separation`（separation < 3.0）是唯一且可达的 warning；`weak_step` 不可达，不写
+- [Phase 4]: 复用门只比较实测的四个 index+sign；`calibration.center/scale` 与探针 `rest` 不参与，同名不同映射必须 `can_reuse() == false`
+- [Phase 4]: `DeviceProfile.from_dict` 任一字段非法 → null + ConfigError，整份丢弃绝不部分恢复；`profile_id` 固定 "primary" 但字段与序列化必须存在
+- [Phase 4]: `suggest_layout` 认不出设备名返回空，调用方必须让用户二选一；绝不预选 Xbox
+- [Phase 4]: 不存设备序号 —— `get_connected_joypads()` 的顺序重启后不保证一致
 
 ### Pending Todos
 
@@ -215,7 +226,7 @@ None yet.
 - 干净 clone 的首次 `--import` 观察到 1/5 的段错误（`reimport | NotoSansSC-Subset.ttf`），4 次复跑全绿；**不加重试**，
   若在别的机器上高频率复现，先查 Godot 4.7.2 的字体导入线程崩溃，不要改闸门
 - `set_use_accumulated_input(false)` 在安卓上是否真的产生亚帧时间戳未验证（Phase 4 真机记录 `t_ms` 直方图）
-- 布局建议表 / 按键确认页未实现（04-03 / 04-05）：`INPUT-04` 只闭合了「未确认布局零判定」的运行时半边，不得据此宣布完成
+- 布局建议纯函数已实现（04-03）；按键确认页与状态机未实现（04-05）：`INPUT-04` 仍未闭合，不得据此宣布完成
 - 帧内反转的事件捕获未验证（04-04）：`INPUT-05` 只闭合了「一次一条 / 两次两条」的结构半边
 
 ## Deferred Items
@@ -228,6 +239,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-11-05T09:38:00.000Z
-Stopped at: Completed 04-02-PLAN.md
+Last session: 2026-11-05T10:04:34.000Z
+Stopped at: Completed 04-03-PLAN.md
 Resume file: None

@@ -142,7 +142,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] 04-02-PLAN.md — `TapRuntime` 引擎子集（冷却 / 手势锁 / 单槽失败 / 分组）+ `layout_confirmed` 硬门 + `TAP_GOLDEN_RUNTIME` + 闸门第 5 条反例 (completed 2026-11-05)
 
 **Wave 3** *(blocked on Wave 2 completion)*
-- [ ] 04-03-PLAN.md — 轴探针 / 校准 / `DeviceProfile` / 复用门（纯逻辑，含 raw → 0/90/180/270 接缝断言）
+- [x] 04-03-PLAN.md — 轴探针 / 校准 / `DeviceProfile` / 复用门（纯逻辑，含 raw → 0/90/180/270 接缝断言）(completed 2026-11-05)
 
 **Wave 4** *(blocked on Wave 3 completion)*
 - [ ] 04-04-PLAN.md — `PadStateBuffer` + `PadSampler`（事件优先 + 每帧对账）+ `ProfileStore` 原子写 + lint 扩到 `src/input/`
