@@ -37,21 +37,57 @@ __all__ = ["main_gui", "DemoSource", "find_cjk_font", "TrainerApp"]
 
 APP_TITLE = "FIFA 花式动作练习"
 
-W, H = 900, 620
+W, H = 960, 660
 FPS = 60
 
-# ---- 配色（深色，低对比背景 + 高对比结果色） ----
-BG = (18, 20, 26)
-PANEL = (28, 31, 40)
-CARD = (36, 40, 52)
-LINE = (54, 59, 74)
-TEXT = (232, 236, 244)
-MUTED = (140, 148, 165)
-FAINT = (96, 103, 119)
-GREEN = (74, 222, 128)
-RED = (248, 113, 113)
-ACCENT = (96, 165, 250)
-AMBER = (251, 191, 36)
+# ---- 几何（与设计稿 desktop.html 对齐，全部程序化绘制） ----
+MARGIN_X, MARGIN_Y = 20, 16
+HEADER_H = 104
+GAP = 14
+FOOTER_H = 78
+LEFT_W = 316
+BODY_Y = 134            # MARGIN_Y + HEADER_H + GAP
+FOOTER_Y = 566          # H - MARGIN_Y - FOOTER_H
+GRID_H = 418            # FOOTER_Y - GAP - BODY_Y
+RIGHT_X = 350           # MARGIN_X + LEFT_W + GAP
+RIGHT_W = 590
+DETAIL_H = 212
+ATTEMPTS_Y = 360        # BODY_Y + DETAIL_H + GAP
+ATTEMPTS_H = 192
+
+# ---- 配色（亮色，卡片白 + 高对比结果色） ----
+BG = (245, 245, 247)
+CARD = (255, 255, 255)
+CARD_SOFT = (250, 250, 252)
+LINE = (236, 236, 240)
+LINE_STRONG = (224, 224, 229)
+TEXT = (29, 29, 31)
+MUTED = (110, 110, 115)
+FAINT = (114, 114, 119)
+TEXT_SOFT = (58, 58, 60)
+GREEN = (6, 138, 54)
+GREEN_DEEP = (4, 107, 42)
+GREEN_FILL = (0, 200, 83)
+GREEN_SOFT = (226, 251, 236)
+GREEN_LINE = (232, 250, 240)
+RED = (215, 0, 21)
+RED_SOFT = (255, 233, 234)
+RED_LINE = (255, 226, 208)
+ACCENT = (0, 113, 227)
+ACCENT_SOFT = (233, 242, 255)
+BLUE_LINE = (168, 202, 240)
+AMBER = (194, 65, 12)
+AMBER_SOFT = (255, 240, 227)
+ORANGE = (255, 138, 31)
+CYAN = (14, 159, 212)
+CYAN_DEEP = (11, 110, 146)
+CYAN_SOFT = (231, 247, 253)
+HOVER = (247, 247, 249)
+ICON_IDLE = (166, 166, 172)
+DIALOG_MASK = (28, 28, 32)
+
+# "马赛回旋 Roulette" -> ("马赛回旋", "Roulette")；没有 ASCII 后缀时整串都是中文名
+_SPLIT_NAME = re.compile(r"^(.*?)\s+([A-Za-z][A-Za-z0-9 '\-/.]*)$")
 
 # 按键校准面板里的行：一列面键/肩键，一列扳机/摇杆/菜单键，
 # 顺序就是手柄上的常见布局，方便对着实物按。
@@ -148,16 +184,18 @@ class FontBook:
         self.cjk_ok = self.path is not None
         self._cache = {}
 
-    def get(self, size: int, bold: bool = False):
+    def get(self, size: float, bold: bool = False):
+        """按字号取字体；设计稿里的 .5 号字在这里四舍五入成像素。"""
         import pygame
 
-        key = (size, bold)
+        px = max(6, int(size + 0.5))
+        key = (px, bold)
         font = self._cache.get(key)
         if font is None:
             if self.path:
-                font = pygame.font.Font(self.path, size)
+                font = pygame.font.Font(self.path, px)
             else:
-                font = pygame.font.SysFont(None, size)
+                font = pygame.font.SysFont(None, px)
             font.set_bold(bold)
             self._cache[key] = font
         return font
@@ -345,6 +383,9 @@ class TrainerApp:
         self.screen = None
         self._clock = pygame_module.time.Clock()
         self._fonts = FontBook()
+        # 绘制缓存：渐变卡、阴影、圆角遮罩都按尺寸/颜色缓存，60fps 下不重复生成
+        self._cache: Dict[Tuple, object] = {}
+        self._mouse: Tuple[int, int] = (-1, -1)
 
         self.config_path = Path(config_path) if config_path else default_config_path()
         self.index_override = index
@@ -1331,7 +1372,11 @@ class TrainerApp:
     def _draw(self, now: float) -> None:
         if self.screen is None:
             return
-        self.screen.fill(BG)
+        try:
+            self._mouse = self.pg.mouse.get_pos()
+        except Exception:
+            self._mouse = (-1, -1)
+        self.screen.blit(self._bg_surface(), (0, 0))
         self._draw_header(now)
         if self.config_error is not None:
             self._draw_config_error()
@@ -1353,10 +1398,214 @@ class TrainerApp:
 
     # -- 基础绘制工具 --------------------------------------------------
 
-    def _panel(self, rect, color=PANEL, radius: int = 14) -> None:
+    def _panel(self, rect, color=CARD_SOFT, radius: int = 14) -> None:
         self.pg.draw.rect(self.screen, color, rect, border_radius=radius)
 
-    def _text(self, text: str, x: int, y: int, size: int, color,
+    def _cached(self, key: Tuple, factory):
+        """取缓存或生成后存入；同尺寸同颜色的表面只生成一次。"""
+        surf = self._cache.get(key)
+        if surf is None:
+            surf = factory()
+            self._cache[key] = surf
+        return surf
+
+    def _round_mask(self, w: int, h: int, radius: int):
+        """圆角遮罩：用 BLEND_RGBA_MULT 把任意表面切成圆角。"""
+        key = ("mask", w, h, radius)
+
+        def make():
+            surf = self.pg.Surface((max(1, w), max(1, h)), self.pg.SRCALPHA)
+            self.pg.draw.rect(surf, (255, 255, 255, 255), surf.get_rect(),
+                              border_radius=max(0, radius))
+            return surf
+        return self._cached(key, make)
+
+    @staticmethod
+    def _lerp_color(a, b, t: float):
+        """两个 RGB 之间线性插值，t 超出 [0, 1] 时夹住。"""
+        t = 0.0 if t < 0.0 else 1.0 if t > 1.0 else t
+        return (int(a[0] + (b[0] - a[0]) * t + 0.5),
+                int(a[1] + (b[1] - a[1]) * t + 0.5),
+                int(a[2] + (b[2] - a[2]) * t + 0.5))
+
+    def _vgrad_surface(self, w: int, h: int, top, bottom, radius: int):
+        """竖直线性渐变，最后切圆角。"""
+        key = ("vg", w, h, top, bottom, radius)
+
+        def make():
+            surf = self.pg.Surface((max(1, w), max(1, h)), self.pg.SRCALPHA)
+            for y in range(max(1, h)):
+                color = self._lerp_color(top, bottom, y / max(1, h - 1))
+                self.pg.draw.line(surf, color, (0, y), (w, y))
+            surf.blit(self._round_mask(w, h, radius), (0, 0),
+                      special_flags=self.pg.BLEND_RGBA_MULT)
+            return surf
+        return self._cached(key, make)
+
+    def _hgrad_surface(self, w: int, h: int, left, right, radius: int):
+        """水平线性渐变（进度条用），最后切圆角。"""
+        key = ("hg", w, h, left, right, radius)
+
+        def make():
+            surf = self.pg.Surface((max(1, w), max(1, h)), self.pg.SRCALPHA)
+            for x in range(max(1, w)):
+                color = self._lerp_color(left, right, x / max(1, w - 1))
+                self.pg.draw.line(surf, color, (x, 0), (x, h))
+            surf.blit(self._round_mask(w, h, radius), (0, 0),
+                      special_flags=self.pg.BLEND_RGBA_MULT)
+            return surf
+        return self._cached(key, make)
+
+    def _shadow_surface(self, w: int, h: int, radius: int):
+        """浅色阴影：小尺寸上叠几层低 alpha 圆角矩形，再放大得到柔和边缘。"""
+        key = ("shadow", w, h, radius)
+
+        def make():
+            sw, sh = max(8, w // 4), max(8, h // 4)
+            small = self.pg.Surface((sw, sh), self.pg.SRCALPHA)
+            step = max(1, sw // 26)
+            for i in range(6):
+                inset = i * step
+                rect = self.pg.Rect(inset, inset, max(1, sw - 2 * inset),
+                                    max(1, sh - 2 * inset))
+                self.pg.draw.rect(small, (20, 20, 30, 7 + i * 5), rect,
+                                  border_radius=max(1, radius // 4))
+            return self.pg.transform.smoothscale(
+                small, (max(1, w), max(1, h)))
+        return self._cached(key, make)
+
+    def _card(self, rect, fill=CARD, radius: int = 14, border=LINE,
+              shadow: bool = True) -> None:
+        """白卡：柔和阴影 + 圆角底 + 1px 描边。"""
+        if shadow:
+            self.screen.blit(self._shadow_surface(rect.width, rect.height,
+                                                  radius),
+                             (rect.x, rect.y + 2))
+        self.pg.draw.rect(self.screen, fill, rect, border_radius=radius)
+        if border is not None:
+            self.pg.draw.rect(self.screen, border, rect, border_radius=radius,
+                              width=1)
+
+    def _gradient_card(self, rect, top, bottom, radius: int, border) -> None:
+        """竖向渐变卡片：成功 / 失败结果卡用。"""
+        self.screen.blit(self._shadow_surface(rect.width, rect.height, radius),
+                         (rect.x, rect.y + 2))
+        surf = self._vgrad_surface(rect.width, rect.height, top, bottom, radius)
+        self.screen.blit(surf, rect.topleft)
+        if border is not None:
+            self.pg.draw.rect(self.screen, border, rect, border_radius=radius,
+                              width=1)
+
+    def _kbd(self, x: int, y: int, label: str, active: bool = False,
+             w: int = 22, h: int = 19):
+        """键帽。active 时蓝底蓝边，否则浅灰底；返回整个键帽的矩形。"""
+        font = self._fonts.get(10, True)
+        width = max(w, font.size(label)[0] + 10)
+        rect = self.pg.Rect(x, y, width, h)
+        if active:
+            bg, border, fg = ACCENT_SOFT, BLUE_LINE, ACCENT
+        else:
+            bg, border, fg = (242, 242, 245), LINE_STRONG, (72, 72, 74)
+        self.pg.draw.rect(self.screen, bg, rect, border_radius=5)
+        self.pg.draw.rect(self.screen, border, rect, border_radius=5, width=1)
+        self.pg.draw.line(self.screen, border, (rect.x + 1, rect.bottom - 1),
+                          (rect.right - 2, rect.bottom - 1), 1)
+        self._text(label, rect.centerx, rect.centery - 1, 10, fg, bold=True,
+                   anchor="center")
+        return rect
+
+    def _chip(self, x: int, y: int, text: str, fg, bg,
+              size: float = 10.5, pad: int = 7, h: int = 18,
+              bold: bool = True):
+        """圆角小标签，返回矩形（方便需要时登记命中区）。"""
+        font = self._fonts.get(size, bold)
+        rect = self.pg.Rect(x, y, font.size(text)[0] + pad * 2, h)
+        self.pg.draw.rect(self.screen, bg, rect, border_radius=8)
+        self._text(text, rect.centerx, rect.centery, size, fg, bold=bold,
+                   anchor="center")
+        return rect
+
+    def _icon_gamepad(self, cx: float, cy: float, size: float, color) -> None:
+        """手柄线框图标：椭圆机身 + 左侧十字键 + 右侧两颗按键。"""
+        r = size / 2.0
+        body = self.pg.Rect(int(cx - r), int(cy - r * 0.62),
+                            max(1, int(size)), max(1, int(size * 0.78)))
+        self.pg.draw.rect(self.screen, color, body, width=1,
+                          border_radius=max(2, int(size * 0.22)))
+        arm = max(1.5, size * 0.10)
+        gx = cx - r * 0.32
+        self.pg.draw.line(self.screen, color, (gx - arm, cy), (gx + arm, cy), 1)
+        self.pg.draw.line(self.screen, color, (gx, cy - arm), (gx, cy + arm), 1)
+        dot = max(1, int(size * 0.055))
+        self.pg.draw.circle(self.screen, color,
+                            (int(cx + r * 0.28), int(cy - arm * 0.4)), dot)
+        self.pg.draw.circle(self.screen, color,
+                            (int(cx + r * 0.50), int(cy + arm * 0.6)), dot)
+
+    def _icon_folder(self, x: float, y: float, size: float, color) -> None:
+        """文件夹线框图标。"""
+        s = size
+        body = self.pg.Rect(int(x), int(y + s * 0.24),
+                            max(1, int(s)), max(1, int(s * 0.60)))
+        self.pg.draw.rect(self.screen, color, body, width=1,
+                          border_radius=max(1, int(s * 0.12)))
+        self.pg.draw.line(self.screen, color, (x, y + s * 0.24),
+                          (x + s * 0.36, y + s * 0.24), 1)
+        self.pg.draw.line(self.screen, color, (x + s * 0.36, y + s * 0.24),
+                          (x + s * 0.44, y + s * 0.10), 1)
+        self.pg.draw.line(self.screen, color, (x + s * 0.44, y + s * 0.10),
+                          (x + s * 0.72, y + s * 0.10), 1)
+
+    def _icon_clock(self, cx: float, cy: float, size: float, color) -> None:
+        """时钟线框图标：圆 + 时针 + 分针。"""
+        r = size / 2.0
+        self.pg.draw.circle(self.screen, color, (int(cx), int(cy)),
+                            max(2, int(round(r))), 1)
+        self.pg.draw.line(self.screen, color, (cx, cy), (cx, cy - r * 0.60), 1)
+        self.pg.draw.line(self.screen, color, (cx, cy),
+                          (cx + r * 0.42, cy + r * 0.30), 1)
+
+    def _icon_gear(self, cx: float, cy: float, size: float, color) -> None:
+        """齿轮线框图标：内圆 + 八根齿。"""
+        r = size / 2.0
+        self.pg.draw.circle(self.screen, color, (int(cx), int(cy)),
+                            max(2, int(round(r * 0.66))), 1)
+        for i in range(8):
+            ang = math.radians(i * 45.0)
+            self.pg.draw.line(
+                self.screen, color,
+                (cx + math.sin(ang) * r * 0.72,
+                 cy - math.cos(ang) * r * 0.72),
+                (cx + math.sin(ang) * r, cy - math.cos(ang) * r), 1)
+
+    def _check_circle(self, cx: float, cy: float, r: float, kind: str) -> None:
+        """结果圆：ok 绿色渐变对勾 / fail 橙红渐变叉 / idle 浅灰对勾。"""
+        radius = max(4, int(round(r)))
+        if kind == "ok":
+            self.pg.draw.circle(self.screen, GREEN_DEEP, (int(cx), int(cy)),
+                                radius)
+            self.pg.draw.circle(self.screen, (0, 184, 70), (int(cx), int(cy)),
+                                max(1, radius - 3))
+            self.pg.draw.circle(self.screen, GREEN_FILL, (int(cx), int(cy)),
+                                max(1, radius - 6))
+            self._mark(cx - r * 0.52, cy - r * 0.54, r * 1.05, True,
+                       (255, 255, 255), max(2, int(r * 0.16)))
+        elif kind == "fail":
+            self.pg.draw.circle(self.screen, (168, 26, 22), (int(cx), int(cy)),
+                                radius)
+            self.pg.draw.circle(self.screen, RED, (int(cx), int(cy)),
+                                max(1, radius - 3))
+            self.pg.draw.circle(self.screen, (233, 84, 32), (int(cx), int(cy)),
+                                max(1, radius - 6))
+            self._mark(cx - r * 0.46, cy - r * 0.46, r * 0.92, False,
+                       (255, 255, 255), max(2, int(r * 0.16)))
+        else:
+            self.pg.draw.circle(self.screen, (242, 242, 245), (int(cx), int(cy)),
+                                radius)
+            self._mark(cx - r * 0.46, cy - r * 0.46, r * 0.92, True,
+                       ICON_IDLE, max(2, int(r * 0.14)))
+
+    def _text(self, text: str, x: int, y: int, size: float, color,
               bold: bool = False, anchor: str = "topleft"):
         if not text:
             return None
@@ -1428,6 +1677,102 @@ class TrainerApp:
     def _short_name(name: str) -> str:
         return name.split(" (")[0].strip()
 
+    @staticmethod
+    def _split_name(name: str) -> Tuple[str, str]:
+        """把 "马赛回旋 Roulette" 拆成中文名和英文名，只用于显示。"""
+        match = _SPLIT_NAME.match(name.strip())
+        if match is None:
+            return name.strip(), ""
+        return match.group(1).strip(), match.group(2).strip()
+
+    # -- 背景 / 顶栏底稿 ------------------------------------------------
+
+    def _bg_surface(self):
+        """窗口底色 + 两团极淡的绿 / 青晕染，只生成一次。"""
+        key = ("bg", W, H)
+
+        def make():
+            small = self.pg.Surface((120, 82), self.pg.SRCALPHA)
+            for cx, cy, color, radius, peak in (
+                    (104, 8, (0, 200, 83), 62, 34),
+                    (14, 74, (14, 159, 212), 60, 30)):
+                steps = 22
+                for i in range(steps, 0, -1):
+                    t = i / steps
+                    alpha = int(peak * (1.0 - t))
+                    if alpha <= 0:
+                        continue
+                    self.pg.draw.circle(small, color + (alpha,), (cx, cy),
+                                        max(1, int(radius * t)))
+            big = self.pg.transform.smoothscale(small, (W, H))
+            surf = self.pg.Surface((W, H))
+            surf.fill(BG)
+            surf.blit(big, (0, 0))
+            return surf
+        return self._cached(key, make)
+
+    def _header_surface(self):
+        """顶栏底稿：白→浅青渐变 + 程序化青色 Hero + 底部绿→青强调线。"""
+        w, h = W - 2 * MARGIN_X, HEADER_H
+        key = ("header", w, h)
+
+        def make():
+            surf = self.pg.Surface((w, h), self.pg.SRCALPHA)
+            for x in range(w):
+                color = self._lerp_color((255, 255, 255), (241, 250, 254),
+                                         x / max(1, w - 1))
+                self.pg.draw.line(surf, color, (x, 0), (x, h))
+
+            # 右侧约 62% 宽的程序化 Hero：纵向青色渐变，左侧淡入
+            hero_w = int(w * 0.62)
+            hero = self.pg.Surface((hero_w, h), self.pg.SRCALPHA)
+            for y in range(h):
+                color = self._lerp_color((44, 181, 232), CYAN,
+                                         y / max(1, h - 1))
+                self.pg.draw.line(hero, color, (0, y), (hero_w, y))
+            fade = self.pg.Surface((hero_w, h), self.pg.SRCALPHA)
+            for x in range(hero_w):
+                t = (x / max(1, hero_w) - 0.45) / 0.20
+                alpha = int(255 * (0.0 if t < 0.0 else 1.0 if t > 1.0 else t))
+                self.pg.draw.line(fade, (255, 255, 255, alpha), (x, 0),
+                                  (x, h))
+            hero.blit(fade, (0, 0), special_flags=self.pg.BLEND_RGBA_MULT)
+            surf.blit(hero, (w - hero_w, 0))
+
+            # 三到四条低 alpha 白色斜向条带
+            for i in range(4):
+                x0 = int(hero_w * (0.28 + i * 0.18))
+                self.pg.draw.polygon(
+                    surf, (255, 255, 255, 22),
+                    [(w - hero_w + x0, h), (w - hero_w + x0 + 52, 0),
+                     (w - hero_w + x0 + 92, 0), (w - hero_w + x0 + 40, h)])
+
+            # 一个大的白色圆形轮廓线，表示球（无照片 / 无商标 / 无人物）
+            self.pg.draw.circle(surf, (255, 255, 255, 64),
+                                (w - int(hero_w * 0.30), int(h * 0.46)),
+                                int(h * 0.88), 2)
+
+            # 底部 2px 的绿→青强调线
+            for x in range(w):
+                t = x / max(1, w - 1)
+                if t <= 0.24:
+                    color, alpha = (0, 200, 83), int(153 * t / 0.24)
+                elif t <= 0.64:
+                    color = self._lerp_color((0, 200, 83), CYAN,
+                                             (t - 0.24) / 0.40)
+                    alpha = int(153 + (133 - 153) * (t - 0.24) / 0.40)
+                else:
+                    color, alpha = CYAN, int(133 * (1.0 - (t - 0.64) / 0.36))
+                if alpha <= 0:
+                    continue
+                self.pg.draw.line(surf, color + (alpha,), (x, h - 2),
+                                  (x, h - 1))
+
+            surf.blit(self._round_mask(w, h, 14), (0, 0),
+                      special_flags=self.pg.BLEND_RGBA_MULT)
+            return surf
+        return self._cached(key, make)
+
     # -- 顶部 ----------------------------------------------------------
 
     @staticmethod
@@ -1441,31 +1786,70 @@ class TrainerApp:
         return cx + x * radius, cy + y * radius
 
     def _draw_header(self, now: float) -> None:
-        self._text(APP_TITLE, 24, 14, 22, TEXT, bold=True)
-        self._text("震一下 = 做对了；没震就是还没到位", 26, 44, 12, MUTED)
+        rect = self.pg.Rect(MARGIN_X, MARGIN_Y, W - 2 * MARGIN_X, HEADER_H)
+        self.screen.blit(self._header_surface(), rect.topleft)
 
-        right = W - 24
+        x = rect.x + 22
+        self._text(APP_TITLE, x, rect.y + 14, 24, TEXT, bold=True)
+        self._text("震一下 = 做对了；没震就是还没到位", x + 1, rect.y + 50,
+                   12, MUTED)
+
+        # 设备行：手柄图标 + 设备名 + · + 震动后端 chip
+        icon_cy = rect.y + 78
+        self._icon_gamepad(x + 9, icon_cy, 17, MUTED)
         if self.config_error is not None:
-            self._text("配置有错误", right, 16, 15, RED, anchor="topright")
-            self._text("R 重新加载", right, 42, 12, MUTED, anchor="topright")
+            device = "配置未加载"
+            backend = ""
+        elif self.engine is not None:
+            device = self.device_label
+            backend = self.rumble_label
+        else:
+            device = "未连接手柄"
+            backend = ""
+        dev_x = x + 26
+        device = self._fit(device, 11.5, rect.right - 150 - dev_x)
+        self._text(device, dev_x, icon_cy, 11.5, MUTED, anchor="midleft")
+        if backend:
+            name_w = self._fonts.get(11.5).size(device)[0]
+            sep_x = dev_x + name_w + 7
+            self._text("·", sep_x, icon_cy, 11.5, (195, 195, 200),
+                       anchor="midleft")
+            self._chip(sep_x + 11, icon_cy - 9, backend, CYAN_DEEP,
+                       CYAN_SOFT, size=10, h=18, bold=False)
+
+        right = rect.right - 18
+        if self.config_error is not None:
+            text = "配置有错误"
+            width = self._fonts.get(10.5, True).size(text)[0] + 14
+            self._chip(right - width, rect.y + 20, text, RED, RED_SOFT,
+                       size=10.5)
+            self._text("R 重新加载", right, rect.y + 46, 11, MUTED,
+                       anchor="topright")
             return
 
-        if self.engine is not None:
-            label = self._fit(
-                f"{self.device_label}   ·   {self.rumble_label}", 14, 560)
-            self._text(label, right, 16, 14, TEXT, anchor="topright")
-            elapsed = max(0.0, now - self.engine.started_at) if now else 0.0
-            clock = f"{int(elapsed) // 60:02d}:{int(elapsed) % 60:02d}"
-            self._text(clock, right, 40, 16, MUTED, bold=True, anchor="topright")
-        else:
-            self._text("未连接手柄", right, 16, 14, MUTED, anchor="topright")
+        if self.engine is None:
+            text = "未连接手柄"
+            width = self._fonts.get(10.5, True).size(text)[0] + 14
+            self._chip(right - width, rect.y + 22, text, MUTED,
+                       (242, 242, 245), size=10.5)
+            return
+
+        # 计时胶囊：白色卡片 + 轻阴影，压在青色 Hero 上
+        cap = self.pg.Rect(right - 96, rect.centery - 30, 96, 60)
+        self._card(cap, CARD, 13, LINE_STRONG, True)
+        elapsed = max(0.0, now - self.engine.started_at) if now else 0.0
+        clock = f"{int(elapsed) // 60:02d}:{int(elapsed) % 60:02d}"
+        self._text(clock, cap.centerx, cap.y + 8, 22, TEXT, bold=True,
+                   anchor="midtop")
+        self._text("练习时长", cap.centerx, cap.y + 40, 9, MUTED,
+                   anchor="midtop")
 
     # -- 左栏：动作熟练度 ----------------------------------------------
 
     def _draw_skills(self) -> None:
         assert self.engine is not None
-        panel = self.pg.Rect(20, 74, 300, 428)
-        self._panel(panel)
+        panel = self.pg.Rect(MARGIN_X, BODY_Y, LEFT_W, GRID_H)
+        self._card(panel)
         self._text("动作熟练度", panel.x + 16, panel.y + 12, 12, MUTED)
         if self.engine.focus is not None:
             label = f"专项：{self._short_name(self.engine.focus.skill.name)}"
@@ -1503,8 +1887,8 @@ class TrainerApp:
         if focused:
             accent = ACCENT
 
-        # 置灰用更暗的底色，专项练习的那一张描一圈高亮边
-        pg.draw.rect(self.screen, PANEL if dimmed else CARD, rect,
+        # 亮色主题下置灰不再用深底：统一白卡，只靠文字颜色区分
+        pg.draw.rect(self.screen, CARD_SOFT if dimmed else CARD, rect,
                      border_radius=10)
         pg.draw.rect(self.screen, accent,
                      pg.Rect(rect.x, rect.y + 10, 4, rect.height - 20),
@@ -1559,7 +1943,7 @@ class TrainerApp:
                 pg.draw.rect(self.screen, ACCENT if on else LINE,
                              chip, border_radius=9)
                 self._text(opt, chip.centerx, chip.y + 2, 10,
-                           BG if on else MUTED, bold=on, anchor="midtop")
+                           CARD if on else MUTED, bold=on, anchor="midtop")
                 self._modifier_hits.append((chip, active, opt))
                 x += width + 4
 
@@ -1595,11 +1979,11 @@ class TrainerApp:
         """卡片左边的专项练习开关。命中区由 _skill_card 记录。"""
         pg = self.pg
         if on:
-            track, knob = ACCENT, BG
+            track, knob = ACCENT, CARD
         elif dimmed:
-            track, knob = (44, 48, 60), (86, 92, 108)
+            track, knob = LINE, LINE_STRONG
         else:
-            track, knob = (66, 72, 90), (190, 196, 210)
+            track, knob = LINE_STRONG, CARD
         pg.draw.rect(self.screen, track, rect, border_radius=rect.height // 2)
         knob_r = rect.height // 2 - 2
         cx = (rect.right - rect.height // 2) if on else (rect.x + rect.height // 2)
@@ -1610,8 +1994,8 @@ class TrainerApp:
     def _draw_result(self) -> None:
         pg = self.pg
         assert self.engine is not None
-        panel = pg.Rect(336, 74, 544, 252)
-        self._panel(panel)
+        panel = pg.Rect(RIGHT_X, BODY_Y, RIGHT_W, DETAIL_H)
+        self._card(panel)
 
         outcome = self.engine.last_outcome
         self._text("最近一次", panel.x + 24, panel.y + 14, 12, MUTED)
@@ -1660,8 +2044,8 @@ class TrainerApp:
 
     def _draw_history(self) -> None:
         pg = self.pg
-        panel = pg.Rect(336, 336, 544, 166)
-        self._panel(panel)
+        panel = pg.Rect(RIGHT_X, ATTEMPTS_Y, RIGHT_W, ATTEMPTS_H)
+        self._card(panel)
         self._text("最近的尝试", panel.x + 20, panel.y + 10, 12, MUTED)
         if self.history:
             hint = f"滚轮滚动 · 保留最近 {len(self.history)}/50 条"
@@ -1725,101 +2109,100 @@ class TrainerApp:
 
     def _draw_footer(self, now: float) -> None:
         pg = self.pg
-        panel = pg.Rect(20, 512, 860, 88)
-        self._panel(panel)
+        rect = pg.Rect(MARGIN_X, FOOTER_Y, W - 2 * MARGIN_X, FOOTER_H)
+        self._card(rect)
 
-        # 一个圆环同时显示两个方向：红 = 左摇杆（球员朝向），蓝 = 右摇杆。
-        # 两条指针都从圆心指向当前方向，顶端带圆球，像手表指针一样便于目测夹角。
         state = self.state or PadState()
         engine = self.engine
         facing = engine.facing if engine is not None else 0.0
         facing_ok = engine.facing_valid if engine is not None else False
         rs_on = state.rs_mag >= 0.02
 
-        cx, cy, r = 64, panel.y + 46, 36
-        pg.draw.circle(self.screen, LINE, (cx, cy), r, 2)
-        pg.draw.line(self.screen, LINE, (cx - r, cy), (cx + r, cy), 1)
-        pg.draw.line(self.screen, LINE, (cx, cy - r), (cx, cy + r), 1)
-        pg.draw.circle(self.screen, FAINT, (cx, cy), 3)
+        # 浅色摇杆图：外圈浅灰环 + 内圈准线 + 中心蓝环
+        cx, cy = rect.x + 42, rect.centery
+        r_out, r_in = 30, 20
+        pg.draw.circle(self.screen, (250, 250, 252), (cx, cy), r_out)
+        pg.draw.circle(self.screen, (217, 217, 223), (cx, cy), r_out, 1)
+        pg.draw.circle(self.screen, (228, 228, 233), (cx, cy), r_in, 1)
+        pg.draw.line(self.screen, (228, 228, 233),
+                     (cx - r_out, cy), (cx + r_out, cy), 1)
+        pg.draw.line(self.screen, (228, 228, 233),
+                     (cx, cy - r_out), (cx, cy + r_out), 1)
+        pg.draw.circle(self.screen, (195, 220, 247), (cx, cy), 10, 1)
+        pg.draw.circle(self.screen, (129, 129, 132), (cx, cy), 4)
 
         def hand(angle: float, color, on: bool,
                  width: int, ball: int) -> None:
             if not on:
                 return
             rad = math.radians(angle)
-            # 两条指针都伸到圆环内缘：球心 = r - 球半径，所以两个球的
-            # 外缘都正好贴住圆环。红球/红线比蓝的粗 2px。
-            reach = r - ball
-            tip = (cx + int(math.sin(rad) * reach),
-                   cy - int(math.cos(rad) * reach))
+            # 指针伸到内圈边缘：球心 = r_in - 球半径，外缘正好贴住内圈
+            tip = self._stick_point(cx, cy, r_in - ball,
+                                    math.sin(rad), -math.cos(rad))
             pg.draw.line(self.screen, color, (cx, cy), tip, width)
-            pg.draw.circle(self.screen, color, tip, ball)
+            pg.draw.circle(self.screen, color,
+                           (int(round(tip[0])), int(round(tip[1]))), ball)
 
-        # 红色先画、且线条/球都比蓝色大 2px；方向重合时蓝色压在红色上，
-        # 仍能看见红色露出的边缘。两条指针长度完全一样。
-        hand(facing, RED, facing_ok, 5, 7)
-        hand(state.rs_angle, ACCENT, rs_on, 3, 5)
+        # 朝向先画（深色），右摇杆后画（蓝色压在深色上也分得清）
+        hand(facing, TEXT, facing_ok, 3, 3)
+        hand(state.rs_angle, ACCENT, rs_on, 2, 3)
 
-        # 文字区只显示“右摇杆相对球员朝向”的角度。
-        # 绝对角度需要自己在脑子里减去朝向，没有意义，所以一律不显示。
-        tx = 112
-        if facing_ok and rs_on:
-            rel = angle_diff(state.rs_angle, facing)
-            self._text("右摇杆 相对", tx, panel.y + 12, 10, ACCENT)
-            self._text(f"{rel:.0f}°", tx + 64, panel.y + 6, 19, TEXT, bold=True)
-        elif not facing_ok:
-            self._text("左摇杆回中", tx, panel.y + 8, 13, AMBER, bold=True)
-        else:
-            self._text("推右摇杆做动作", tx, panel.y + 8, 12, FAINT)
-
+        tx = cx + r_out + 14
         if facing_ok:
-            self._text(f"球员朝向 {direction_name(facing)}",
-                       tx, panel.y + 34, 11, RED)
-        elif rs_on:
-            self._text("右摇杆 已推（无朝向基准）",
-                       tx, panel.y + 34, 10, ACCENT)
+            self._text(f"球员朝向 {direction_name(facing)}", tx, rect.y + 9,
+                       13, TEXT, bold=True)
         else:
-            self._text("右摇杆 居中", tx, panel.y + 34, 10, FAINT)
+            self._text("左摇杆回中", tx, rect.y + 9, 13, TEXT, bold=True)
+        if rs_on:
+            if facing_ok:
+                rel = angle_diff(state.rs_angle, facing)
+                sub = f"右摇杆 相对 {rel:.0f}°"
+            else:
+                sub = "右摇杆 · 已推（无朝向基准）"
+        else:
+            sub = "右摇杆 · 居中"
+        self._text(sub, tx, rect.y + 31, 11, FAINT)
         if not facing_ok:
-            self._text("方向类动作暂不可用", tx, panel.y + 52, 10, AMBER)
+            warn = "方向类动作暂不可用"
+            w = self._fonts.get(10.5, True).size(warn)[0] + 26
+            box = pg.Rect(tx, rect.y + 47, w, 19)
+            pg.draw.rect(self.screen, AMBER_SOFT, box, border_radius=7)
+            pg.draw.circle(self.screen, ORANGE, (box.x + 9, box.centery), 2)
+            self._text(warn, box.x + 17, box.centery, 10.5, AMBER, bold=True,
+                       anchor="midleft")
 
-        # 快捷键按钮：鼠标点一下和按键等效
-        right = W - 40
-        self._draw_hotkeys(right, panel.y + 10)
-        hint = self.notice or ("卡片开关＝专项（数字键）· T 切修饰键 · "
-                               "L1 的动作要先按键再推杆")
-        self._text(self._fit(hint, 10, 480), right, panel.y + 40,
-                   10, ACCENT if self.notice else FAINT, anchor="topright")
+        # 右侧一列：快捷键 / 提示行 / 配置文件路径
+        right = rect.right - 18
+        self._draw_hotkeys(right, rect.y + 9)
+        hint = self.notice or ("点卡片＝专项 · 数字键 1–5 · T 切修饰键 · "
+                               "修饰键动作先按键再推杆")
+        self._text(self._fit(hint, 10.5, 520), right, rect.y + 35, 10.5,
+                   ACCENT if self.notice else FAINT, anchor="topright")
         if not self._fonts.cjk_ok:
             self._text("未找到中文字体，部分文字可能显示为方块", right,
-                       panel.y + 60, 10, AMBER, anchor="topright")
+                       rect.y + 54, 10, AMBER, anchor="topright")
         else:
-            self._text(self._fit(f"配置文件：{self.config_path}", 10, 480),
-                       right, panel.y + 60, 10, FAINT, anchor="topright")
+            label = self._fit(f"配置文件：{self.config_path}", 10, 480)
+            label_w = self._fonts.get(10).size(label)[0]
+            self._icon_folder(right - label_w - 16, rect.y + 55, 12, FAINT)
+            self._text(label, right, rect.y + 54, 10, FAINT,
+                       anchor="topright")
 
     def _draw_hotkeys(self, right: int, y: int) -> None:
-        """底部的快捷键按钮。键盘按和鼠标点走同一套动作。"""
-        pg = self.pg
+        """底栏快捷键：键帽 + 文字整项可点，和键盘按走同一套动作。"""
         self._hotkey_hits = []
-        font = self._fonts.get(11, True)
-        try:
-            mouse = pg.mouse.get_pos()
-        except Exception:
-            mouse = (-1, -1)
+        label_font = self._fonts.get(11.5)
+        key_font = self._fonts.get(10, True)
         x = right
         for action, key, label in reversed(_HOTKEYS):
-            text = f"{key} {label}"
-            width = font.size(text)[0] + 18
-            rect = pg.Rect(x - width, y, width, 22)
-            hover = rect.collidepoint(mouse)
-            pg.draw.rect(self.screen, (48, 54, 70) if hover else CARD,
-                         rect, border_radius=11)
-            pg.draw.rect(self.screen, ACCENT if hover else LINE,
-                         rect, border_radius=11, width=1)
-            self._text(text, rect.centerx, rect.centery, 11,
-                       TEXT if hover else MUTED, bold=True, anchor="center")
+            key_w = max(22, key_font.size(key)[0] + 10)
+            width = key_w + 6 + label_font.size(label)[0]
+            rect = self.pg.Rect(x - width, y, width, 20)
+            self._kbd(rect.x, rect.y, key, w=key_w, h=20)
+            self._text(label, rect.x + key_w + 6, rect.centery, 11.5, MUTED,
+                       anchor="midleft")
             self._hotkey_hits.append((rect, action))
-            x -= width + 6
+            x -= width + 16
 
     # -- 按键校准面板 ---------------------------------------------------
 
@@ -1851,7 +2234,7 @@ class TrainerApp:
                 box = pg.Rect(panel.x + 26 + col * (col_w + 16),
                               top + row * row_h, col_w, row_h - 6)
                 selected = (index == self._cal_sel)
-                pg.draw.rect(self.screen, (44, 56, 84) if selected else PANEL,
+                pg.draw.rect(self.screen, (44, 56, 84) if selected else CARD_SOFT,
                              box, border_radius=8)
                 if selected:
                     pg.draw.rect(self.screen, ACCENT, box,
