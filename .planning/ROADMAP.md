@@ -134,7 +134,7 @@ Decimal phases appear between their surrounding integers in numeric order.
   4. 布局建议（Xbox / PlayStation）自动给出，但必须用户按键确认后才进入练习，未确认不前进一步
   5. 在真机上做一次绿色搓射，屏幕产出且仅产出一次判定并显示成功或失败原因；快速连做两次得到两次独立判定（事件流保住了帧内反转）
 
-**Plans**: 7 plans, 7 waves
+**Plans**: 8 plans, 8 waves
 **Wave 1**
 - [x] 04-01-PLAN.md — tap 检测器逐行移植 + Python 生成黄金夹具 + `TAP_GOLDEN_DETECTOR` 哨兵（成功标准 1）(completed 2026-11-05)
 
@@ -154,8 +154,11 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] 04-06-PLAN.md — 练习屏 + 结果横幅 + 无设备 60 Hz 集成竖切 + `ACCEPTANCE.md` 第 6 节 (completed 2026-11-05)
 
 **Wave 7** *(blocked on Wave 6 completion)*
+- [ ] 04-08-PLAN.md — 引导 UX 修复：探针实时读数 + 2 次软重试 + 纯语言文案 + 停止屏增量 + 屏上诊断覆盖层（D1/D2 的新证据通道），并重建 APK
+
+**Wave 8** *(blocked on Wave 7 completion)*
 - [ ] 04-07-PLAN.md — 签名 APK + 真机 D0–D6 清单（`checkpoint:human-verify`，无设备不得勾选）
-      — **2026-11-05 真机结果：D0 失败**（探针三次拒绝 + 停止屏「没有收到摇杆事件（events_motion = 1931）」）；D1–D6 未执行（`run-as: package not debuggable`；只有一只 Xbox 手柄）。用户要求把多步引导改成**单屏输入检测**，需重新规划与重建；成功标准 2/3/4/5 仍未闭合
+      — **2026-11-05 真机结果：D0 失败**（探针三次拒绝 + 停止屏「没有收到摇杆事件（events_motion = 1931）」）；D1–D6 未执行（`run-as: package not debuggable`；只有一只 Xbox 手柄）。**用户最终决定保留四步探针、修 UX**（不做单屏检测）；修复与重建由 04-08 承担，本计划改为 Wave 8，必须等 04-08 的新 APK 出来后再走查；成功标准 2/3/4/5 仍未闭合
 
 **UI hint**: yes
 
