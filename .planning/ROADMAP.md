@@ -194,7 +194,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] 05-01-PLAN.md — 参考冻结 + 生成器骨架 + 10 条已知用例（tracer：Python 参考 → 夹具 → GDScript 回放 → `GESTURE_GOLDEN` 哨兵）
 
 **Wave 2** *(blocked on Wave 1 completion)*
-- [ ] 05-02-PLAN.md — 检测器语料扩到 50 条：六类边界 + 变体配置 + 反向对照 + 变异验证
+- [x] 05-02-PLAN.md — 检测器语料扩到 52+ 条（实际 55）：六类边界 + 变体配置 + 反向对照 + 四次变异验证
 
 **Wave 3** *(blocked on Wave 2 completion)*
 - [ ] 05-03-PLAN.md — `GestureEngine` + `ActiveSkill` + `TapRuntime` 子类 + 29 条引擎语料（`GESTURE_RUNTIME`）

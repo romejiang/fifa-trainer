@@ -2,18 +2,18 @@
 gsd_state_version: "1.0"
 current_phase: 5
 current_phase_name: 全动作判定对等性 — 三类检测器 + 引擎仲裁 + 抽稀矩阵
-current_plan: 2
+current_plan: 3
 status: executing
-stopped_at: Completed 05-01-PLAN.md
-last_updated: "2026-11-05T18:20:00.000Z"
+stopped_at: Completed 05-02-PLAN.md
+last_updated: "2026-11-05T18:37:00.000Z"
 last_activity: 2026-11-06
-last_activity_desc: Phase 5 plan 01 complete — 10 条手势黄金用例全绿
-state_head: 0153e0d04e6f4864ad00d1a452f215ddd06c129e
+last_activity_desc: Phase 5 plan 02 complete — 55 条手势语料全绿，四次变异验证通过
+state_head: ec7f35e5da2a5e83441eed80bb277519a74f444b
 progress:
   total_phases: 10
   completed_phases: 4
   total_plans: 34
-  completed_plans: 27
+  completed_plans: 28
   percent: 40
 ---
 
@@ -28,21 +28,21 @@ See: .planning/PROJECT.md (updated 2026-11-04)
 
 ## Current Position
 
-Current Plan: 2
+Current Plan: 3
 Total Plans in Phase: 7
 Phase: 5 (全动作判定对等性 — 三类检测器 + 引擎仲裁 + 抽稀矩阵) — EXECUTING
-Plan: 2 of 7
+Plan: 3 of 7
 Status: Executing Phase 5
-Last activity: 2026-11-06 — 05-01 完成：手势黄金回放 10 条用例全绿
+Last activity: 2026-11-06 — 05-02 完成：55 条检测器语料 + 四次变异验证
 
 Progress: [████░░░░░░] 40%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 27
+- Total plans completed: 28
 - Average duration: — min
-- Total execution time: 1.2 hours
+- Total execution time: 1.4 hours
 
 **By Phase:**
 
@@ -89,6 +89,7 @@ Progress: [████░░░░░░] 40%
 | Phase 4 P10 | 13min | 2 tasks | 9 files |
 | Phase 4 P11 | 18min | 2 tasks | 16 files |
 | Phase 5 P01 | 14min | 3 tasks | 16 files |
+| Phase 5 P02 | 13min | 3 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -225,6 +226,11 @@ Recent decisions affecting current work:
 - [Phase 5]: `direction_name()` 的数字回落分支在参考实现里不可达（八向间隔 45°，最近卡点恒 ≤ 22.5°）；保留为死分支以维持逐行对等，`30°` 的真实结果是「前右」
 - [Phase 5]: `_assert_not_rounding_cliff` 在 `update()` 之前预演会被 `%.0f` 格式化的 `swept` / `end_rel`；踩单车语料因此选 0.72°/帧（500ms），避开 4.5° 刀口
 - [Phase 5]: 失败码只写数学可达的配置：油炸丸子不写 `too_fast`；`overshoot` / `wrong_direction` 出厂配置不可达，留给变体配置用例
+- [Phase 5]: 边界用例的刀口必须放在最后一帧：参考实现「进入终点窗口就成功」，中途满足会提前命中，测到的是窗口入口而不是边界
+- [Phase 5]: 时长边界从检测器 `t0`（推过 enter 的那一帧）起算；夹具 `end_ms` = 边界时长 + 100ms 起手延迟
+- [Phase 5]: 逆时针 sweep 必须写负的 `angle_to`（线性插值 + `norm_deg`）；写 325 会变成顺时针 271°，这是生成器层面最先暴露的坑
+- [Phase 5]: 变体只改一个维度：顶层 `relative_to_ls` 或 `params` 的单个键；反向对照两条用例引用同一个 `segments` 常量与同一份 `ls`
+- [Phase 5]: 变异验证用临时目录 `cp` 还原，不用 `git checkout --`；变异 3 的字面目标 `reset()` 在 arc 回放路径不可达，实际机制是回中分支的 rearm 赋值
 - [Phase 4]: 复用门只比较实测的四个 index+sign；`calibration.center/scale` 与探针 `rest` 不参与，同名不同映射必须 `can_reuse() == false`
 - [Phase 4]: `DeviceProfile.from_dict` 任一字段非法 → null + ConfigError，整份丢弃绝不部分恢复；`profile_id` 固定 "primary" 但字段与序列化必须存在
 - [Phase 4]: `suggest_layout` 认不出设备名返回空，调用方必须让用户二选一；绝不预选 Xbox
@@ -316,6 +322,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-11-05T18:20:00.000Z
-Stopped at: Completed 05-01-PLAN.md
+Last session: 2026-11-05T18:37:00.000Z
+Stopped at: Completed 05-02-PLAN.md
 Resume file: None
