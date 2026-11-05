@@ -1398,9 +1398,6 @@ class TrainerApp:
 
     # -- 基础绘制工具 --------------------------------------------------
 
-    def _panel(self, rect, color=CARD_SOFT, radius: int = 14) -> None:
-        self.pg.draw.rect(self.screen, color, rect, border_radius=radius)
-
     def _cached(self, key: Tuple, factory):
         """取缓存或生成后存入；同尺寸同颜色的表面只生成一次。"""
         surf = self._cache.get(key)
@@ -1804,7 +1801,7 @@ class TrainerApp:
             device = self.device_label
             backend = self.rumble_label
         else:
-            device = "未连接手柄"
+            device = "未连接"
             backend = ""
         dev_x = x + 26
         device = self._fit(device, 11.5, rect.right - 150 - dev_x)
@@ -1823,7 +1820,11 @@ class TrainerApp:
             width = self._fonts.get(10.5, True).size(text)[0] + 14
             self._chip(right - width, rect.y + 20, text, RED, RED_SOFT,
                        size=10.5)
-            self._text("R 重新加载", right, rect.y + 46, 11, MUTED,
+            hint = "R 重新加载"
+            hint_w = self._fonts.get(11).size(hint)[0] + 16
+            pill = self.pg.Rect(right - hint_w, rect.y + 43, hint_w, 20)
+            self.pg.draw.rect(self.screen, CARD, pill, border_radius=7)
+            self._text(hint, right - 8, rect.y + 47, 11, MUTED,
                        anchor="topright")
             return
 
@@ -2205,39 +2206,56 @@ class TrainerApp:
 
     # -- 按键校准面板 ---------------------------------------------------
 
+    def _dialog_mask(self):
+        """校准弹窗的半透明遮罩：rgba(28, 28, 32, .28)，只生成一次。"""
+        key = ("dialog-mask", W, H)
+
+        def make():
+            surf = self.pg.Surface((W, H), self.pg.SRCALPHA)
+            surf.fill(DIALOG_MASK + (72,))
+            return surf
+        return self._cached(key, make)
+
     def _draw_calibration(self) -> None:
         pg = self.pg
-        mask = pg.Surface((W, H), pg.SRCALPHA)
-        mask.fill((8, 9, 13, 205))
-        self.screen.blit(mask, (0, 0))
+        self.screen.blit(self._dialog_mask(), (0, 0))
 
         panel = pg.Rect(48, 52, W - 96, H - 104)
         self._cal_panel_rect = panel
-        self._panel(panel, CARD, 16)
-        self._text("按键校准", panel.x + 26, panel.y + 16, 22, TEXT, bold=True)
+        self._card(panel, CARD, 16, LINE_STRONG, True)
+
+        icon = pg.Rect(panel.x + 26, panel.y + 20, 40, 40)
+        pg.draw.rect(self.screen, ACCENT_SOFT, icon, border_radius=10)
+        self._icon_gear(icon.centerx, icon.centery, 22, ACCENT)
+        self._text("按键校准", icon.right + 14, icon.y + 2, 17, TEXT,
+                   bold=True)
         tip = ("按下手柄上的键，就绑到高亮的那一项。绿色搓射只要对准 "
                "X（要连按的键）和 RB（要按住的键）。")
-        self._text(self._fit(tip, 12, panel.width - 52),
-                   panel.x + 26, panel.y + 46, 12, MUTED)
+        self._text(self._fit(tip, 13, panel.width - 52),
+                   panel.x + 26, panel.y + 68, 13, MUTED)
         tip2 = "LT / RT 一般由扳机轴自动识别，不用绑；如果扳机是数字键，按一下它就能绑上。"
-        self._text(self._fit(tip2, 11, panel.width - 52),
-                   panel.x + 26, panel.y + 68, 11, FAINT)
+        self._text(self._fit(tip2, 11.5, panel.width - 52),
+                   panel.x + 26, panel.y + 90, 11.5, FAINT)
 
         col_w = (panel.width - 52 - 16) // 2
         row_h = 40
-        top = panel.y + 96
+        top = panel.y + 112
         self._cal_hits = []
         index = 0
         for col, names in enumerate(_CAL_COLUMNS):
             for row, name in enumerate(names):
                 box = pg.Rect(panel.x + 26 + col * (col_w + 16),
-                              top + row * row_h, col_w, row_h - 6)
+                              top + row * row_h, col_w, 34)
                 selected = (index == self._cal_sel)
-                pg.draw.rect(self.screen, (44, 56, 84) if selected else CARD_SOFT,
-                             box, border_radius=8)
                 if selected:
+                    pg.draw.rect(self.screen, ACCENT_SOFT, box,
+                                 border_radius=8)
                     pg.draw.rect(self.screen, ACCENT, box,
-                                 border_radius=8, width=2)
+                                 border_radius=8, width=1)
+                else:
+                    pg.draw.rect(self.screen, CARD, box, border_radius=8)
+                    pg.draw.rect(self.screen, LINE, box,
+                                 border_radius=8, width=1)
                 self._text(name, box.x + 12, box.centery, 14, TEXT,
                            bold=selected, anchor="midleft")
                 value = self._cal_map.get(name)
@@ -2246,8 +2264,9 @@ class TrainerApp:
                            FAINT if value is None else ACCENT,
                            bold=value is not None, anchor="midright")
                 if selected:
-                    self._text("按手柄键…", box.right - 74, box.centery, 11,
-                               AMBER, anchor="midright")
+                    label_w = self._fonts.get(13, value is not None).size(label)[0]
+                    self._text("按手柄键…", box.right - 24 - label_w,
+                               box.centery, 11, AMBER, anchor="midright")
                 self._cal_hits.append((box, index))
                 index += 1
 
@@ -2272,59 +2291,78 @@ class TrainerApp:
         """校准面板底部的保存/清除/关闭按钮。返回最左边的 x。"""
         pg = self.pg
         self._cal_btn_hits = []
-        font = self._fonts.get(11, True)
-        try:
-            mouse = pg.mouse.get_pos()
-        except Exception:
-            mouse = (-1, -1)
+        font = self._fonts.get(12.5, True)
         specs = (("save", "S 保存", True),
                  ("clear", "Del 清除", False),
                  ("close", "Esc 关闭", False))
         x = panel.right - 26
         for action, text, primary in reversed(specs):
-            width = font.size(text)[0] + 20
-            rect = pg.Rect(x - width, y, width, 26)
-            hover = rect.collidepoint(mouse)
+            width = font.size(text)[0] + 24
+            rect = pg.Rect(x - width, y, width, 32)
+            hover = rect.collidepoint(self._mouse)
             if primary:
-                bg = (32, 92, 160) if hover else (28, 72, 120)
-                border, fg = ACCENT, TEXT
+                bg = (0, 102, 204) if hover else ACCENT
+                border, fg = bg, CARD
             else:
-                bg = (48, 54, 70) if hover else CARD
-                border = ACCENT if hover else LINE
-                fg = TEXT if hover else MUTED
-            pg.draw.rect(self.screen, bg, rect, border_radius=13)
-            pg.draw.rect(self.screen, border, rect, border_radius=13, width=1)
-            self._text(text, rect.centerx, rect.centery, 11, fg,
-                       bold=True, anchor="center")
+                bg = HOVER if hover else CARD
+                border = LINE_STRONG
+                fg = TEXT
+            pg.draw.rect(self.screen, bg, rect, border_radius=8)
+            pg.draw.rect(self.screen, border, rect, border_radius=8, width=1)
+            self._text(text, rect.centerx, rect.centery, 12.5, fg,
+                       anchor="center")
             self._cal_btn_hits.append((rect, action))
             x -= width + 8
         return x
 
     # -- 无手柄 / 连接中 / 配置错误 -------------------------------------
 
+    def _keycap_row(self, cx: int, y: int, items) -> None:
+        """一排纯视觉键帽 + 文字（不登记命中区），整体水平居中。"""
+        label_font = self._fonts.get(11.5)
+        key_font = self._fonts.get(10, True)
+        parts = []
+        for key, label in items:
+            key_w = max(22, key_font.size(key)[0] + 10)
+            parts.append((key_w, label_font.size(label)[0], key, label))
+        total = sum(kw + 6 + lw for kw, lw, _, _ in parts) \
+            + 18 * (len(parts) - 1)
+        x = cx - total // 2
+        for key_w, label_w, key, label in parts:
+            self._kbd(x, y, key, w=key_w, h=20)
+            self._text(label, x + key_w + 6, y + 10, 11.5, MUTED,
+                       anchor="midleft")
+            x += key_w + 6 + label_w + 18
+
     def _draw_opening(self) -> None:
-        panel = self.pg.Rect(20, 74, 860, 428)
-        self._panel(panel)
-        self._text("正在连接手柄…", W // 2, panel.centery - 12, 26, TEXT,
-                   bold=True, anchor="center")
-        self._text("首次连接会花 0.25 秒校准扳机静止值", W // 2,
-                   panel.centery + 28, 13, MUTED, anchor="center")
+        panel = self.pg.Rect(MARGIN_X, BODY_Y, W - 2 * MARGIN_X, GRID_H)
+        self._card(panel)
+        box = self.pg.Rect(panel.centerx - 28, panel.centery - 96, 56, 56)
+        self.pg.draw.rect(self.screen, ACCENT_SOFT, box, border_radius=14)
+        self._icon_gamepad(box.centerx, box.centery, 30, ACCENT)
+        self._text("正在连接手柄…", panel.centerx, panel.centery - 22, 22,
+                   TEXT, bold=True, anchor="midtop")
+        self._text("首次连接会花 0.25 秒校准扳机静止值", panel.centerx,
+                   panel.centery + 14, 12.5, MUTED, anchor="midtop")
 
     def _draw_no_device(self) -> None:
         pg = self.pg
-        panel = pg.Rect(20, 74, 860, 428)
-        self._panel(panel)
+        panel = pg.Rect(MARGIN_X, BODY_Y, W - 2 * MARGIN_X, GRID_H)
+        self._card(panel)
 
-        self._text("未检测到手柄", W // 2, panel.y + 54, 30, TEXT,
-                   bold=True, anchor="midtop")
+        icon = pg.Rect(panel.x + 48, panel.y + 40, 52, 52)
+        pg.draw.rect(self.screen, ACCENT_SOFT, icon, border_radius=12)
+        self._icon_gamepad(icon.centerx, icon.centery, 28, ACCENT)
+        self._text("未检测到手柄", icon.right + 16, icon.y + 10, 22, TEXT,
+                   bold=True)
 
-        y = panel.y + 108
+        y = panel.y + 120
         message = self.error or "请确认手柄已连接并开机。"
-        for line in self._wrap_lines(message, 14, panel.width - 160)[:4]:
-            self._text(line, panel.x + 80, y, 14, MUTED)
+        for line in self._wrap_lines(message, 14, panel.width - 96)[:4]:
+            self._text(line, panel.x + 48, y, 14, MUTED)
             y += 22
 
-        y = max(y + 18, panel.y + 200)
+        y = max(y + 24, panel.y + 220)
         tips = []
         if sys.platform == "darwin":
             tips = [
@@ -2339,31 +2377,42 @@ class TrainerApp:
         else:
             tips = ["确认手柄已连接，并且有 /dev/input 的访问权限。"]
         for tip in tips:
-            self._text("· " + tip, panel.x + 80, y, 13, FAINT)
+            pg.draw.circle(self.screen, (170, 170, 176),
+                           (panel.x + 52, y + 8), 2)
+            self._text(tip, panel.x + 64, y, 13, FAINT)
             y += 24
 
         self._text("插上手柄后会自动重试，也可以按 R 立即重试。",
-                   W // 2, panel.bottom - 74, 13, ACCENT, anchor="midtop")
-        self._text("C 打开配置文件夹      Esc 退出",
-                   W // 2, panel.bottom - 44, 11, FAINT, anchor="midtop")
+                   panel.centerx, panel.bottom - 74, 12.5, ACCENT,
+                   anchor="midtop")
+        self._keycap_row(panel.centerx, panel.bottom - 44,
+                         (("R", "重试"), ("C", "配置文件夹"), ("Esc", "退出")))
 
     def _draw_config_error(self) -> None:
         pg = self.pg
-        panel = pg.Rect(20, 74, 860, 428)
-        self._panel(panel)
-        self._text("配置文件有错误", W // 2, panel.y + 46, 28, RED,
-                   bold=True, anchor="midtop")
+        panel = pg.Rect(MARGIN_X, BODY_Y, W - 2 * MARGIN_X, GRID_H)
+        self._card(panel)
 
-        y = panel.y + 100
-        for line in self._wrap_lines(self.config_error or "", 14,
-                                     panel.width - 160)[:10]:
-            self._text(line, panel.x + 80, y, 14, TEXT)
-            y += 24
+        icon = pg.Rect(panel.x + 48, panel.y + 32, 52, 52)
+        pg.draw.rect(self.screen, RED_SOFT, icon, border_radius=12)
+        self._icon_gear(icon.centerx, icon.centery, 28, RED)
+        self._text("配置文件有错误", icon.right + 16, icon.y + 10, 22, RED,
+                   bold=True)
 
-        self._text("改好保存后按 R 重新加载。", W // 2, panel.bottom - 74,
-                   13, ACCENT, anchor="midtop")
-        self._text("C 打开配置文件夹      Esc 退出",
-                   W // 2, panel.bottom - 44, 11, FAINT, anchor="midtop")
+        box = pg.Rect(panel.x + 48, panel.y + 96, panel.width - 96,
+                      panel.height - 96 - 84)
+        pg.draw.rect(self.screen, CARD_SOFT, box, border_radius=10)
+        y = box.y + 12
+        for line in self._wrap_lines(self.config_error or "", 13.5,
+                                     box.width - 32)[:10]:
+            self._text(line, box.x + 16, y, 13.5, TEXT)
+            y += 22
+
+        self._text("改好保存后按 R 重新加载。", panel.centerx,
+                   panel.bottom - 70, 12.5, ACCENT, anchor="midtop")
+        self._keycap_row(panel.centerx, panel.bottom - 42,
+                         (("R", "重新加载"), ("C", "配置文件夹"),
+                          ("Esc", "退出")))
 
 
 # ---------------------------------------------------------------------------
