@@ -151,7 +151,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] 04-05-PLAN.md — `OnboardingFlow` 纯状态机 + 组合根 + 引导屏 S1–S11 + 字形闭世界断言 (completed 2026-11-05)
 
 **Wave 6** *(blocked on Wave 5 completion)*
-- [ ] 04-06-PLAN.md — 练习屏 + 结果横幅 + 无设备 60 Hz 集成竖切 + `ACCEPTANCE.md` 第 6 节
+- [x] 04-06-PLAN.md — 练习屏 + 结果横幅 + 无设备 60 Hz 集成竖切 + `ACCEPTANCE.md` 第 6 节 (completed 2026-11-05)
 
 **Wave 7** *(blocked on Wave 6 completion)*
 - [ ] 04-07-PLAN.md — 签名 APK + 真机 D0–D6 清单（`checkpoint:human-verify`，无设备不得勾选）

@@ -3,16 +3,16 @@ gsd_state_version: "1.0"
 current_phase: 4
 current_phase_name: 设备输入层 + 绿色搓射竖切
 status: executing
-stopped_at: Completed 04-05-PLAN.md
-last_updated: "2026-11-05T10:47:49.000Z"
+stopped_at: Completed 04-06-PLAN.md
+last_updated: "2026-11-05T11:18:26.000Z"
 last_activity: 2026-11-05
-last_activity_desc: 04-05 引导状态机 + 组合根 + 引导屏 + 字形闭世界完成
-state_head: 07b336818045d34365d3ec2b20ee836485b1abfa
+last_activity_desc: 04-06 练习屏 + 结果横幅 + 60 Hz 集成竖切 + 真机记录表完成
+state_head: 8c1fc74e8b56e7e3531e314ace92673cab105376
 progress:
   total_phases: 10
   completed_phases: 3
   total_plans: 23
-  completed_plans: 21
+  completed_plans: 22
   percent: 32
 ---
 
@@ -28,9 +28,9 @@ See: .planning/PROJECT.md (updated 2026-11-04)
 ## Current Position
 
 Phase: 4 (设备输入层 + 绿色搓射竖切) — EXECUTING
-Plan: 5 of 7
+Plan: 6 of 7
 Status: Executing Phase 4
-Last activity: 2026-11-05 — 04-05 引导状态机 + 组合根 + 引导屏 + 字形闭世界完成
+Last activity: 2026-11-05 — 04-06 练习屏 + 结果横幅 + 60 Hz 集成竖切 + 真机记录表完成
 
 Progress: [███░░░░░░░] 32%
 
@@ -79,6 +79,7 @@ Progress: [███░░░░░░░] 32%
 | Phase 4 P03 | 22min | 2 tasks | 11 files |
 | Phase 4 P04 | 13min | 3 tasks | 18 files |
 | Phase 4 P05 | 15min | 3 tasks | 17 files |
+| Phase 4 P06 | 9min | 3 tasks | 16 files |
 
 ## Accumulated Context
 
@@ -228,6 +229,13 @@ Recent decisions affecting current work:
 - [Phase 4]: `Frame.now` 是秒，`PadSampler` 的事件时间戳是毫秒；两类时间量在文件边界分开，组合根不做换算
 - [Phase 4]: 字形闭世界：`src/ui` 下任何未登记的 `.gd`/`.tscn` 让 `make_font_subset.py --check` 直接失败（断言挂在 `collect_chars()` 第一句）
 - [Phase 4]: 引导屏的 D0 停止条件只在采样窗口仍为空（确实在等推杆）时触发，避免把「设备静止时不发事件」误判成失败
+- [Phase 4]: 结果呈现的唯一通路是 `pop_outcomes()` 全量 drain → `result_banner.show_outcome`；去重谓词是静态纯函数 `accepts(shown_seq, seq) = seq > shown_seq`
+- [Phase 4]: 进入练习必须同时置 `%Practice` 容器与练习屏节点可见：`practice_screen._process` 第一句 `if not visible: return` 会把其余一切静默挡在屏幕外
+- [Phase 4]: 布局三支文案由注入值决定；空布局是错误态（「布局未确认，请返回引导重选」），绝不回退 Xbox 键名
+- [Phase 4]: `%DebugPanel` 纯 ASCII 单行，与 `%LiveMs` / `%SuccessCount` 共用 10 Hz 节流且只在变化时赋值；D5/D6 另有 1 Hz `PAD_DIAG` / `PAD_AXIS` / `PAD_DEV`
+- [Phase 4]: 字形闭世界两条边：`src/ui` 目录自动枚举 + `RENDER_SOURCES` 点名会渲染的 core 文案；清单 876 → 992 字符
+- [Phase 4]: `AppFont.tres` 显式 `variation_opentype wght=400`（UI-SPEC G11）；不改 cmap、不影响 `GLYPH_OK`
+- [Phase 4]: `test_green_slice` 用真实配置字节与 60 Hz 合成轴，七段各自新建运行时；不在测试里复刻 `select_taps_skill` 的筛选循环
 
 ### Pending Todos
 
@@ -258,6 +266,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-11-05T10:47:49.000Z
-Stopped at: Completed 04-05-PLAN.md
+Last session: 2026-11-05T11:18:26.000Z
+Stopped at: Completed 04-06-PLAN.md
 Resume file: None
