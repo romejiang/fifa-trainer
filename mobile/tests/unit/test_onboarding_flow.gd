@@ -15,6 +15,8 @@ func run(r) -> void:
 	_check_probe_happy_path(r)
 	_check_probe_step_rejection(r)
 	_check_probe_cross_validation(r)
+	_check_soft_retry_resets_on_success(r)
+	_check_soft_retry_code_filter(r)
 	_check_reuse_gate_accepts(r)
 	_check_reuse_gate_rejects(r)
 	_check_calibration_gate(r)
@@ -92,21 +94,39 @@ func _check_probe_happy_path(r) -> void:
 				"quality[%s] 必须带 samples / margin / separation" % key)
 
 
-## 第二步被拒：停在 probe_failed；重试只回退到该步，第一步结果仍在。
+## 第二步被拒：前两次留在本步（软重试），第 3 次才停在 probe_failed；
+## 按 B 重来只回退到该步、计数归零，第一步结果仍在。
 func _check_probe_step_rejection(r) -> void:
 	var flow := _to_probe(_fresh())
 	flow.submit_probe_step(_step(3, -1))
+
+	flow.submit_probe_step(_reject(&"ambiguous_axes", "两轴同时动了：请只推一个方向"))
+	r.check(flow.state == OnboardingFlow.STATE_PROBE_RIGHT,
+		"第 1 次 ambiguous_axes 必须留在本步（期望 probe_right，实际 %s）" % flow.state)
+	r.check(flow.soft_retry_count == 1,
+		"第 1 次软重试后计数必须是 1（实际 %d）" % flow.soft_retry_count)
+	r.check(flow.probe_failure_code == &"",
+		"软重试期间 probe_failure_code 必须保持空（实际 %s）" % flow.probe_failure_code)
+
+	flow.submit_probe_step(_reject(&"ambiguous_axes", "两轴同时动了：请只推一个方向"))
+	r.check(flow.state == OnboardingFlow.STATE_PROBE_RIGHT,
+		"第 2 次 ambiguous_axes 仍必须留在本步（期望 probe_right，实际 %s）" % flow.state)
+	r.check(flow.soft_retry_count == 2,
+		"第 2 次软重试后计数必须是 2（实际 %d）" % flow.soft_retry_count)
+
 	flow.submit_probe_step(_reject(&"ambiguous_axes", "两轴同时动了：请只推一个方向"))
 	r.check(flow.state == OnboardingFlow.STATE_PROBE_FAILED,
-		"被拒必须停在 probe_failed（实际 %s）" % flow.state)
+		"第 3 次 ambiguous_axes 必须判失败（期望 probe_failed，实际 %s）" % flow.state)
 	r.check(flow.probe_failure_code == &"ambiguous_axes",
-		"被拒必须保留具体 code（实际 %s）" % flow.probe_failure_code)
+		"硬失败必须保留具体 code（实际 %s）" % flow.probe_failure_code)
 	r.check(flow.retry_state == OnboardingFlow.STATE_PROBE_RIGHT,
 		"重试必须指向出错的那一步（实际 %s）" % flow.retry_state)
 
 	flow.retry_probe_step()
 	r.check(flow.state == OnboardingFlow.STATE_PROBE_RIGHT,
 		"重试必须回到 probe_right（实际 %s）" % flow.state)
+	r.check(flow.soft_retry_count == 0,
+		"按 B 重来必须把软重试计数归零（实际 %d）" % flow.soft_retry_count)
 	# 只补 right / down / left 就能到 calibrate_center，说明 up 的结果没有被清掉。
 	flow.submit_probe_step(_step(2, -1))
 	flow.submit_probe_step(_step(3, 1))
@@ -115,19 +135,61 @@ func _check_probe_step_rejection(r) -> void:
 		"重试后补完剩余步骤必须能继续（实际 %s）" % flow.state)
 
 
-## 四步都「成功」但上/右同轴：交叉校验必须拒绝并指向 probe_right。
+## 四步都「成功」但上/右同轴：前两次回到出错的 probe_right，第 3 次才判失败。
 func _check_probe_cross_validation(r) -> void:
 	var flow := _to_probe(_fresh())
+	_submit_four_steps_ambiguous(flow)
+	r.check(flow.state == OnboardingFlow.STATE_PROBE_RIGHT,
+		"第 1 次上/右同轴必须回到 probe_right（期望 probe_right，实际 %s）" % flow.state)
+	r.check(flow.soft_retry_count == 1,
+		"第 1 次交叉失败后计数必须是 1（实际 %d）" % flow.soft_retry_count)
+	r.check(flow.last_reject_code == &"same_axis_up_right",
+		"交叉失败必须把码写进 last_reject_code（实际 %s）" % flow.last_reject_code)
+
+	# 状态已经回到 probe_right，重测同一个键就会覆盖它并重新触发交叉校验。
 	flow.submit_probe_step(_step(3, -1))
+	r.check(flow.state == OnboardingFlow.STATE_PROBE_RIGHT,
+		"第 2 次上/右同轴仍必须回到 probe_right（期望 probe_right，实际 %s）" % flow.state)
+	r.check(flow.soft_retry_count == 2,
+		"第 2 次交叉失败后计数必须是 2（实际 %d）" % flow.soft_retry_count)
+
 	flow.submit_probe_step(_step(3, -1))
-	flow.submit_probe_step(_step(3, 1))
-	flow.submit_probe_step(_step(2, 1))
 	r.check(flow.state == OnboardingFlow.STATE_PROBE_FAILED,
-		"上/右同轴必须停在 probe_failed（实际 %s）" % flow.state)
+		"第 3 次上/右同轴必须判失败（期望 probe_failed，实际 %s）" % flow.state)
 	r.check(flow.probe_failure_code == &"same_axis_up_right",
-		"交叉校验必须给出 same_axis_up_right（实际 %s）" % flow.probe_failure_code)
+		"硬失败必须给出 same_axis_up_right（实际 %s）" % flow.probe_failure_code)
 	r.check(flow.retry_state == OnboardingFlow.STATE_PROBE_RIGHT,
 		"same_axis_up_right 的重试必须指向 probe_right（实际 %s）" % flow.retry_state)
+
+
+## 软重试之后推对了：计数与拒绝码立刻归零，状态正常推进。
+func _check_soft_retry_resets_on_success(r) -> void:
+	var flow := _to_probe(_fresh())
+	flow.submit_probe_step(_step(3, -1))
+	flow.submit_probe_step(_reject(&"ambiguous_axes", "两轴同时动了：请只推一个方向"))
+	r.check(flow.soft_retry_count == 1,
+		"前置：一次软重试之后计数必须是 1（实际 %d）" % flow.soft_retry_count)
+
+	flow.submit_probe_step(_step(2, -1))
+	r.check(flow.soft_retry_count == 0,
+		"推对之后软重试计数必须归零（实际 %d）" % flow.soft_retry_count)
+	r.check(flow.last_reject_code == &"",
+		"推对之后 last_reject_code 必须清空（实际 %s）" % flow.last_reject_code)
+	r.check(flow.state == OnboardingFlow.STATE_PROBE_DOWN,
+		"推对之后必须推进到 probe_down（实际 %s）" % flow.state)
+
+
+## 不在软重试表里的码（例如 displacement_too_small）必须立刻硬失败：
+## 重推一次也没用的问题，不该给用户「再试两次」的错觉。
+func _check_soft_retry_code_filter(r) -> void:
+	var flow := _to_probe(_fresh())
+	flow.submit_probe_step(_reject(&"displacement_too_small", "位移不够：最大只有 0.100"))
+	r.check(flow.state == OnboardingFlow.STATE_PROBE_FAILED,
+		"非软重试码必须立刻判失败（期望 probe_failed，实际 %s）" % flow.state)
+	r.check(flow.soft_retry_count == 0,
+		"非软重试码不得消耗软重试次数（实际 %d）" % flow.soft_retry_count)
+	r.check(flow.probe_failure_code == &"displacement_too_small",
+		"硬失败必须保留具体 code（实际 %s）" % flow.probe_failure_code)
 
 
 ## 复用门命中：只验 right + down，整份采用档案；但布局仍需重新确认。
@@ -401,6 +463,14 @@ func _submit_four_steps(flow: OnboardingFlow) -> void:
 func _submit_four_steps_from_probe(flow: OnboardingFlow) -> void:
 	flow.submit_probe_step(_step(3, -1))
 	flow.submit_probe_step(_step(2, -1))
+	flow.submit_probe_step(_step(3, 1))
+	flow.submit_probe_step(_step(2, 1))
+
+
+## 四步各自「成功」但上/右落在同一根轴：专门用来触发交叉校验。
+func _submit_four_steps_ambiguous(flow: OnboardingFlow) -> void:
+	flow.submit_probe_step(_step(3, -1))
+	flow.submit_probe_step(_step(3, -1))
 	flow.submit_probe_step(_step(3, 1))
 	flow.submit_probe_step(_step(2, 1))
 

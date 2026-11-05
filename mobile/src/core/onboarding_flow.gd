@@ -48,6 +48,18 @@ const REUSE_KEYS: Array[StringName] = [&"right", &"down"]
 ## 静止基线的最少帧数：60 Hz 下 300 ms 有 18 帧；15 是「确实按住了一会儿」的底线。
 const MIN_REST_SAMPLES := 15
 
+## 软重试：同一个探针步最多自动重来 2 次，第 3 次才真正判失败。
+##
+## 为什么需要它：D0 真机的失败原文是「一直显示重来重来重来」。一次没推准就整屏
+## 判死，用户既不知道自己做错了什么，也没有第二次机会 —— 判定逻辑没问题，坏的是
+## 容错。软重试只对「这一下没推好」的三类原因生效（推歪了 / 推太快 / 推得不够远），
+## 这三类重推一次通常就能过；其余原因（复用失配、配置层面的问题）重推也没用，
+## 仍然立刻硬失败。
+const SOFT_RETRY_LIMIT := 2
+const SOFT_RETRY_CODES: Array[StringName] = [
+	&"ambiguous_axes", &"not_enough_samples", &"not_enough_travel",
+]
+
 var state: StringName = STATE_NO_DEVICE
 var device_name: String = ""
 ## 由设备名推导的建议布局；认不出就是空（绝不预选）。
@@ -63,6 +75,11 @@ var probe_failure_message: String = ""
 var retry_state: StringName = &""
 ## 探针质量：四步各自的 samples / margin / separation，随档案一起落盘。
 var quality: Dictionary = {}
+## 当前这一步已经软重来过几次（0..SOFT_RETRY_LIMIT）。成功或重新开始即归零。
+var soft_retry_count: int = 0
+## 最近一次被拒的码与技术原文。屏幕用它决定 %Hint 第二行写什么，logcat 用它留证。
+var last_reject_code: StringName = &""
+var last_reject_message: String = ""
 ## INPUT-03 预留：单档案阶段固定 "primary"。
 var profile_id: String = "primary"
 ## 探针 / 复验共用的静止基线；空数组 = 未采集。
@@ -183,8 +200,13 @@ func has_rest() -> bool:
 
 ## 四步探针的一步。没有 rest 时直接返回（防御，正常时序不可能到这里）。
 ##
-## 成功时保留该步结果，四步齐了做交叉校验；失败时停在 probe_failed 并保留
-## **其它已完成步骤** —— 重试只回退出错的那一步，不做整轮清空。
+## 成功时保留该步结果，四步齐了做交叉校验；失败时先记下码与原文，再判断这是
+## 「这一下没推好」还是「真的不行」：
+##   * 软重试表里的原因且还有机会 → 停在**本步**直接返回，窗口由屏幕清空，用户立刻重推；
+##     这条分支**不写** `probe_failure_code` / `probe_failure_message` / `retry_state` ——
+##     那三个字段的语义是「流程停在这里了」，软重试并没有停。
+##   * 否则走硬失败，停在 probe_failed 并保留**其它已完成步骤** —— 重试只回退出错的
+##     那一步，不做整轮清空。
 func submit_probe_step(result: Dictionary) -> void:
 	if not _has_rest:
 		return
@@ -196,9 +218,14 @@ func submit_probe_step(result: Dictionary) -> void:
 	# 置成 probe_failed 之后就查不到「出错的是哪一步」了。
 	var step_state := current_probe_state()
 	if not bool(result.get("ok", false)):
+		last_reject_code = StringName(result.get("code", &""))
+		last_reject_message = String(result.get("message", ""))
+		if SOFT_RETRY_CODES.has(last_reject_code) and soft_retry_count < SOFT_RETRY_LIMIT:
+			soft_retry_count += 1
+			return
 		state = STATE_PROBE_FAILED
-		probe_failure_code = StringName(result.get("code", &""))
-		probe_failure_message = String(result.get("message", ""))
+		probe_failure_code = last_reject_code
+		probe_failure_message = last_reject_message
 		retry_state = step_state
 		return
 	_steps[step_key] = result
@@ -207,38 +234,53 @@ func submit_probe_step(result: Dictionary) -> void:
 		"margin": result.get("margin", 0.0),
 		"separation": result.get("separation", 0.0),
 	}
-	_clear_failure()
 	if _steps.size() < PROBE_KEYS.size():
+		_clear_failure()
 		state = _next_probe_state(step_key)
 		return
 	var cross := ProbeEvaluator.validate_cross(
 		_steps["up"], _steps["right"], _steps["down"], _steps["left"])
 	if bool(cross["ok"]):
+		_clear_failure()
 		state = STATE_CALIBRATE_CENTER
 		return
+	# 交叉失败**不调** `_clear_failure()`：这一步单独测是成功的，但整轮过不了校验，
+	# 软重试计数必须留到下一次；否则每次重测都会把它清零，交叉失败就变成无限重来。
+	last_reject_code = StringName(cross["code"])
+	last_reject_message = String(cross["message"])
+	var cross_target := _cross_retry_state(last_reject_code)
+	# 交叉校验失败先回到出错的那一步，别让用户重跑整轮；四步结果保留在 _steps 里，
+	# 重测同一个键会覆盖它，所以下一次提交仍会走到这里再校验一遍。
+	if soft_retry_count < SOFT_RETRY_LIMIT:
+		soft_retry_count += 1
+		retry_state = cross_target
+		if cross_target == STATE_PROBE_UP:
+			# 只有未知交叉码会落到这里（当前不可达）：整轮重探就必须丢掉旧结果，
+			# 否则下一次提交会拿着上一轮的四步再校验一遍，永远过不去。
+			_steps.clear()
+		state = _retry_entry_state(cross_target)
+		return
 	state = STATE_PROBE_FAILED
-	probe_failure_code = StringName(cross["code"])
-	probe_failure_message = String(cross["message"])
-	retry_state = _cross_retry_state(probe_failure_code)
+	probe_failure_code = last_reject_code
+	probe_failure_message = last_reject_message
+	retry_state = cross_target
 
 
 ## 重来这一步。retry_state 是 UP 时整轮重探（rest 已存在就直接回到 probe_up，
 ## 不重复要求用户松手）；其余步骤只回退到该步，保留其它已完成结果。
+##
+## 用户按 B 是一次**全新的开始**：`_clear_failure()` 会把软重试计数一起归零，
+## 于是这一步重新获得 2 次机会。硬上限仍然存在 —— 坏手柄不可能无限重来。
 func retry_probe_step() -> void:
 	if state != STATE_PROBE_FAILED:
 		return
 	var target := retry_state
 	_clear_failure()
 	retry_state = &""
-	match target:
-		STATE_PROBE_UP:
-			_steps.clear()
-			_reused_mapping = null
-			state = STATE_PROBE_UP if _has_rest else STATE_PROBE_REST
-		STATE_PROBE_RIGHT, STATE_PROBE_DOWN, STATE_PROBE_LEFT:
-			state = target
-		_:
-			state = STATE_PROBE_UP if _has_rest else STATE_PROBE_REST
+	if target == STATE_PROBE_UP:
+		_steps.clear()
+		_reused_mapping = null
+	state = _retry_entry_state(target)
 
 
 ## ProfileStore.find(key) 命中后的唯一入口。档案不完整（缺 axes / calibration）
@@ -492,6 +534,16 @@ func _cross_retry_state(code: StringName) -> StringName:
 	return STATE_PROBE_UP
 
 
+## 「回到某一步」的唯一实现：三步探针步直接回该步；UP / 空 / 未知一律整轮重探，
+## 且 rest 已采过时直接回到 probe_up，不重复要求用户松手。
+## 软重试与用户按 B 重来共用它 —— 两条路径对「回到哪一屏」必须一字不差。
+func _retry_entry_state(target: StringName) -> StringName:
+	match target:
+		STATE_PROBE_RIGHT, STATE_PROBE_DOWN, STATE_PROBE_LEFT:
+			return target
+	return STATE_PROBE_UP if _has_rest else STATE_PROBE_REST
+
+
 func _clear_probe() -> void:
 	_steps.clear()
 	quality.clear()
@@ -512,6 +564,16 @@ func _clear_reuse() -> void:
 	reuse_rejected = false
 
 
+## 「清掉这一轮的失败文案」与「清掉软重试计数」的唯一实现。
+##
+## 为什么要合并成一个函数：软重试是一件**只属于当前这一轮尝试**的事。每一次
+## 「重新开始」（begin_probe / retry_probe_step / 换设备 / 断连 / 清空探针）都必须
+## 同时丢掉旧文案与旧计数，否则用户会在新的轮次里看到「第 1/2 次机会」这种残余状态。
+## 这些入口最终都会走到本函数（`_clear_probe()` 也调它），所以不要在任何地方
+## 再抄第二份清空逻辑。
 func _clear_failure() -> void:
 	probe_failure_code = &""
 	probe_failure_message = ""
+	soft_retry_count = 0
+	last_reject_code = &""
+	last_reject_message = ""

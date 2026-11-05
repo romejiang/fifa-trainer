@@ -32,6 +32,104 @@ const REST_PEAK_LIMIT := 0.15
 ## 等待推杆的看门狗帧数（约 1 s @60 Hz）。
 const MOTION_STOP_FRAMES := 60
 const AXIS_COUNT := 8
+## 实时读数的门槛与刷新频率。
+##
+## 门槛 0.2 是「这根轴确实被推动了」的最小位移：静止噪声在 ±0.02 内，0.2 已经
+## 是噪声的十倍，不会把抖动念成「轴 N 的正方向」。
+##
+## 刷新 10 Hz 而不是每帧：`Label.text` 赋值触发文本整形，60 Hz 下是全帧最贵的
+## 操作；读数只需要人眼跟得上，10 Hz 已经比人反应快。
+const READOUT_MIN_DELTA := 0.2
+const READOUT_REFRESH_SECONDS := 0.1
+
+
+## 方向键 → 中文方位词。屏幕上的每个方向词都从这里来，测试才能逐条断言。
+static func direction_word(key: StringName) -> String:
+	match key:
+		&"up":
+			return "上"
+		&"right":
+			return "右"
+		&"down":
+			return "下"
+		&"left":
+			return "左"
+	return "这个方向"
+
+
+## 实时读数：**app 到底收到了什么**。
+##
+## 逐轴算 `raw - rest` 的位移，取绝对值最大的那根轴，显示它的序号、正负方向与
+## **有符号**位移。用户看到「轴 2 的负方向（-0.98）」就能对上自己推的方向，
+## 而不是只看到一句「位移不够」。
+##
+## **不得**在这里断言哪根轴是 X 还是 Y：轴序号只能由探针给出（INPUT-02）。
+## 屏幕说「轴 2」是诚实的；说「右摇杆 X 轴」是猜的，猜错就会把用户带进沟里。
+##
+## `rest` 为空（静止基线还没采）时按 0 处理：此时读数仍然有意义 —— 它显示的是
+## 原始轴值本身。
+static func live_readout(raw: PackedFloat32Array, rest: PackedFloat32Array) -> String:
+	var winner := -1
+	var winner_delta := 0.0
+	for axis in raw.size():
+		var baseline := rest[axis] if axis < rest.size() else 0.0
+		var delta := raw[axis] - baseline
+		if absf(delta) > absf(winner_delta):
+			winner = axis
+			winner_delta = delta
+	if winner < 0 or absf(winner_delta) < READOUT_MIN_DELTA:
+		return "你推的是：没有推动（最大变化 %.2f）" % absf(winner_delta)
+	var sign_word := "正方向" if winner_delta > 0.0 else "负方向"
+	return "你推的是：轴 %d 的%s（%.2f）" % [winner, sign_word, winner_delta]
+
+
+## 拒绝原因 → 人话动作句（第一行）。技术数值（margin / 轴号 / 符号）只作为
+## 第二行或 logcat 出现，绝不当成唯一内容。
+##
+## `attempt` 是「这是第几次机会」：大于 0 时句尾写「（第 n/2 次机会）」；等于 0
+## 表示两次软重试已经用完、这次是真失败，写「（已经试了 2 次仍不对）」。
+static func plain_rejection(code: StringName, key: StringName, attempt: int) -> String:
+	var word := direction_word(key)
+	var sentence := ""
+	match code:
+		&"ambiguous_axes":
+			sentence = "只推「%s」这一个方向：别的方向先松开" % word
+		&"not_enough_travel":
+			sentence = "推得不够远：把右摇杆推到「%s」到底再按住" % word
+		&"not_enough_samples":
+			sentence = "松得太快：推到「%s」后保持不动约 0.3 秒" % word
+		_:
+			sentence = "这一步没测出来：把右摇杆推到「%s」到底再按住" % word
+	if attempt > 0:
+		return sentence + "（第 %d/2 次机会）" % attempt
+	return sentence + "（已经试了 2 次仍不对）"
+
+
+## 交叉校验失败 → 先告诉用户「你刚才推的方向不像「右」」，再说清为什么。
+##
+## 三个交叉码是四个方向之间的**一致性**问题，不是单手推歪：用户很可能每一步都
+## 自己觉得推对了。所以第一句先否定方向判断，第二句才说轴的关系，最后给下一步。
+static func cross_check_plain(code: StringName, key: StringName) -> String:
+	match code:
+		&"same_axis_up_right":
+			return "你刚才推的方向不像「右」：上和右落在了同一根轴上，这把手的右摇杆可能没有独立的左右轴。先松开，再只把右摇杆推到「右」到底按住。"
+		&"vertical_not_opposed":
+			return "你刚才推的方向不像「下」：上和下的符号没有相反，推下时轴变化的方向和推上一样。先松开，再只把右摇杆推到「下」到底按住。"
+		&"horizontal_not_opposed":
+			return "你刚才推的方向不像「左」：左和右的符号没有相反，推左时轴变化的方向和推右一样。先松开，再只把右摇杆推到「左」到底按住。"
+	var word := direction_word(key)
+	return "你刚才推的方向不像「%s」：先松开，再只把右摇杆推到「%s」到底按住。" % [word, word]
+
+
+## 停止屏：报的是**本步增量**，不是累计总数。
+##
+## D0 的旧文案把「本状态 1 秒内没有新事件」念成「本机从没送上任何摇杆事件」，
+## 与同一时段的 `PAD_DIAG ev_m=2633` 自相矛盾，用户当然看不明白。增量语义不会
+## 撒谎：它只说这一步开始之后有没有新事件。
+static func stop_message(delta: int, total: int) -> String:
+	return "本步开始后新增 %d 个摇杆事件（累计 %d）。本机可能不发送轴事件，请记录并停止（D0 判失败）" % [
+		delta, total]
+
 
 @onready var _title: Label = %Title
 @onready var _step: Label = %Step
@@ -56,6 +154,12 @@ var _center: Vector2 = Vector2.ZERO
 var _frames_in_state: int = 0
 var _motion_at_state_start: int = 0
 var _motion_stop: bool = false
+## 最近一次算好的实时读数；10 Hz 节流更新，渲染只读它。
+var _readout: String = ""
+var _readout_accum: float = 0.0
+## 已经打进 logcat 的拒绝码：同一个码只打一行，换码就打新的一行。
+var _logged_reject_code: StringName = &""
+
 
 
 func _ready() -> void:
@@ -70,13 +174,26 @@ func setup(p_flow: OnboardingFlow, p_sampler: PadSampler) -> void:
 	_refresh()
 
 
-func _process(_delta: float) -> void:
+func _process(delta: float) -> void:
 	if _flow == null or not visible:
 		return
 	if _flow.state != _last_state:
 		_enter_state(_flow.state)
+	_refresh_readout(delta)
 	_advance()
 	_refresh()
+
+
+## 实时读数的节流块。**必须在 `_advance()` 之前**：本帧采样完再算读数，
+## 屏幕上显示的就是这一帧刚采到的值；放到后面会永远慢一帧。
+func _refresh_readout(delta: float) -> void:
+	_readout_accum += delta
+	if _readout_accum < READOUT_REFRESH_SECONDS:
+		return
+	_readout_accum = 0.0
+	if _sampler == null:
+		return
+	_readout = live_readout(_current_axis_frame(), _flow.rest_baseline())
 
 
 ## 状态切换时清空所有窗口与计数。采样进度不能跨状态复用。
@@ -91,6 +208,10 @@ func _enter_state(next: StringName) -> void:
 	_frames_in_state = 0
 	_motion_stop = false
 	_motion_at_state_start = _sampler.buffer.events_motion if _sampler != null else 0
+	# 进屏第一帧就要有读数：等满 0.1 秒才出现会让用户以为屏幕没在听。
+	_readout_accum = 0.0
+	if _sampler != null and _flow != null:
+		_readout = live_readout(_current_axis_frame(), _flow.rest_baseline())
 
 
 func _advance() -> void:
@@ -281,6 +402,7 @@ func _rest_is_still(samples: Array[PackedFloat32Array]) -> bool:
 func _refresh() -> void:
 	if _flow == null:
 		return
+	_log_rejection()
 	if _motion_stop:
 		_render_motion_stop()
 		return
@@ -328,14 +450,7 @@ func _refresh() -> void:
 		OnboardingFlow.STATE_PROBE_DOWN, OnboardingFlow.STATE_PROBE_LEFT:
 			_render_probe_step()
 		OnboardingFlow.STATE_PROBE_FAILED:
-			_set_text(_title, "这一步没通过")
-			_set_text(_step, "")
-			_set_text(_body, "按 B 重来这一步")
-			_set_text(_big_hint, "重来")
-			_set_text(_hint, _flow.probe_failure_message if not _flow.probe_failure_message.is_empty()
-				else "按 B 重来这一步")
-			_set_text(_options, "")
-			_reset_meter()
+			_render_probe_failed()
 		OnboardingFlow.STATE_REUSE_REST:
 			_set_text(_title, "先松手，验证上次档案")
 			_set_text(_step, "")
@@ -374,13 +489,29 @@ func _refresh() -> void:
 	_set_text(_footer, _footer_text())
 
 
+## 每次「新的拒绝码」打一行 logcat：技术值（margin、轴号、符号）必须能从日志
+## 抄回来，屏幕不是唯一证据。同一个码连续显示时只打一次，避免 60 Hz 刷屏。
+func _log_rejection() -> void:
+	if _flow.last_reject_code == _logged_reject_code:
+		return
+	_logged_reject_code = _flow.last_reject_code
+	if _logged_reject_code == &"":
+		return
+	print("PROBE_REJECT code=%s key=%s soft=%d msg=%s" % [
+		String(_logged_reject_code), String(_flow.current_probe_key()),
+		_flow.soft_retry_count, _flow.last_reject_message,
+	])
+
+
 func _render_probe_step() -> void:
 	var key := _flow.current_probe_key()
 	_set_text(_title, "轴探测")
 	_set_text(_step, "第 %d/4 步" % _probe_step_number(key))
 	_set_text(_body, _probe_direction_text(key))
 	_set_text(_big_hint, "推到底并保持不动")
-	_set_text(_hint, "")
+	# 第一行永远是「app 收到了什么」，第二行才是下一步该做什么。两行 = 67.2 px，
+	# 落在 %Hint 的 104 px 带里（28 px × 3 行 = 100.8 px 是上限）。
+	_set_text(_hint, "%s\n%s" % [_readout, _probe_second_line(key)])
 	_set_text(_options, "")
 
 
@@ -390,8 +521,62 @@ func _render_reuse_check() -> void:
 	_set_text(_step, "")
 	_set_text(_body, "按 B 跳过验证，重新探测")
 	_set_text(_big_hint, _probe_direction_text(key))
-	_set_text(_hint, "只验右与下两步；不一致会自动丢弃档案并重探四步。")
+	_set_text(_hint, "%s\n%s" % [_readout, _reuse_second_line(key)])
 	_set_text(_options, "")
+
+
+## 探针第二行：正在软重试就把「为什么被拒 + 还剩几次机会」说清，否则只说这一步要什么。
+func _probe_second_line(key: StringName) -> String:
+	if _flow.soft_retry_count > 0 and _flow.last_reject_code != &"":
+		return _soft_retry_sentence(key)
+	return "本步要的是「%s」：推到底并保持" % direction_word(key)
+
+
+## 复用门第二行：软重试句优先；没有重试时补一句「只验右与下两步」的既有说明。
+func _reuse_second_line(key: StringName) -> String:
+	if _flow.soft_retry_count > 0 and _flow.last_reject_code != &"":
+		return _soft_retry_sentence(key)
+	return "本步要的是「%s」：推到底并保持（只验右与下两步）" % direction_word(key)
+
+
+## 软重试句的唯一实现：交叉码走「不像「右」」的长句并补次数，其余走纯语言映射。
+func _soft_retry_sentence(key: StringName) -> String:
+	var code := _flow.last_reject_code
+	match code:
+		&"same_axis_up_right", &"vertical_not_opposed", &"horizontal_not_opposed":
+			return "%s（第 %d/2 次机会）" % [cross_check_plain(code, key), _flow.soft_retry_count]
+	return plain_rejection(code, key, _flow.soft_retry_count)
+
+
+## 硬失败面：三行 = 100.8 px，正好落在 %Hint 的 104 px 带里。
+##   1. 实时读数（app 收到了什么）
+##   2. 人话动作句（下一步做什么）
+##   3. 检测器的技术原文（margin 与门槛的比较、轴号与符号）—— 逐字来自 core，UI 不重拼
+func _render_probe_failed() -> void:
+	var key := _key_from_state(_flow.retry_state)
+	_set_text(_title, "这一步没通过")
+	_set_text(_step, "")
+	_set_text(_body, "按 B 重来这一步")
+	_set_text(_big_hint, "重来")
+	var third := _flow.probe_failure_message if not _flow.probe_failure_message.is_empty() \
+		else "按 B 重来这一步"
+	_set_text(_hint, "%s\n%s\n%s" % [_readout, plain_rejection(_flow.probe_failure_code, key, 0), third])
+	_set_text(_options, "")
+	_reset_meter()
+
+
+## 失败面的方向词只能从 retry_state 反查：probe_failed 状态下 current_probe_key() 是空的。
+func _key_from_state(target: StringName) -> StringName:
+	match target:
+		OnboardingFlow.STATE_PROBE_UP:
+			return &"up"
+		OnboardingFlow.STATE_PROBE_RIGHT:
+			return &"right"
+		OnboardingFlow.STATE_PROBE_DOWN:
+			return &"down"
+		OnboardingFlow.STATE_PROBE_LEFT:
+			return &"left"
+	return &""
 
 
 func _render_layout() -> void:
@@ -421,10 +606,11 @@ func _render_layout() -> void:
 func _render_motion_stop() -> void:
 	_set_text(_title, "输入事件缺失")
 	_set_text(_step, "")
-	_set_text(_body, "本机在当前阶段没有送上任何摇杆事件。")
+	_set_text(_body, "这一步开始后没有再收到新的摇杆事件。")
 	_set_text(_big_hint, "停止")
-	_set_text(_hint, "没有收到摇杆事件（events_motion = %d）：本机可能不发送轴事件，请记录并停止（D0 判失败）"
-		% _sampler.buffer.events_motion)
+	# 停的是**本步增量**：绝对总数在长会话里永远大于 0，拿它当判据只会自相矛盾。
+	var delta := _sampler.buffer.events_motion - _motion_at_state_start
+	_set_text(_hint, stop_message(delta, _sampler.buffer.events_motion))
 	_set_text(_options, "记录此屏并停止（D0 判失败）")
 	_set_text(_footer, _footer_text())
 	_reset_meter()
