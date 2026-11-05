@@ -224,6 +224,10 @@ func _check_counters(r, case_id: String, runtime: TapRuntime, expected: Dictiona
 
 ## 布局硬门：未确认时**任意**输入零判定，且中途撤销确认必须静默清场。
 ##
+## 第一个序列是「噪声 + 一条本来会命中的 500ms 两下」：纯确定性噪声凑不成一次合法
+## 搓射（X 每 4~16ms 反转一次，`_armed` 永远等不到 120ms 的松开），那样这条断言会
+## 变成真空 —— 布局门被删掉也照样绿。叠一条干净的两下以后，没有布局门就必然产出判定。
+##
 ## 第二个序列是断连的模型：`_t0` 已建立（半截搓射）→ 撤销确认 → 恢复 → 喂一帧
 ## 无按键。若 `set_layout_confirmed(false)` 没有 `abandon()`，`reset()` 会立刻产
 ## hold_short —— 断连被当成一次「保持不够」的尝试，这是明确不允许的。
@@ -242,6 +246,21 @@ func _check_layout_gate_blocks(r, skill: Skill, config: AppConfig) -> void:
 			frame.buttons["X"] = true
 		if mask & 4:
 			frame.buttons["RT"] = true
+		# 4~104ms 按住 RB；100ms 第一下 X；600ms 第二下 X（间隔 500ms，本来会命中）。
+		if index >= 1 and index <= 26:
+			frame.buttons["RB"] = true
+			frame.buttons.erase("X")
+		if index == 25:
+			frame.buttons["X"] = true
+		if index >= 27 and index <= 149:
+			frame.buttons["RB"] = true
+			frame.buttons.erase("X")
+		if index == 150:
+			frame.buttons["RB"] = true
+			frame.buttons["X"] = true
+		if index == 151:
+			frame.buttons["RB"] = true
+			frame.buttons.erase("X")
 		blocked.tick(frame)
 		leaked += blocked.pop_outcomes().size()
 	_eq_int(r, leaked, 0, "未确认布局时 200 帧任意输入必须零 Outcome")
