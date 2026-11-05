@@ -24,6 +24,11 @@ extends RefCounted
 ##
 ## 轴对识别只看「最近 1 秒内谁在动」：窗口按帧数计（`RECENT_SAMPLES` 帧，60 Hz 下
 ## 正好 1 秒）。core 不读时钟，帧数就是唯一可注入、可复现的时间口径。
+##
+## 左右摇杆是两对独立的轴（D-06）：用户被要求先推右摇杆、再推左摇杆。`active_pair()`
+## 的最近性会把「现在在动的那一对」翻到左摇杆上，所以右摇杆轴对必须在第一次推满
+## 量程时**冻结**（`rs_pair()`），`ls_pair()` 再去排除冻结对之外的候选里取次高 ——
+## 否则 D5-1 的顺序会把两只摇杆的归属对调，而且没有任何测试会自己发现。
 
 const AXIS_COUNT := 8
 
@@ -75,6 +80,21 @@ var _y_sign: int = 1
 var _layout_cycle: StringName = &""
 ## 只有页面在 A 的保存路径上调 `mark_layout_confirmed()` 之后才为 true。
 var _layout_confirmed: bool = false
+## 右摇杆轴对的冻结值。PAIR_NONE = 还没冻结；一旦冻结就再也不看 `active_pair()`。
+var _rs_pair_frozen: Vector2i = PAIR_NONE
+## 预留给将来的人工选择（本阶段没有按键绑定）：>= 0 时优先于自动识别。
+var _ls_manual_index: int = -1
+## 左摇杆的符号与「是否已由用户动作确认」分开存：默认 +1 不是确认。
+var _ls_x_sign: int = 1
+var _ls_y_sign: int = 1
+var _have_ls_x_sign: bool = false
+var _have_ls_y_sign: bool = false
+## 正在等哪一次「已知方向」的推杆（空 / up / right）。
+var _ls_arm: StringName = &""
+## 摆臂那一刻的 (x, y) 原始值：符号由位移方向判定，不看绝对位置。
+var _ls_arm_base: Vector2 = Vector2.ZERO
+## 最近一次摆臂的结果：空 = 未完成；ok = 符号已确认；sideways = 推错方向（不改符号）。
+var _ls_arm_result: StringName = &""
 
 
 func _init() -> void:
@@ -108,6 +128,17 @@ func reset() -> void:
 	# 显示的键名和用户以为的不一样。
 	_layout_cycle = &""
 	_layout_confirmed = false
+	# 左右摇杆的状态一起清：冻结的 RS 对与已确认的 LS 符号都属于「上一次观测」，
+	# 留着会让新设备继承旧摇杆的归属。
+	_rs_pair_frozen = PAIR_NONE
+	_ls_manual_index = -1
+	_ls_x_sign = 1
+	_ls_y_sign = 1
+	_have_ls_x_sign = false
+	_have_ls_y_sign = false
+	_ls_arm = &""
+	_ls_arm_base = Vector2.ZERO
+	_ls_arm_result = &""
 
 
 ## 喂一帧。`values` 少于 8 根时，缺的轴保持上一帧的值（不制造一次假的「回中」）。
@@ -134,6 +165,10 @@ func observe(values: PackedFloat32Array) -> void:
 	if _recent.size() > RECENT_SAMPLES:
 		_recent.pop_front()
 	_frame_index += 1
+	# 顺序是硬约束：先冻结 RS 轴对，再处理 LS 摆臂。反过来时，第一次推 LS 的动作
+	# 会先被 `_poll_ls_arm()` 看到，而那时 `ls_pair()` 还没有可用的非 RS 候选。
+	_maybe_freeze_rs_pair()
+	_poll_ls_arm()
 
 
 ## 当前活动轴对：人工选择优先；否则取「最近 1 秒内两轴峰峰值的最小值」最大的一对。
@@ -162,6 +197,177 @@ func active_pair() -> Vector2i:
 			best = pair
 			best_recency = recency
 	return best
+
+
+## 右摇杆轴对的冻结值：已冻结就返回冻结值，否则返回此刻的自动结果。
+##
+## `build_profile()`、`pair_center/scale()` 与设置页的 `rs=` 都走这里。只要有一次
+## 冻结，用户之后推左摇杆把 `active_pair()` 翻过去也不会改变归属（D5-1 / T-05-21b）。
+func rs_pair() -> Vector2i:
+	if _rs_pair_frozen != PAIR_NONE:
+		return _rs_pair_frozen
+	return active_pair()
+
+
+## 左摇杆轴对：排除冻结的 RS 对之后，长窗口 `min(span_x, span_y)` 最高、且最近
+## 确实在动（`_pair_score > 0`，同时沿用设备基线跳变的排除规则）的那一对。
+##
+## 用长窗口排名而不是 `active_pair()`：用户推完 LS 后可能停一拍再按 A，最近窗口的
+## 1 秒会把「刚推过」抹掉，但长窗口的行程仍然可信。`_pair_score > 0` 保留「必须
+## 真的动过」这一条，防止把静止噪声当成一对。
+func ls_pair() -> Vector2i:
+	if _ls_manual_index >= 0:
+		var manual := PAIRS[_ls_manual_index]
+		if manual != rs_pair():
+			return manual
+	var frozen := rs_pair()
+	var best := PAIR_NONE
+	var best_span := 0.0
+	for pair in PAIRS:
+		if pair == frozen:
+			continue
+		if _pair_score(pair) <= 0.0:
+			continue
+		var span := minf(axis_span(pair.x), axis_span(pair.y))
+		if span < MIN_PAIR_TRAVEL:
+			continue
+		if span > best_span + 1e-9:
+			best = pair
+			best_span = span
+	return best
+
+
+## 摆臂「向上推」：把基线定在当前 (x, y)，之后 `observe()` 用位移方向判 Y 符号。
+## 返回 `&"no_pair"` 表示还没有可用的 LS 轴对（页面应继续提示先推左摇杆）。
+func arm_ls_up() -> StringName:
+	return _arm_ls(&"up")
+
+
+## 摆臂「向右推」：同上，判 X 符号。
+func arm_ls_right() -> StringName:
+	return _arm_ls(&"right")
+
+
+func _arm_ls(kind: StringName) -> StringName:
+	var pair := ls_pair()
+	if pair == PAIR_NONE:
+		_ls_arm = &""
+		_ls_arm_result = &""
+		return &"no_pair"
+	_ls_arm = kind
+	_ls_arm_result = &""
+	_ls_arm_base = Vector2(_last[pair.x], _last[pair.y])
+	return &"ok"
+
+
+## 每帧检查摆臂：只有**已知方向**的位移才能定符号，横向位移必须明确回报。
+func _poll_ls_arm() -> void:
+	if _ls_arm == &"":
+		return
+	var pair := ls_pair()
+	if pair == PAIR_NONE:
+		return
+	var delta := Vector2(_last[pair.x], _last[pair.y]) - _ls_arm_base
+	if _ls_arm == &"up":
+		if absf(delta.x) > absf(delta.y) and absf(delta.x) >= MIN_PAIR_TRAVEL:
+			_ls_arm_result = &"sideways"
+			_ls_arm = &""
+			return
+		if delta.y <= -MIN_PAIR_TRAVEL:
+			# SDL 的 y 向下为正：向上推得到负值 → 归一化不需要翻转。
+			_ls_y_sign = 1
+			_have_ls_y_sign = true
+			_ls_arm_result = &"ok"
+			_ls_arm = &""
+			return
+		if delta.y >= MIN_PAIR_TRAVEL:
+			_ls_y_sign = -1
+			_have_ls_y_sign = true
+			_ls_arm_result = &"ok"
+			_ls_arm = &""
+			return
+		return
+	if _ls_arm == &"right":
+		if absf(delta.y) > absf(delta.x) and absf(delta.y) >= MIN_PAIR_TRAVEL:
+			_ls_arm_result = &"sideways"
+			_ls_arm = &""
+			return
+		if delta.x >= MIN_PAIR_TRAVEL:
+			_ls_x_sign = 1
+			_have_ls_x_sign = true
+			_ls_arm_result = &"ok"
+			_ls_arm = &""
+			return
+		if delta.x <= -MIN_PAIR_TRAVEL:
+			_ls_x_sign = -1
+			_have_ls_x_sign = true
+			_ls_arm_result = &"ok"
+			_ls_arm = &""
+
+
+## 最近一次摆臂的结果：`&""` 未完成 / `&"ok"` 已确认 / `&"sideways"` 推错方向。
+func ls_arm_result() -> StringName:
+	return _ls_arm_result
+
+
+func ls_arm_pending() -> bool:
+	return _ls_arm != &""
+
+
+## 当前推到基线之外的位移长度。设置页用它判断「用户已松手」以便重新取基线；
+## 本方法不改任何状态。
+func ls_arm_delta_len() -> float:
+	if _ls_arm == &"":
+		return 0.0
+	var pair := ls_pair()
+	if pair == PAIR_NONE:
+		return 0.0
+	return (Vector2(_last[pair.x], _last[pair.y]) - _ls_arm_base).length()
+
+
+func has_ls_x_sign() -> bool:
+	return _have_ls_x_sign
+
+
+func has_ls_y_sign() -> bool:
+	return _have_ls_y_sign
+
+
+func ls_x_sign() -> int:
+	return _ls_x_sign
+
+
+func ls_y_sign() -> int:
+	return _ls_y_sign
+
+
+## 左摇杆就绪：轴对已识别 + X/Y 符号都由用户动作确认 + 两轴量程都推满。
+## 与 `range_ready()` 是同一层的「保存时事实」，不是从校准数值反推。
+func ls_ready() -> bool:
+	var pair := ls_pair()
+	if pair == PAIR_NONE:
+		return false
+	if not _have_ls_x_sign or not _have_ls_y_sign:
+		return false
+	return axis_span(pair.x) >= RANGE_READY and axis_span(pair.y) >= RANGE_READY
+
+
+## 第一次推满右摇杆时冻结轴对。手动选择（LB/RB）本身就是用户的明确决定，直接采信；
+## 自动识别则要求它确实是此刻 `_pair_score` 最高的一对，避免一次擦边动作把 RS 定死。
+func _maybe_freeze_rs_pair() -> void:
+	if _rs_pair_frozen != PAIR_NONE:
+		return
+	var pair := active_pair()
+	if pair == PAIR_NONE:
+		return
+	if axis_span(pair.x) < RANGE_READY or axis_span(pair.y) < RANGE_READY:
+		return
+	if _manual_index < 0:
+		var score := _pair_score(pair)
+		for other in PAIRS:
+			if _pair_score(other) > score + 1e-9:
+				return
+	_rs_pair_frozen = pair
 
 
 ## LB / RB：在候选对之间人工切换。`direction > 0` 为下一对，`< 0` 为上一对，0 不动。
@@ -235,17 +441,15 @@ func range_ready() -> bool:
 	return axis_span(pair.x) >= RANGE_READY and axis_span(pair.y) >= RANGE_READY
 
 
-## 能不能写档案：量程真的推满了才允许。没有轴对、或任何一根轴的峰峰值没到门槛，
-## 都返回 false —— 04-09 的真机就是在这里放行了一次 `scale=1.0` 的「默认校准」。
+## 能不能写档案：RS 与 LS 的量程都真的推满才允许。缺左摇杆的档案会让四个
+## `relative_to_ls` 技能静默变成「推了完全没反应」（T-05-19）—— 那是本项目最贵的
+## 一类失败，所以保存门必须在写盘前就把它拦住。
 func can_save() -> bool:
-	return range_ready()
+	return range_ready() and ls_ready()
 
 
-## 中点 = (min + max) / 2，量程半宽 = (max - min) / 2，都取当前轴对的长窗口。
-##
-## 没有轴对时返回 ZERO：屏幕显示「等轴对认出来」，而不是拿 0/1 冒充一次校准。
-func center() -> Vector2:
-	var pair := active_pair()
+## 指定轴对的中点 = (min + max) / 2，取长窗口。PAIR_NONE 返回 ZERO。
+func pair_center(pair: Vector2i) -> Vector2:
 	if pair == PAIR_NONE:
 		return Vector2.ZERO
 	var span_x := axis_range(pair.x)
@@ -253,13 +457,24 @@ func center() -> Vector2:
 	return Vector2((span_x.x + span_x.y) * 0.5, (span_y.x + span_y.y) * 0.5)
 
 
-func scale() -> Vector2:
-	var pair := active_pair()
+## 指定轴对的量程半宽 = (max - min) / 2，取长窗口。PAIR_NONE 返回 ZERO。
+func pair_scale(pair: Vector2i) -> Vector2:
 	if pair == PAIR_NONE:
 		return Vector2.ZERO
 	var span_x := axis_range(pair.x)
 	var span_y := axis_range(pair.y)
 	return Vector2((span_x.y - span_x.x) * 0.5, (span_y.y - span_y.x) * 0.5)
+
+
+## 中点与量程半宽都取当前活动轴对的长窗口。
+##
+## 没有轴对时返回 ZERO：屏幕显示「等轴对认出来」，而不是拿 0/1 冒充一次校准。
+func center() -> Vector2:
+	return pair_center(active_pair())
+
+
+func scale() -> Vector2:
+	return pair_scale(active_pair())
 
 
 ## 某根轴的扳机静止值 = 观测到的最小值。从未收到样本时返回 0.0。
@@ -314,11 +529,13 @@ func recent_range(axis: int) -> float:
 ## 构造 per-device 档案。**只在用户按 A 时由界面调用** —— 自动识别结果必须先显示在
 ## 屏幕上（轴对、符号、量程），由人确认之后才落盘（INPUT-04 / T-04-18）。
 ##
-## 量程没推满时返回 **null**：默认校准（scale=1.0 / center=0）不是校准，写进去之后
-## 复用门会把它当成「这台手柄已经校准过」，下次启动直接进练习，圆点与手柄对不上。
-## 界面必须在 A 分支先问 `can_save()`，拿到 null 只能提示、不能落盘。
+## RS 与 LS 的量程没推满、或 LS 符号没确认时返回 **null**：默认校准
+## （scale=1.0 / center=0）不是校准，写进去之后复用门会把它当成「这台手柄已经
+## 校准过」，下次启动直接进练习，圆点与手柄对不上。界面必须在 A 分支先问
+## `can_save()`，拿到 null 只能提示、不能落盘。
 ##
-## 没有轴对时 rs 索引写 -1：这份档案不可用，界面也不该走到这里（A 分支会先拦下）。
+## RS 索引取**冻结值** `rs_pair()`，不取 `active_pair()`：用户推左摇杆之后活动轴对
+## 会翻到 LS，跟着它走会把两只摇杆的归属对调（D5-1 / T-05-21b）。
 func build_profile(device_name: String, device_guid: String, now_iso: String) -> DeviceProfile:
 	if not can_save():
 		return null
@@ -328,16 +545,22 @@ func build_profile(device_name: String, device_guid: String, now_iso: String) ->
 	profile.device_guid = device_guid
 	profile.key = DeviceProfile.make_key(device_guid, device_name)
 
-	var pair := active_pair()
+	var rs := rs_pair()
+	var ls := ls_pair()
 	var mapping := AxisMapping.new()
-	if pair != PAIR_NONE:
-		mapping.rs_x_index = pair.x
+	if rs != PAIR_NONE:
+		mapping.rs_x_index = rs.x
 		mapping.rs_x_sign = _x_sign
-		mapping.rs_y_index = pair.y
+		mapping.rs_y_index = rs.y
 		mapping.rs_y_sign = _y_sign
-	# 本页不区分左右摇杆：用户只被要求推右摇杆，左摇杆保持未映射。
-	mapping.ls_x_index = -1
-	mapping.ls_y_index = -1
+	# 04 阶段这里刻意写 -1（只探右摇杆）；05 阶段 D-06 补上真实的 LS 索引与符号。
+	# `can_save()` 已保证 ls != PAIR_NONE；AxisMapping 的默认值本来就是 -1，
+	# 不需要再写一份「未映射」的兜底（那正是 04 阶段那三行的形状）。
+	if ls != PAIR_NONE:
+		mapping.ls_x_index = ls.x
+		mapping.ls_x_sign = _ls_x_sign
+		mapping.ls_y_index = ls.y
+		mapping.ls_y_sign = _ls_y_sign
 	mapping.lt_index = TRIGGER_AXES[0]
 	mapping.lt_rest = trigger_rest(TRIGGER_AXES[0])
 	mapping.rt_index = TRIGGER_AXES[1]
@@ -345,21 +568,31 @@ func build_profile(device_name: String, device_guid: String, now_iso: String) ->
 	profile.axes = mapping
 
 	var calibration := Calibration.new()
-	var measured_center := center()
-	var measured_scale := scale()
-	calibration.center_x = measured_center.x
-	calibration.center_y = measured_center.y
-	calibration.scale_x = _usable_scale(measured_scale.x)
-	calibration.scale_y = _usable_scale(measured_scale.y)
+	var rs_center := pair_center(rs)
+	var rs_scale := pair_scale(rs)
+	calibration.center_x = rs_center.x
+	calibration.center_y = rs_center.y
+	calibration.scale_x = _usable_scale(rs_scale.x)
+	calibration.scale_y = _usable_scale(rs_scale.y)
+	var ls_center := pair_center(ls)
+	var ls_scale := pair_scale(ls)
+	calibration.ls_center_x = ls_center.x
+	calibration.ls_center_y = ls_center.y
+	calibration.ls_scale_x = _usable_scale(ls_scale.x)
+	calibration.ls_scale_y = _usable_scale(ls_scale.y)
 	profile.calibration = calibration
 
 	profile.quality = {
 		"source": PROFILE_ID,
-		"pair": [pair.x, pair.y],
-		"span_x": axis_span(pair.x) if pair != PAIR_NONE else 0.0,
-		"span_y": axis_span(pair.y) if pair != PAIR_NONE else 0.0,
+		"pair": [rs.x, rs.y],
+		"span_x": axis_span(rs.x) if rs != PAIR_NONE else 0.0,
+		"span_y": axis_span(rs.y) if rs != PAIR_NONE else 0.0,
+		"ls_pair": [ls.x, ls.y] if ls != PAIR_NONE else [-1, -1],
+		"ls_span_x": axis_span(ls.x) if ls != PAIR_NONE else 0.0,
+		"ls_span_y": axis_span(ls.y) if ls != PAIR_NONE else 0.0,
 		"trigger_rest": [trigger_rest(TRIGGER_AXES[0]), trigger_rest(TRIGGER_AXES[1])],
 		"range_ready": range_ready(),
+		"ls_ready": ls_ready(),
 	}
 	# 布局必须在同一页上由人确认（Start 切换、A 确认）。`_layout_confirmed` 只有
 	# `mark_layout_confirmed()` 能置位，所以 build_profile 自己永远不会写 true。

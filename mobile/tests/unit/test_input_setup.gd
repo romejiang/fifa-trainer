@@ -30,8 +30,15 @@ func run(r) -> void:
 	_check_legacy_profile(r)
 	_check_profile(r)
 	_check_reset(r)
+	_check_rs_pair_frozen_before_ls(r)
+	_check_ls_pair_excludes_rs(r)
+	_check_ls_up_sign(r)
+	_check_ls_right_sign(r)
+	_check_ls_ready_gate(r)
+	_check_build_profile_writes_ls(r)
+	_check_reset_clears_ls(r)
 	var total: int = r.assertions
-	r.check(total >= 50, "本套件至少 50 条断言（实际 %d）" % total)
+	r.check(total >= 100, "本套件至少 100 条断言（实际 %d）" % total)
 	r.complete()
 
 
@@ -228,7 +235,13 @@ func _check_save_gate(r) -> void:
 	var ready := InputSetup.new()
 	_sweep(ready, 2, -1.0, 1.0, 12)
 	_sweep(ready, 3, -1.0, 1.0, 12)
-	r.check(ready.can_save(), "两轴峰峰值都到 2.0：can_save 为 true")
+	# 05 阶段 D-06：保存门同时要求 LS 就绪。RS 推满只是必要条件 —— 缺左摇杆
+	# 映射的档案会让四个 relative_to_ls 技能静默变成「推了完全没反应」。
+	r.check(not ready.can_save(), "RS 推满但 LS 未就绪：can_save 仍为 false")
+	r.check(ready.build_profile("Pad", "", "") == null,
+		"LS 未就绪时 build_profile 必须返回 null")
+	_sweep_ls(ready)
+	r.check(ready.can_save(), "RS 与 LS 量程都推满：can_save 为 true")
 	r.check(ready.build_profile("Pad", "", "") != null, "量程满了才允许返回档案")
 
 
@@ -253,6 +266,9 @@ func _check_layout_confirm(r) -> void:
 
 	_sweep(setup, 2, -1.0, 1.0, 12)
 	_sweep(setup, 3, -1.0, 1.0, 12)
+	# `_sweep_ls` 必须排在两条 RS `_sweep` 之后：它先推轴 0/1，若在 RS 冻结之前
+	# 调用，`_maybe_freeze_rs_pair()` 会把 (0,1) 当成 RS，LS 就没有候选轴对了。
+	_sweep_ls(setup)
 	var unconfirmed := setup.build_profile("Xbox Series X Controller", "GUID-1", "")
 	r.check(unconfirmed != null, "前置：量程满了才能构造档案")
 	r.check(unconfirmed != null and not unconfirmed.layout_confirmed,
@@ -316,6 +332,8 @@ func _check_profile(r) -> void:
 	var setup := InputSetup.new()
 	_sweep(setup, 2, -1.0, 1.0, 10)
 	_sweep(setup, 3, -0.8, 0.6, 10)
+	# RS 冻结之后再推 LS（顺序不可倒，见 `_sweep_ls` 的注释）。
+	_sweep_ls(setup)
 	_feed(setup, {4: -1.0, 5: -1.0}, 3)
 	setup.toggle_y_sign()
 	setup.mark_layout_confirmed()
@@ -330,8 +348,17 @@ func _check_profile(r) -> void:
 	r.check(profile.axes.rs_y_index == 3, "rs_y_index 来自轴对 Y（实际 %d）" % profile.axes.rs_y_index)
 	r.check(profile.axes.rs_x_sign == 1, "X 符号默认 +1")
 	r.check(profile.axes.rs_y_sign == -1, "Y 符号被翻转成 -1")
-	r.check(profile.axes.ls_x_index == -1 and profile.axes.ls_y_index == -1,
-		"本页不映射左摇杆")
+	# 04 阶段这一页刻意不映射左摇杆（ls = -1）；05 阶段 D-06 补上：四个
+	# relative_to_ls 技能需要真实的 LS 索引、符号与校准。索引必须非负，且不得与
+	# RS 共用同一对轴。
+	r.check(profile.axes.ls_x_index >= 0 and profile.axes.ls_y_index >= 0,
+		"05 阶段 D-06：LS 索引必须非负（实际 %d/%d）" % [
+			profile.axes.ls_x_index, profile.axes.ls_y_index])
+	r.check(Vector2i(profile.axes.ls_x_index, profile.axes.ls_y_index)
+		!= Vector2i(profile.axes.rs_x_index, profile.axes.rs_y_index),
+		"LS 轴对不得与 RS 轴对相同")
+	r.check(bool(profile.quality.get("ls_ready", false)),
+		"05 阶段：档案必须记下 quality.ls_ready = true")
 	r.check(profile.axes.lt_index == 4 and profile.axes.rt_index == 5,
 		"扳机轴按标准布局记 4/5")
 	r.eq_float(profile.axes.rt_rest, -1.0, TOL, "扳机静止值是观测到的最小值")
@@ -364,6 +391,7 @@ func _check_profile(r) -> void:
 	var named := InputSetup.new()
 	_sweep(named, 2, -1.0, 1.0, 10)
 	_sweep(named, 3, -1.0, 1.0, 10)
+	_sweep_ls(named)
 	named.mark_layout_confirmed()
 	var pad := named.build_profile("Pad", "", "")
 	r.check(pad != null and pad.key == "name:pad",
@@ -393,6 +421,165 @@ func _check_reset(r) -> void:
 	r.check(setup.axis_range(2) == Vector2.ZERO, "从未采样时 axis_range 返回 ZERO")
 
 
+## 13. D5-1 的机械证明：先推 RS 四方向、再推 LS，RS 轴对必须在 LS 检测开始之前
+## 就被冻结。`active_pair()` 的最近性会把「现在在动的那一对」翻到 LS；如果
+## `rs_pair()` 跟着它走，档案里的 RS 就会变成 (0,1)，两只摇杆对调。
+func _check_rs_pair_frozen_before_ls(r) -> void:
+	var setup := _ls_ready_setup()
+	r.check(setup.active_pair() == Vector2i(0, 1),
+		"前置：此刻最近在动的是 LS（实际 %s）" % str(setup.active_pair()))
+	r.check(setup.rs_pair() == Vector2i(2, 3),
+		"D5-1：先推 RS 再推 LS，rs_pair 必须冻结在 (2,3)（实际 %s）" % str(setup.rs_pair()))
+	r.check(setup.ls_pair() == Vector2i(0, 1),
+		"D5-1：ls_pair 必须是排除冻结 RS 之后的 (0,1)（实际 %s）" % str(setup.ls_pair()))
+	r.check(setup.ls_ready(), "D5-1：轴对 + 两个符号 + 两轴量程齐备 → ls_ready")
+
+	setup.mark_layout_confirmed()
+	var profile := setup.build_profile("Xbox Series X Controller", "GUID-D51", "")
+	r.check(profile != null, "D5-1：保存门通过时必须能构造档案")
+	if profile == null:
+		return
+	r.check(profile.axes.rs_x_index == 2 and profile.axes.rs_y_index == 3,
+		"档案 RS 必须是冻结的 2/3（实际 %d/%d）" % [
+			profile.axes.rs_x_index, profile.axes.rs_y_index])
+	r.check(profile.axes.ls_x_index == 0 and profile.axes.ls_y_index == 1,
+		"档案 LS 必须是 0/1（实际 %d/%d）" % [
+			profile.axes.ls_x_index, profile.axes.ls_y_index])
+	r.check(bool(profile.quality.get("ls_ready", false)),
+		"档案 quality.ls_ready 必须为 true")
+	r.check(profile.quality.get("ls_pair") == [0, 1],
+		"档案 quality.ls_pair 必须记录 LS 索引（实际 %s）" % str(profile.quality.get("ls_pair")))
+	r.eq_float(profile.calibration.ls_scale_x, 1.0, 1e-5, "LS X 量程半宽写进档案")
+	r.eq_float(profile.calibration.ls_scale_y, 1.0, 1e-5, "LS Y 量程半宽写进档案")
+
+
+## 14. `ls_pair()` 永远不返回冻结的 RS 对：RS 与 LS 必须是两对不同的轴。
+func _check_ls_pair_excludes_rs(r) -> void:
+	var setup := _ls_ready_setup()
+	# 先让 LS 的最近窗口自然过期（长窗口行程不受影响），再轻轻推一下 LS、用力推 RS：
+	# active_pair 会翻回 (2,3)，但 ls_pair 仍必须排除冻结的 RS 对。
+	_feed(setup, {}, 61)
+	_feed(setup, {0: 0.4, 1: -0.4}, 3)
+	_feed(setup, {2: 1.0, 3: -1.0}, 3)
+	r.check(setup.active_pair() == Vector2i(2, 3),
+		"前置：再推 RS 后 active_pair 回到 (2,3)（实际 %s）" % str(setup.active_pair()))
+	r.check(setup.ls_pair() != Vector2i(2, 3),
+		"ls_pair 永远不得等于冻结的 rs_pair（实际 %s）" % str(setup.ls_pair()))
+	r.check(setup.ls_pair() == Vector2i(0, 1),
+		"LS 仍是最近推满的 (0,1)（实际 %s）" % str(setup.ls_pair()))
+
+
+## 15. 向左摇杆「向上推」的三种结果：Y 读数为负 → +1、为正 → -1、推成左右 → sideways。
+##
+## 符号不能从极值推断 —— 用户为了量程把四个方向都推满了，min/max 里没有方向信息。
+## 必须有一次**已知方向**的观测，推错时明确回报，绝不静默把 X 的位移当成 Y。
+func _check_ls_up_sign(r) -> void:
+	var negative := _ls_unconfirmed_setup()
+	negative.arm_ls_up()
+	_feed(negative, {0: 0.0, 1: -1.0}, 3)
+	r.check(negative.has_ls_y_sign() and negative.ls_y_sign() == 1,
+		"向上推且 Y 轴读数为负 → ls_y_sign = +1（实际 %d）" % negative.ls_y_sign())
+	r.check(negative.ls_arm_result() == &"ok", "成功时 ls_arm_result = ok")
+
+	var positive := _ls_unconfirmed_setup()
+	_feed(positive, {0: 0.0, 1: -0.5}, 2)
+	positive.arm_ls_up()
+	_feed(positive, {0: 0.0, 1: 0.5}, 3)
+	r.check(positive.has_ls_y_sign() and positive.ls_y_sign() == -1,
+		"向上推但 Y 轴读数为正（反接）→ ls_y_sign = -1（实际 %d）" % positive.ls_y_sign())
+
+	var sideways := _ls_unconfirmed_setup()
+	sideways.arm_ls_up()
+	_feed(sideways, {0: -1.0, 1: 1.0}, 3)
+	r.check(sideways.ls_arm_result() == &"sideways",
+		"向上推却推成左右 → ls_arm_result = sideways（实际 %s）" % String(sideways.ls_arm_result()))
+	r.check(not sideways.has_ls_y_sign() and sideways.ls_y_sign() == 1,
+		"sideways 不得改动 Y 符号")
+	r.check(not sideways.ls_arm_pending(), "sideways 之后不再 pending")
+
+
+## 16. 向左摇杆「向右推」：X 读数为正 → +1、为负 → -1。
+func _check_ls_right_sign(r) -> void:
+	var positive := _ls_unconfirmed_setup()
+	positive.arm_ls_right()
+	_feed(positive, {0: 1.0, 1: 0.0}, 3)
+	r.check(positive.has_ls_x_sign() and positive.ls_x_sign() == 1,
+		"向右推且 X 轴读数为正 → ls_x_sign = +1（实际 %d）" % positive.ls_x_sign())
+
+	var negative := _ls_unconfirmed_setup()
+	_feed(negative, {0: 0.5, 1: 0.0}, 2)
+	negative.arm_ls_right()
+	_feed(negative, {0: -1.0, 1: 0.0}, 3)
+	r.check(negative.has_ls_x_sign() and negative.ls_x_sign() == -1,
+		"向右推但 X 轴读数为负（反接）→ ls_x_sign = -1（实际 %d）" % negative.ls_x_sign())
+
+
+## 17. `ls_ready()` 的三个必要条件：轴对、两个符号、两轴量程。缺一不可。
+func _check_ls_ready_gate(r) -> void:
+	var idle := InputSetup.new()
+	r.check(not idle.ls_ready(), "没有 LS 轴对 → ls_ready 为 false")
+	r.check(idle.ls_pair() == InputSetup.PAIR_NONE, "没有轴对时 ls_pair 返回 PAIR_NONE")
+
+	var short := InputSetup.new()
+	_sweep(short, 2, -1.0, 1.0, 12)
+	_sweep(short, 3, -1.0, 1.0, 12)
+	_sweep(short, 0, -0.2, 0.2, 8)
+	_sweep(short, 1, -0.2, 0.2, 8)
+	r.check(short.ls_pair() == Vector2i(0, 1),
+		"0.4 的行程足够认出 LS 轴对（实际 %s）" % str(short.ls_pair()))
+	r.check(not short.ls_ready(), "符号未确认 → ls_ready 为 false")
+	short.arm_ls_up()
+	_feed(short, {0: 0.0, 1: -0.4}, 3)
+	short.arm_ls_right()
+	_feed(short, {0: 0.4, 1: 0.0}, 3)
+	r.check(short.has_ls_x_sign() and short.has_ls_y_sign(), "两个符号都已确认")
+	r.check(not short.ls_ready(), "量程只有 0.4 < 1.2 → ls_ready 仍为 false")
+	_sweep(short, 0, -1.0, 1.0, 12)
+	_sweep(short, 1, -1.0, 1.0, 12)
+	r.check(short.ls_ready(), "量程推满 → ls_ready 为 true")
+
+
+## 18. `build_profile()` 写真实的 LS 索引 / 符号 / 校准，不是占位 -1。
+func _check_build_profile_writes_ls(r) -> void:
+	var setup := _ls_ready_setup()
+	setup.toggle_y_sign()
+	setup.mark_layout_confirmed()
+	var profile := setup.build_profile("Pad", "", "")
+	r.check(profile != null, "前置：LS 就绪后 build_profile 非 null")
+	if profile == null:
+		return
+	r.check(profile.axes.rs_x_index == 2 and profile.axes.rs_y_index == 3,
+		"RS 索引来自冻结对")
+	r.check(profile.axes.rs_y_sign == -1, "RS Y 符号仍来自十字键翻转")
+	r.check(profile.axes.ls_x_index == 0 and profile.axes.ls_y_index == 1,
+		"LS 索引来自 ls_pair（实际 %d/%d）" % [
+			profile.axes.ls_x_index, profile.axes.ls_y_index])
+	r.check(profile.axes.ls_x_sign == 1 and profile.axes.ls_y_sign == 1,
+		"LS 符号来自自动确认（实际 %d/%d）" % [
+			profile.axes.ls_x_sign, profile.axes.ls_y_sign])
+	r.eq_float(profile.calibration.ls_center_x, 0.0, 1e-5, "LS X 中点写进档案")
+	r.eq_float(profile.calibration.ls_center_y, 0.0, 1e-5, "LS Y 中点写进档案")
+	r.eq_float(profile.calibration.ls_scale_x, 1.0, 1e-5, "LS X 量程半宽写进档案")
+	r.eq_float(profile.calibration.ls_scale_y, 1.0, 1e-5, "LS Y 量程半宽写进档案")
+	r.check(profile.quality.get("ls_pair") == [0, 1], "quality.ls_pair 记录 LS 索引")
+	r.check(bool(profile.quality.get("ls_ready", false)), "quality.ls_ready = true")
+
+
+## 19. reset：RS 冻结、LS 轴对、两个符号、未完成的摆臂全部清空。
+func _check_reset_clears_ls(r) -> void:
+	var setup := _ls_ready_setup()
+	r.check(setup.ls_ready(), "前置：LS 已就绪")
+	setup.reset()
+	r.check(setup.rs_pair() == InputSetup.PAIR_NONE, "reset 清掉 RS 冻结")
+	r.check(setup.ls_pair() == InputSetup.PAIR_NONE, "reset 之后 ls_pair 回到 PAIR_NONE")
+	r.check(not setup.ls_ready(), "reset 之后 ls_ready 为 false")
+	r.check(not setup.has_ls_x_sign() and not setup.has_ls_y_sign(),
+		"reset 清掉 LS 符号确认")
+	r.check(setup.ls_x_sign() == 1 and setup.ls_y_sign() == 1,
+		"reset 把 LS 符号退回 +1")
+	r.check(not setup.ls_arm_pending(), "reset 清掉未完成的 LS 摆臂")
+
+
 ## 8 根轴的一帧。字典里没写的轴填 `fallback`（默认 0.0）。
 func _frame(values: Dictionary, fallback: float = 0.0) -> PackedFloat32Array:
 	var frame := PackedFloat32Array()
@@ -419,10 +606,43 @@ func _sweep(setup: InputSetup, axis: int, from_value: float, to_value: float, fr
 		setup.observe(_frame({axis: lerpf(from_value, to_value, ratio)}))
 
 
+## 完整的左摇杆夹具：先把轴 0 / 1 各推满 -1..1，再确认两个符号。
+##
+## 顺序不能倒：`arm_ls_up()` 的基线取当前值，所以必须先推满量程、再推「向上」那一下。
+## 所有调用点都必须排在两条 RS `_sweep` 之后 —— `_sweep_ls` 先推轴 0/1，若在 RS
+## 冻结之前调用，`_maybe_freeze_rs_pair()` 会把 (0,1) 冻结成 RS，`ls_pair()` 再无
+## 非 RS 候选，两个 LS 符号都确认不了，`ls_ready()` 恒假。
+func _sweep_ls(setup: InputSetup) -> void:
+	_sweep(setup, 0, -1.0, 1.0, 12)
+	_sweep(setup, 1, -1.0, 1.0, 12)
+	setup.arm_ls_up()
+	_feed(setup, {1: -1.0}, 3)
+	setup.arm_ls_right()
+	_feed(setup, {0: 1.0}, 3)
+
+
+## LS 轴对已认出、量程已推满，但两个符号都还没确认：用于单独证明符号判定。
+func _ls_unconfirmed_setup() -> InputSetup:
+	var setup := InputSetup.new()
+	_sweep(setup, 2, -1.0, 1.0, 12)
+	_sweep(setup, 3, -1.0, 1.0, 12)
+	_sweep(setup, 0, -1.0, 1.0, 12)
+	_sweep(setup, 1, -1.0, 1.0, 12)
+	return setup
+
+
+## 完整的 D5-1 形态：先 RS 后 LS，两个符号都已确认。
+func _ls_ready_setup() -> InputSetup:
+	var setup := _ls_unconfirmed_setup()
+	_sweep_ls(setup)
+	return setup
+
+
 ## 一份「已保存且可用」的档案：四项映射 + 合理校准 + 布局已确认 + range_ready 标记。
 ##
-## 不从 `build_profile()` 构造：保存门要求量程真的推满，而这里要单独证明「档案侧」
-## 的复用门 —— 两份数据源分开，任何一个门坏了都会被另一边的用例抓住。
+## 04-11 时期的档案是 `ls = -1`；05 阶段 D-06 之后这样的档案会被 schema v2 与
+## `has_ls()` 双重拒绝。这里显式写真实的 LS 轴对与四个 LS 校准字段，代表「新的、
+## 可进入练习的档案」，与 `_check_legacy_profile` 里各个旧档案反例形成对照。
 static func _stored_profile() -> DeviceProfile:
 	var profile := DeviceProfile.new()
 	profile.key = "guid:stored"
@@ -433,8 +653,8 @@ static func _stored_profile() -> DeviceProfile:
 	profile.axes.rs_x_sign = 1
 	profile.axes.rs_y_index = 3
 	profile.axes.rs_y_sign = 1
-	profile.axes.ls_x_index = -1
-	profile.axes.ls_y_index = -1
+	profile.axes.ls_x_index = 0
+	profile.axes.ls_y_index = 1
 	profile.axes.lt_index = 4
 	profile.axes.rt_index = 5
 	profile.calibration = Calibration.new()
@@ -442,7 +662,13 @@ static func _stored_profile() -> DeviceProfile:
 	profile.calibration.center_y = -0.02
 	profile.calibration.scale_x = 0.98
 	profile.calibration.scale_y = 0.96
-	profile.quality = {"range_ready": true, "span_x": 2.0, "span_y": 2.0}
+	profile.calibration.ls_center_x = 0.0
+	profile.calibration.ls_center_y = 0.0
+	profile.calibration.ls_scale_x = 0.97
+	profile.calibration.ls_scale_y = 0.95
+	profile.quality = {
+		"range_ready": true, "ls_ready": true, "span_x": 2.0, "span_y": 2.0,
+	}
 	profile.layout = DeviceProfile.LAYOUT_XBOX
 	profile.layout_confirmed = true
 	profile.probed_at_iso = "2026-11-05T22:00:00"
