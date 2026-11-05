@@ -3,16 +3,16 @@ gsd_state_version: "1.0"
 current_phase: 4
 current_phase_name: 设备输入层 + 绿色搓射竖切
 status: executing
-stopped_at: Completed 04-04-PLAN.md
-last_updated: "2026-11-05T10:23:27.000Z"
+stopped_at: Completed 04-05-PLAN.md
+last_updated: "2026-11-05T10:47:49.000Z"
 last_activity: 2026-11-05
-last_activity_desc: 04-04 设备输入层 + 档案存储 + lint/闸门扩展完成
-state_head: 2e176f856cfe040805cd66a871c408033803b793
+last_activity_desc: 04-05 引导状态机 + 组合根 + 引导屏 + 字形闭世界完成
+state_head: 07b336818045d34365d3ec2b20ee836485b1abfa
 progress:
   total_phases: 10
   completed_phases: 3
   total_plans: 23
-  completed_plans: 20
+  completed_plans: 21
   percent: 32
 ---
 
@@ -30,7 +30,7 @@ See: .planning/PROJECT.md (updated 2026-11-04)
 Phase: 4 (设备输入层 + 绿色搓射竖切) — EXECUTING
 Plan: 5 of 7
 Status: Executing Phase 4
-Last activity: 2026-11-05 — 04-04 设备输入层 + 档案存储 + lint/闸门扩展完成
+Last activity: 2026-11-05 — 04-05 引导状态机 + 组合根 + 引导屏 + 字形闭世界完成
 
 Progress: [███░░░░░░░] 32%
 
@@ -78,6 +78,7 @@ Progress: [███░░░░░░░] 32%
 | Phase 4 P02 | 10min | 3 tasks | 12 files |
 | Phase 4 P03 | 22min | 2 tasks | 11 files |
 | Phase 4 P04 | 13min | 3 tasks | 18 files |
+| Phase 4 P05 | 15min | 3 tasks | 17 files |
 
 ## Accumulated Context
 
@@ -218,6 +219,15 @@ Recent decisions affecting current work:
 - [Phase 4]: `ProfileStore` 任一条目 schema 非法即整份丢弃并删文件；`res://` 返回 `ERR_UNAUTHORIZED`；超 1 MiB 用 `ERR_INVALID_DATA` 在分配前拒绝
 - [Phase 4]: 本阶段修饰键只有 `RB`；`LT`/`RT` 是轴，`pressed_dict()` 不合成，RT 分支等 Phase 5 扳机归一
 - [Phase 4]: lint 的 `outer_layer_dep` 扩到 `src/input/`；轴枚举常量零出现断言排在导入之前，反例 `joy_axis_canary` 证明它在几秒内变红
+- [Phase 4]: `OnboardingFlow` 不设 config_error 状态：配置错误发生在状态机构造之前，永远到不了的状态等于假路径；错误屏归 `main.gd`
+- [Phase 4]: rest 是四步探针的硬前置：`begin_probe` 只到 `probe_rest`，没有基线时 `submit_probe_step` 直接返回
+- [Phase 4]: 探针失败保留已完成步骤，retry 只回退出错那一步；交叉校验失败按 code 指向 RIGHT/DOWN/LEFT/UP
+- [Phase 4]: 复用门四项 index+sign 全等才整份采用，失配即整份丢弃；复用成功后 `chosen_layout` 仍清空，必须按键确认布局
+- [Phase 4]: 空布局时 `confirm_layout` 与 `accept_layout_anyway` 都留在布局页；绝不静默按 Xbox 进练习
+- [Phase 4]: 组合根先 connect 再 add_child，随后主动播种；同一设备的重复列表不重绑、不重放边沿
+- [Phase 4]: `Frame.now` 是秒，`PadSampler` 的事件时间戳是毫秒；两类时间量在文件边界分开，组合根不做换算
+- [Phase 4]: 字形闭世界：`src/ui` 下任何未登记的 `.gd`/`.tscn` 让 `make_font_subset.py --check` 直接失败（断言挂在 `collect_chars()` 第一句）
+- [Phase 4]: 引导屏的 D0 停止条件只在采样窗口仍为空（确实在等推杆）时触发，避免把「设备静止时不发事件」误判成失败
 
 ### Pending Todos
 
@@ -233,7 +243,8 @@ None yet.
 - 干净 clone 的首次 `--import` 观察到 1/5 的段错误（`reimport | NotoSansSC-Subset.ttf`），4 次复跑全绿；**不加重试**，
   若在别的机器上高频率复现，先查 Godot 4.7.2 的字体导入线程崩溃，不要改闸门
 - `set_use_accumulated_input(false)` 在安卓上是否真的产生亚帧时间戳未验证（Phase 4 真机记录 `t_ms` 直方图）
-- 布局建议纯函数已实现（04-03）；按键确认页与状态机未实现（04-05）：`INPUT-04` 仍未闭合，不得据此宣布完成
+- 布局建议与按键确认页已就位（04-03 / 04-05），但 DualSense 的实际确认索引未实测：`INPUT-04` 仍未闭合，不得据此宣布完成
+- 引导状态机与组合根已在无头环境证明（04-05：14 套件 / 1175 断言 / main 场景 30 帧启动无错）；真机首启零触摸走完（D0）与断连重探（D2）仍在 04-07
 - 帧内反转的事件捕获已在无头层证明（04-04：同帧右→左→右三条 motion 事件全部保留）；真机 `events_motion` / `events_button` / `poll_edges` 的解释与 Δt p95 ≤ 20 ms 仍在 04-07（D5/D6），INPUT-05 不得提前勾选
 - `PadSampler._input` 是否在主线程未验证（M3）：`input_thread_id` / `process_thread_id` 已暴露，跨线程时在 `src/input/` 加一把 Mutex 即可
 
@@ -247,6 +258,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-11-05T10:23:27.000Z
-Stopped at: Completed 04-04-PLAN.md
+Last session: 2026-11-05T10:47:49.000Z
+Stopped at: Completed 04-05-PLAN.md
 Resume file: None

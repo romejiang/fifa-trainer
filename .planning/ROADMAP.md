@@ -148,7 +148,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] 04-04-PLAN.md — `PadStateBuffer` + `PadSampler`（事件优先 + 每帧对账）+ `ProfileStore` 原子写 + lint 扩到 `src/input/` (completed 2026-11-05)
 
 **Wave 5** *(blocked on Wave 4 completion)*
-- [ ] 04-05-PLAN.md — `OnboardingFlow` 纯状态机 + 组合根 + 引导屏 S1–S11 + 字形闭世界断言
+- [x] 04-05-PLAN.md — `OnboardingFlow` 纯状态机 + 组合根 + 引导屏 S1–S11 + 字形闭世界断言 (completed 2026-11-05)
 
 **Wave 6** *(blocked on Wave 5 completion)*
 - [ ] 04-06-PLAN.md — 练习屏 + 结果横幅 + 无设备 60 Hz 集成竖切 + `ACCEPTANCE.md` 第 6 节
@@ -272,7 +272,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 →
 | 1. 仓库拆分 + 配置单一真源 + 桌面回归闸门 | 5/5 | Complete    | 2026-11-04 |
 | 2. 安卓工具链 + 真机冒烟 APK | 5/5 | Complete    | 2026-11-05 |
 | 3. 纯核心地基 | 6/6 | Complete    | 2026-11-05 |
-| 4. 设备输入层 + 绿色搓射竖切 | 1/7 | In progress | - |
+| 4. 设备输入层 + 绿色搓射竖切 | 5/7 | In progress | - |
 | 5. 全动作判定对等性 | 0/0 | Not started | - |
 | 6. 训练循环 | 0/0 | Not started | - |
 | 7. 反馈呈现 | 0/0 | Not started | - |
