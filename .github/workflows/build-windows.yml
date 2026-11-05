@@ -1,0 +1,68 @@
+name: build-windows-exe
+
+# PyInstaller 不能交叉编译：exe 必须在 Windows 上打。
+# 这个工作流让 GitHub 的 windows-latest 来打包，Mac 上只要点一下或推一个 tag。
+#
+#   手动触发：Actions 页面 -> build-windows-exe -> Run workflow
+#   打 tag 触发：git tag v1.0.1 && git push origin v1.0.1
+#
+# 产物：Actions 页面下载 FIFA-Skill-Trainer-windows；打 tag 时同时发到 Release。
+# 桌面回归闸门（tools/check_desktop.sh）仍由 desktop-checks.yml 在 Linux 上守。
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: desktop
+
+    steps:
+      - name: 检出仓库
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4
+      - name: 安装 uv
+        uses: astral-sh/setup-uv@38f3f104447c67c051c4a08e39b64a148898af3a  # v6
+        with:
+          enable-cache: true
+
+      - name: 桌面自测（打包前挡住改坏规则的提交）
+        run: |
+          uv run tests/test_detectors.py
+          uv run tests/test_gui_smoke.py
+
+      - name: 打包 exe
+        run: powershell -ExecutionPolicy Bypass -File build\build_windows.ps1
+
+      - name: 确认产物存在
+        shell: pwsh
+        run: |
+          if (-not (Test-Path "dist\FIFA-Skill-Trainer.exe")) {
+            throw "没有生成 dist\FIFA-Skill-Trainer.exe"
+          }
+          Get-Item "dist\FIFA-Skill-Trainer.exe" | Format-List Name, Length
+
+      - name: 上传 exe
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4
+        with:
+          name: FIFA-Skill-Trainer-windows
+          path: desktop/dist/FIFA-Skill-Trainer.exe
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: 打 tag 时发到 Release
+        if: startsWith(github.ref, 'refs/tags/')
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          gh release create $env:TAG "dist\FIFA-Skill-Trainer.exe" `
+            --title $env:TAG `
+            --notes "Windows 桌面版单文件 exe（未签名，首次运行请点「更多信息 -> 仍要运行」）。"
