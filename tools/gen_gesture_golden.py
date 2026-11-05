@@ -505,6 +505,113 @@ BOUNDARY_CASES = (
 )
 
 
+# 同一段顺时针 200° 弧（马赛回旋的成功轨迹）：方向变体与「相对/绝对」反向
+# 对照全部复用它。反向对照的两条用例必须引用**同一个** segments 对象，
+# 否则「只改 relative_to_ls」就只是口号。
+_ROULETTE_CW_SEGMENTS = (
+    ("hold", 0, 96, 0.0, 0.0),
+    ("sweep", 100, 500, 180.0, 380.0, 0.9),
+    ("hold", 604, 700, 0.0, 0.0),
+)
+
+# 变体配置：出厂配置下到不了的分支（wrong_direction / start_angle:null /
+# absolute / 负 grace）只能靠改一份**深拷贝副本**来覆盖。每条只改一个维度，
+# 完整对象进夹具的 `configs` 注册表，GDScript 逐字重建。
+VARIANT_CASES = (
+    # 1. direction: cw —— 顺时针轨迹在只认顺时针的变体下正常命中。
+    {
+        "id": "det_roulette_direction_cw_ok",
+        "kind": "detector",
+        "skill": "马赛回旋 Roulette",
+        "config": "variant:roulette_cw",
+        "end_ms": 700,
+        "segments": _ROULETTE_CW_SEGMENTS,
+    },
+    # 2. direction: ccw —— 同一段顺时针轨迹在只认逆时针的变体下报 wrong_direction。
+    {
+        "id": "det_roulette_direction_ccw_wrong",
+        "kind": "detector",
+        "skill": "马赛回旋 Roulette",
+        "config": "variant:roulette_ccw",
+        "end_ms": 700,
+        "segments": _ROULETTE_CW_SEGMENTS,
+    },
+    # 3. start_angle: null —— 从相对 100° 起手也不再是「起点不对」；
+    #    逆时针 90° 收在相对 10°，swept 70 时命中。
+    {
+        "id": "det_roulette_start_null_any_start",
+        "kind": "detector",
+        "skill": "马赛回旋 Roulette",
+        "config": "variant:roulette_start_null",
+        "end_ms": 700,
+        "segments": (
+            ("hold", 0, 96, 0.0, 0.0),
+            ("sweep", 100, 500, 100.0, 10.0, 0.9),
+            ("hold", 604, 700, 0.0, 0.0),
+        ),
+    },
+    # 4. 反向对照（相对）：LS 朝向 90°，起手绝对 180° → 起点相对 90°。
+    #    既超出 65° 容差、又超出 65+20=85 的 claim 边界 → 静默 abort，零判定。
+    {
+        "id": "det_roulette_relative_ls90_zero",
+        "kind": "detector",
+        "skill": "马赛回旋 Roulette",
+        "config": "shipped",
+        "end_ms": 700,
+        "ls": ((0, 90.0, 0.9),),
+        "segments": _ROULETTE_CW_SEGMENTS,
+    },
+    # 5. 反向对照（绝对）：**同一 frames、同一 ls**，只把 relative_to_ls 改成
+    #    false。base 变成 0，起手 180° 正好是目标 180° → ok。
+    {
+        "id": "det_roulette_absolute_ls90_ok",
+        "kind": "detector",
+        "skill": "马赛回旋 Roulette",
+        "config": "variant:roulette_absolute",
+        "end_ms": 700,
+        "ls": ((0, 90.0, 0.9),),
+        "segments": _ROULETTE_CW_SEGMENTS,
+    },
+    # 6. timeout_grace_ms: -50 —— 参考实现用 max(0.0, ...) 兜底，负值不会把
+    #    窗口压短；两下 X 间隔 500ms 仍然命中。
+    {
+        "id": "det_green_finesse_negative_grace",
+        "kind": "detector",
+        "skill": "绿色搓射 Green Finesse",
+        "config": "variant:green_negative_grace",
+        "end_ms": 700,
+        "buttons": (
+            (0, ()),
+            (4, ("RB",)),
+            (100, ("RB", "X")),
+            (104, ("RB",)),
+            (600, ("RB", "X")),
+            (604, ("RB",)),
+        ),
+        "segments": (
+            ("hold", 0, 700, 0.0, 0.0),
+        ),
+    },
+    # 7. 反向对照（序列 + 绝对）：LS 朝向 90°，摇杆推到绝对 180°。
+    #    相对模式下 180-90=90 是「右」→ 本会命中；绝对模式下 180 是「后」，
+    #    偏离目标 90° > tolerance 10 → 零判定。
+    {
+        "id": "det_croqueta_absolute_no_match",
+        "kind": "detector",
+        "skill": "油炸丸子 La Croqueta",
+        "config": "variant:croqueta_absolute",
+        "end_ms": 560,
+        "ls": ((0, 90.0, 0.9),),
+        "buttons": ((0, ()), (4, ("LB",)), (456, ())),
+        "segments": (
+            ("hold", 0, 96, 0.0, 0.0),
+            ("hold", 100, 452, 180.0, 0.9),
+            ("hold", 456, 560, 0.0, 0.0),
+        ),
+    },
+)
+
+
 class _NullSource(GamepadSource):
     """只用于构造引擎；生成器直接手工喂 `_tick`，`poll()` 永不被调用。"""
 
@@ -796,16 +903,25 @@ def _runtime_outcomes(case_id: str, engine: _CollectingEngine) -> list:
 # ---------------------------------------------------------------------------
 
 
-def variant(base: dict, skill_name: str, **params) -> dict:
-    """深拷贝整份配置，只改点名技能的 params，再用 `parse_config` 自检一次。
+def variant(base: dict, skill_name: str, *,
+            relative_to_ls: bool | None = None, **params) -> dict:
+    """深拷贝整份配置，只改点名技能的一个维度，再用 `parse_config` 自检一次。
 
     与桌面 `test_arc_direction` 的 `variant()` 同构：变体只改一个技能，其余不动。
-    返回值是**完整**配置对象（不是 diff），直接进夹具的 `configs` 注册表。
+    可改的维度只有两类 —— 技能顶层的 `relative_to_ls` 布尔，或 `params` 里的
+    某个键（`direction` / `start_angle` / `timeout_grace_ms` / `max_angle`）。
+    一次只准改一处：反向对照必须只差一个变量，否则「什么都没判」无法被区分。
+
+    返回值是**完整**配置对象（不是 diff），直接进夹具的 `configs` 注册表 ——
+    GDScript 读不懂 diff 的语义，只记 diff 会让变体用例按出厂阈值静默回放。
     """
     data = copy.deepcopy(base)
     for item in data.get("skills", []):
         if item.get("name") == skill_name:
-            item.setdefault("params", {}).update(params)
+            if relative_to_ls is not None:
+                item["relative_to_ls"] = bool(relative_to_ls)
+            if params:
+                item.setdefault("params", {}).update(params)
             break
     else:
         raise SystemExit(f"✗ variant: 配置里找不到动作 {skill_name!r}")
@@ -908,10 +1024,32 @@ def _case_payload(case: dict, cfg) -> dict:
 def build_payload(root: Path) -> dict:
     """按 Python 参考实现逐用例推导夹具内容（纯计算，不写盘）。"""
     base_dict = json.loads((root / CONFIG_REL).read_text(encoding="utf-8"))
-    config_dicts: dict[str, dict] = {"shipped": base_dict}
-    # 后续变体 / 合成配置注册到这里，例如：
-    #   config_dicts["variant:roulette_cw"] = variant(
-    #       base_dict, "马赛回旋 Roulette", direction="cw")
+    # 注册表存**完整**配置对象（不是 diff）。每个变体只改一个技能的一个维度，
+    # 摘要写在 meta.variants 里仅供人读，回放只认这里的完整对象。
+    config_dicts: dict[str, dict] = {
+        "shipped": base_dict,
+        "variant:roulette_cw": variant(
+            base_dict, "马赛回旋 Roulette", direction="cw"),
+        "variant:roulette_ccw": variant(
+            base_dict, "马赛回旋 Roulette", direction="ccw"),
+        "variant:roulette_start_null": variant(
+            base_dict, "马赛回旋 Roulette", start_angle=None),
+        "variant:roulette_absolute": variant(
+            base_dict, "马赛回旋 Roulette", relative_to_ls=False),
+        "variant:green_negative_grace": variant(
+            base_dict, "绿色搓射 Green Finesse", timeout_grace_ms=-50),
+        "variant:croqueta_absolute": variant(
+            base_dict, "油炸丸子 La Croqueta", relative_to_ls=False),
+    }
+    variant_diffs = {
+        "variant:roulette_cw": "马赛回旋 Roulette: params.direction 'any' → 'cw'",
+        "variant:roulette_ccw": "马赛回旋 Roulette: params.direction 'any' → 'ccw'",
+        "variant:roulette_start_null": "马赛回旋 Roulette: params.start_angle 180 → null",
+        "variant:roulette_absolute": "马赛回旋 Roulette: relative_to_ls true → false",
+        "variant:green_negative_grace": (
+            "绿色搓射 Green Finesse: params.timeout_grace_ms 150 → -50"),
+        "variant:croqueta_absolute": "油炸丸子 La Croqueta: relative_to_ls true → false",
+    }
 
     parsed = {
         key: parse_config(copy.deepcopy(value), root / CONFIG_REL)
@@ -921,7 +1059,7 @@ def build_payload(root: Path) -> dict:
     used: dict[str, object] = {}
     cases = []
     seen: set[str] = set()
-    for case in CASES + BOUNDARY_CASES:
+    for case in CASES + BOUNDARY_CASES + VARIANT_CASES:
         case_id = case["id"]
         if case_id in seen:
             raise SystemExit(f"✗ 夹具 id 重复：{case_id}")
@@ -938,7 +1076,7 @@ def build_payload(root: Path) -> dict:
             **{name: rel.as_posix() for name, rel in SOURCE_RELS.items()},
             "sha256": {name: _sha256(root, rel) for name, rel in SOURCE_RELS.items()},
         },
-        "meta": {"hz": HZ, "step_ms": STEP_MS},
+        "meta": {"hz": HZ, "step_ms": STEP_MS, "variants": variant_diffs},
         "configs": config_dicts,
         "cases": cases,
     }

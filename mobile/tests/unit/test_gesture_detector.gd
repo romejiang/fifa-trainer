@@ -33,6 +33,10 @@ const REQUIRED_DETECTOR_IDS: Array[String] = [
 	"det_stepover_wrong_start",
 	"det_roulette_wrong_end",
 	"det_croqueta_hold_short",
+	# 反向对照：同一段 frames / 同一 LS 朝向，只差 relative_to_ls 一个布尔。
+	# 少了任何一条，「相对动作真的用了左摇杆基准」就重新变回不可证。
+	"det_roulette_relative_ls90_zero",
+	"det_roulette_absolute_ls90_ok",
 ]
 
 var _mismatches := 0
@@ -105,8 +109,8 @@ func _check_meta(r, data: Dictionary) -> void:
 ## 规模与 id 下限：删空夹具、丢掉点名用例、复制 id 都必须变红。
 ## 下限与 `test-core.sh` 的 grep 是**同一个数字**：两层不一致等于允许删语料仍绿。
 func _check_scale(r, cases: Array) -> void:
-	r.check(cases.size() >= 28, "detector 用例至少 28 条（实际 %d）" % cases.size())
-	if cases.size() < 28:
+	r.check(cases.size() >= 35, "detector 用例至少 35 条（实际 %d）" % cases.size())
+	if cases.size() < 35:
 		_mismatches += 1
 	var ids: Dictionary = {}
 	for case in cases:
