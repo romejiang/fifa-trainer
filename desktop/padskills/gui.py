@@ -85,6 +85,8 @@ CYAN_DEEP = (11, 110, 146)
 CYAN_SOFT = (231, 247, 253)
 HOVER = (247, 247, 249)
 ICON_IDLE = (166, 166, 172)
+DIM_TEXT = (166, 166, 172)
+DIM_SOFT = (190, 190, 196)
 DIALOG_MASK = (28, 28, 32)
 
 # "马赛回旋 Roulette" -> ("马赛回旋", "Roulette")；没有 ASCII 后缀时整串都是中文名
@@ -1563,6 +1565,59 @@ class TrainerApp:
         self.pg.draw.line(self.screen, color, (cx, cy),
                           (cx + r * 0.42, cy + r * 0.30), 1)
 
+    def _football_surface(self, radius: int):
+        """黑白足球贴图：4 倍分辨率绘制后缩小，边缘比直接画圆更干净。"""
+        r = max(10, int(radius))
+        key = ("football", r)
+
+        def make():
+            scale = 4
+            size = r * 2
+            hi = self.pg.Surface((size * scale, size * scale),
+                                 self.pg.SRCALPHA)
+            cx = cy = size * scale // 2
+            rr = r * scale
+            white = (255, 255, 255)
+            black = (29, 29, 31)
+
+            def pentagon(px: float, py: float, pr: float, rot: float):
+                pts = []
+                for i in range(5):
+                    ang = math.radians(rot + i * 72)
+                    pts.append((px + math.cos(ang) * pr,
+                                py + math.sin(ang) * pr))
+                return pts
+
+            self.pg.draw.circle(hi, white, (cx, cy), rr)
+            self.pg.draw.circle(hi, black, (cx, cy), rr, max(1, scale * 2))
+
+            # 中心黑五边形 + 外圈五块黑斑，黑白相间才像足球
+            self.pg.draw.polygon(hi, black, pentagon(cx, cy, rr * 0.34, -90))
+            outer = []
+            for i in range(5):
+                ang = math.radians(-90 + i * 72)
+                px = cx + math.cos(ang) * rr * 0.66
+                py = cy + math.sin(ang) * rr * 0.66
+                outer.append((px, py))
+                self.pg.draw.polygon(
+                    hi, black, pentagon(px, py, rr * 0.24, -90 + i * 72 + 36))
+
+            # 接缝：中心五边形 -> 外圈黑斑 -> 球缘
+            for i, (px, py) in enumerate(outer):
+                ang = math.radians(-90 + i * 72)
+                vx = cx + math.cos(ang) * rr * 0.34
+                vy = cy + math.sin(ang) * rr * 0.34
+                self.pg.draw.line(hi, black, (vx, vy), (px, py),
+                                  max(1, scale))
+                edge = math.atan2(py - cy, px - cx)
+                self.pg.draw.line(
+                    hi, black, (px, py),
+                    (cx + math.cos(edge) * rr * 0.98,
+                     cy + math.sin(edge) * rr * 0.98), max(1, scale))
+
+            return self.pg.transform.smoothscale(hi, (size, size))
+        return self._cached(key, make)
+
     def _icon_warning(self, cx: float, cy: float, size: float, color) -> None:
         """警告三角线框图标：三角 + 感叹号。"""
         r = size / 2.0
@@ -1750,23 +1805,15 @@ class TrainerApp:
                 glow.blit(band, (int(hero_w * fx) - band.get_width() // 2,
                                  -band.get_height() // 3))
 
-            # 线框足球：完全落在顶栏内，避免被裁成奇怪的白色三角
+            # 黑白足球：先在 overlay 上垫一圈白光，再贴实心黑白球
             bx, by, br = hero_w - 190, int(h * 0.52), 46
-            self.pg.draw.circle(glow, (255, 255, 255, 52), (bx, by), br, 2)
-            pent = []
-            for i in range(5):
-                ang = math.radians(-90 + i * 72)
-                pent.append((bx + math.cos(ang) * br * 0.34,
-                             by + math.sin(ang) * br * 0.34))
-            self.pg.draw.polygon(glow, (255, 255, 255, 38), pent, 1)
-            for px, py in pent:
-                ang = math.atan2(py - by, px - bx)
-                self.pg.draw.line(
-                    glow, (255, 255, 255, 26), (px, py),
-                    (bx + math.cos(ang) * br * 0.92,
-                     by + math.sin(ang) * br * 0.92), 1)
+            for pad, alpha in ((16, 16), (9, 26), (2, 38)):
+                self.pg.draw.circle(glow, (255, 255, 255, alpha),
+                                    (bx, by), br + pad)
 
             hero.blit(glow, (0, 0))
+            ball = self._football_surface(br)
+            hero.blit(ball, (bx - br, by - br))
 
             # 左侧柔和淡入：Hero 从 5% 处开始出现，35% 处完全实心
             fade = self.pg.Surface((hero_w, h), self.pg.SRCALPHA)
@@ -1889,15 +1936,24 @@ class TrainerApp:
         self._card(panel)
         self._text("动作熟练度", panel.x + 16, panel.y + 14, 11.5, MUTED,
                    bold=True)
+
         skills = self.engine.skills
+        focus = self.engine.focus
+        focus_name = (self._split_name(self._short_name(focus.skill.name))[0]
+                      if focus is not None else "")
+        show_strip = 0 < len(skills) <= 9
+
         if not skills:
             hint = "没有启用的动作"
-        elif len(skills) <= 9:
-            hint = f"点按切换 · 1–{len(skills)}"
+        elif focus is not None:
+            hint = ("点开关关闭" if show_strip
+                    else self._fit(f"专项：{focus_name}", 10.5, 180, True))
         else:
-            hint = "点按切换专项"
+            hint = "开关＝专项"
         self._text(hint, panel.right - 16, panel.y + 15, 10.5,
-                   FAINT, anchor="topright")
+                   ACCENT if focus is not None else FAINT,
+                   bold=focus is not None and not show_strip,
+                   anchor="topright")
 
         self._modifier_hits = []
         self._focus_hits = []
@@ -1907,10 +1963,40 @@ class TrainerApp:
                        anchor="center")
             return
 
-        n = max(1, len(skills))
+        # 模式条：把「自由练习 / 专项训练：某某」说清楚；动作太多时省略
         top = panel.y + 40
+        if show_strip:
+            strip = pg.Rect(panel.x + 8, panel.y + 38,
+                            panel.width - 16, 26)
+            if focus is not None:
+                pg.draw.rect(self.screen, ACCENT_SOFT, strip,
+                             border_radius=8)
+                pg.draw.rect(self.screen, BLUE_LINE, strip,
+                             border_radius=8, width=1)
+                pg.draw.circle(self.screen, ACCENT,
+                               (strip.x + 11, strip.centery), 3)
+                label = f"专项训练：{focus_name}"
+                self._text(self._fit(label, 10.5, strip.width - 100, True),
+                           strip.x + 20, strip.centery, 10.5, ACCENT,
+                           bold=True, anchor="midleft")
+                self._text("其他动作已置灰", strip.right - 10, strip.centery,
+                           9.5, MUTED, anchor="midright")
+            else:
+                pg.draw.rect(self.screen, CARD_SOFT, strip,
+                             border_radius=8)
+                pg.draw.rect(self.screen, LINE, strip, border_radius=8,
+                             width=1)
+                self._text("自由练习 · 所有动作都参与判定",
+                           strip.x + 10, strip.centery, 10.5, MUTED,
+                           anchor="midleft")
+                self._text(f"数字键 1–{min(9, len(skills))} 也能切",
+                           strip.right - 10, strip.centery, 9.5, FAINT,
+                           anchor="midright")
+            top = strip.bottom + 6
+
+        n = max(1, len(skills))
         gap = 6 if n <= 8 else 4
-        avail = panel.height - 40 - 10
+        avail = panel.bottom - 10 - top
         row_h = int((avail - gap * (n - 1)) / n)
         # 用户往配置里加动作时行会变矮；低于 58px 走单行紧凑布局，
         # 否则 7 个以上动作会顶出面板、压到下面的卡片上。
@@ -1921,35 +2007,59 @@ class TrainerApp:
                            panel.width - 16, row_h)
             self._draw_skill_row(active, rect, i)
 
+    def _focus_switch(self, rect, on: bool, dimmed: bool) -> None:
+        """动作行左侧的专项开关：开=蓝，关=灰，置灰行更浅。"""
+        pg = self.pg
+        if on:
+            track, knob = ACCENT, CARD
+        elif dimmed:
+            track, knob = (232, 232, 237), (250, 250, 252)
+        else:
+            track, knob = (219, 219, 225), CARD
+        pg.draw.rect(self.screen, track, rect, border_radius=rect.height // 2)
+        r = max(3, rect.height // 2 - 1)
+        cx = (rect.right - rect.height // 2 if on
+              else rect.x + rect.height // 2)
+        pg.draw.circle(self.screen, knob, (cx, rect.centery), r)
+
     def _draw_skill_row(self, active, rect, index: int) -> None:
-        """一个动作占一行：名字 / 成功数 / 进度条 / 最近一次 / 键帽。"""
+        """一个动作占一行：专项开关 / 名字 / 成功数 / 进度条 / 最近一次。"""
         pg = self.pg
         focus = self.engine.focus if self.engine is not None else None
         selected = focus is active
         dimmed = focus is not None and not selected
         hover = rect.collidepoint(self._mouse)
+        compact = rect.height < 58
 
-        # 选中行：3px 蓝色外发光 + 白卡 + 蓝色描边；置灰只改文字颜色
+        # 选中行：3px 蓝色外发光 + 白卡 + 蓝色描边；其余行不参与时整行变灰
         if selected:
             pg.draw.rect(self.screen, ACCENT_SOFT, rect.inflate(6, 6),
                          border_radius=13)
-        pg.draw.rect(self.screen, HOVER if hover and not selected else CARD,
-                     rect, border_radius=10)
+        row_bg = HOVER if dimmed else (
+            HOVER if hover and not selected else CARD)
+        pg.draw.rect(self.screen, row_bg, rect, border_radius=10)
         if selected:
             pg.draw.rect(self.screen, BLUE_LINE, rect, border_radius=10,
                          width=1)
+
+        switch = (pg.Rect(rect.x + 8, rect.centery - 7, 24, 14) if compact
+                  else pg.Rect(rect.x + 10, rect.y + 9, 30, 16))
+        self._focus_switch(switch, selected, dimmed)
+        name_x = switch.right + (6 if compact else 8)
 
         # 顶行：中文名 + 英文名 / 成功次数 + 本组进度
         cn, en = self._split_name(self._short_name(active.skill.name))
         group = min(active.group_hits, Engine.GROUP_SIZE)
         ratio = f"{group}/{Engine.GROUP_SIZE}"
-        ratio_color = GREEN if group > 0 and not dimmed else FAINT
+        ratio_color = (DIM_TEXT if dimmed
+                       else GREEN if group > 0 else FAINT)
+        name_color = DIM_TEXT if dimmed else TEXT
+        soft_color = DIM_SOFT if dimmed else FAINT
 
-        # 动作多到行高不足时只留一行：名字 + 进度，保证所有行都落在面板内
-        if rect.height < 58:
-            self._text(self._fit(cn, 12, rect.width - 80, bold=True),
-                       rect.x + 10, rect.centery, 12,
-                       MUTED if dimmed else TEXT, bold=True,
+        # 动作多到行高不足时只留一行：开关 + 名字 + 进度
+        if compact:
+            self._text(self._fit(cn, 12, rect.width - 110, bold=True),
+                       name_x, rect.centery, 12, name_color, bold=True,
                        anchor="midleft")
             self._text(ratio, rect.right - 10, rect.centery, 12.5,
                        ratio_color, bold=True, anchor="midright")
@@ -1957,8 +2067,7 @@ class TrainerApp:
             return
 
         name = self._fit(cn, 13.5, rect.width - 150, bold=True)
-        self._text(name, rect.x + 10, rect.y + 8, 13.5,
-                   MUTED if dimmed else TEXT, bold=True)
+        self._text(name, name_x, rect.y + 8, 13.5, name_color, bold=True)
         if en:
             # 中文名被截断时不再画英文名，否则会把 "…" 画到行外
             cn_w = self._fonts.get(13.5, True).size(name)[0]
@@ -1966,24 +2075,27 @@ class TrainerApp:
             if en_room >= 24:
                 en = self._fit(en, 10.5, en_room)
                 if en != "…":
-                    self._text(en, rect.x + 15 + cn_w, rect.y + 11,
-                               10.5, FAINT)
+                    self._text(en, name_x + cn_w + 5, rect.y + 11,
+                               10.5, soft_color)
 
         ratio_w = self._fonts.get(13.5, True).size(ratio)[0]
         self._text(ratio, rect.right - 10, rect.y + 6, 13.5, ratio_color,
                    bold=True, anchor="topright")
         self._text(f"成功 {active.hits}", rect.right - 22 - ratio_w,
-                   rect.y + 9, 10.5, MUTED, anchor="topright")
+                   rect.y + 9, 10.5, DIM_SOFT if dimmed else MUTED,
+                   anchor="topright")
 
         # 进度条：本组做满 10 个由引擎清零。行太矮时省略，避免压住底行文字
-        if rect.height >= 66:
-            bar = pg.Rect(rect.x + 10, rect.y + 31, rect.width - 20, 4)
-            pg.draw.rect(self.screen, LINE, bar, border_radius=2)
+        if rect.height >= 62:
+            bar = pg.Rect(rect.x + 10, rect.y + 30, rect.width - 20, 4)
+            pg.draw.rect(self.screen, (242, 242, 245) if dimmed else LINE,
+                         bar, border_radius=2)
             if group > 0:
                 fill_w = max(2, int(bar.width * group / Engine.GROUP_SIZE))
+                left = (214, 214, 220) if dimmed else GREEN_FILL
+                right = (214, 214, 220) if dimmed else (59, 226, 124)
                 self.screen.blit(
-                    self._hgrad_surface(fill_w, 4, GREEN_FILL,
-                                        (59, 226, 124), 2),
+                    self._hgrad_surface(fill_w, 4, left, right, 2),
                     (bar.x, bar.y))
 
         # 右侧键帽：数字键（专项）+ 可点的修饰键；行高太矮时不画
@@ -2000,8 +2112,9 @@ class TrainerApp:
                 total = sum(widths) + 4 * (len(options) - 1)
                 x = num_x - 4 - total
                 for opt, width in zip(options, widths):
-                    on = bool(active.skill.required_buttons) \
-                        and active.skill.required_buttons[0] == opt
+                    on = (not dimmed
+                          and bool(active.skill.required_buttons)
+                          and active.skill.required_buttons[0] == opt)
                     key_rect = self._kbd(x, key_y, opt, active=on, w=width)
                     self._modifier_hits.append((key_rect, active, opt))
                     x += width + 4
@@ -2013,10 +2126,11 @@ class TrainerApp:
         status = active.detector.status()
         if status and status != "待机":
             self._text(self._fit(status, 10.5, text_w), rect.x + 10, base_y,
-                       10.5, FAINT if dimmed else ACCENT)
+                       10.5, DIM_SOFT if dimmed else ACCENT)
         elif active.last_outcome is not None:
             last = active.last_outcome
-            color = FAINT if dimmed else (GREEN if last.ok else RED)
+            color = (DIM_SOFT if dimmed
+                     else GREEN if last.ok else RED)
             self._mark(rect.x + 10, base_y + 1, 10, last.ok, color, 2)
             if last.ok:
                 detail = f"最近 {last.elapsed_ms:.0f}ms"
@@ -2026,7 +2140,8 @@ class TrainerApp:
             self._text(self._fit(detail, 10.5, text_w - 14), rect.x + 23,
                        base_y, 10.5, color)
         else:
-            self._text("还没有成功记录", rect.x + 10, base_y, 10.5, FAINT)
+            self._text("还没有成功记录", rect.x + 10, base_y, 10.5,
+                       DIM_SOFT if dimmed else FAINT)
 
         self._focus_hits.append((rect, active))
 
@@ -2261,7 +2376,7 @@ class TrainerApp:
         # 右侧一列：快捷键 / 提示行 / 配置文件路径
         right = rect.right - 18
         self._draw_hotkeys(right, rect.y + 9)
-        hint = self.notice or ("点卡片＝专项 · 数字键选专项 · T 切修饰键 · "
+        hint = self.notice or ("开关＝专项 · 数字键也能切 · T 切修饰键 · "
                                "修饰键动作先按键再推杆")
         self._text(self._fit(hint, 10.5, 520), right, rect.y + 35, 10.5,
                    ACCENT if self.notice else FAINT, anchor="topright")
