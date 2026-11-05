@@ -54,6 +54,7 @@ RIGHT_W = 590
 DETAIL_H = 212
 ATTEMPTS_Y = 360        # BODY_Y + DETAIL_H + GAP
 ATTEMPTS_H = 192
+FULL_H = 510            # H - MARGIN_Y - BODY_Y，无底栏页面的整块正文卡
 
 # ---- 配色（亮色，卡片白 + 高对比结果色） ----
 BG = (245, 245, 247)
@@ -1562,18 +1563,18 @@ class TrainerApp:
         self.pg.draw.line(self.screen, color, (cx, cy),
                           (cx + r * 0.42, cy + r * 0.30), 1)
 
-    def _icon_gear(self, cx: float, cy: float, size: float, color) -> None:
-        """齿轮线框图标：内圆 + 八根齿。"""
+    def _icon_warning(self, cx: float, cy: float, size: float, color) -> None:
+        """警告三角线框图标：三角 + 感叹号。"""
         r = size / 2.0
-        self.pg.draw.circle(self.screen, color, (int(cx), int(cy)),
-                            max(2, int(round(r * 0.66))), 1)
-        for i in range(8):
-            ang = math.radians(i * 45.0)
-            self.pg.draw.line(
-                self.screen, color,
-                (cx + math.sin(ang) * r * 0.72,
-                 cy - math.cos(ang) * r * 0.72),
-                (cx + math.sin(ang) * r, cy - math.cos(ang) * r), 1)
+        points = [(cx, cy - r), (cx + r * 0.95, cy + r * 0.78),
+                  (cx - r * 0.95, cy + r * 0.78)]
+        self.pg.draw.polygon(self.screen, color, points,
+                             max(2, int(size * 0.08)))
+        self.pg.draw.line(self.screen, color, (cx, cy - r * 0.30),
+                          (cx, cy + r * 0.26), max(2, int(size * 0.09)))
+        self.pg.draw.circle(self.screen, color,
+                            (int(cx), int(cy + r * 0.52)),
+                            max(1, int(size * 0.05)))
 
     def _check_circle(self, cx: float, cy: float, r: float, kind: str) -> None:
         """结果圆：ok 绿色渐变对勾 / fail 橙红渐变叉 / idle 浅灰对勾。"""
@@ -1633,7 +1634,8 @@ class TrainerApp:
                               (x + size * 0.84, y + size * 0.16),
                               (x + size * 0.16, y + size * 0.84), w)
 
-    def _fit(self, text: str, size: int, width: int, bold: bool = False) -> str:
+    def _fit(self, text: str, size: float, width: int,
+             bold: bool = False) -> str:
         font = self._fonts.get(size, bold)
         if font.size(text)[0] <= width:
             return text
@@ -1646,7 +1648,7 @@ class TrainerApp:
                 hi = mid - 1
         return text[:lo] + "…"
 
-    def _wrap(self, text: str, size: int, width: int,
+    def _wrap(self, text: str, size: float, width: int,
               bold: bool = False) -> List[str]:
         font = self._fonts.get(size, bold)
         lines: List[str] = []
@@ -1662,7 +1664,7 @@ class TrainerApp:
             lines.append(cur.rstrip())
         return lines
 
-    def _wrap_lines(self, text: str, size: int, width: int,
+    def _wrap_lines(self, text: str, size: float, width: int,
                     bold: bool = False) -> List[str]:
         """保留原文的换行再逐行折行——配置报错是多行的。"""
         out: List[str] = []
@@ -1709,7 +1711,12 @@ class TrainerApp:
         return self._cached(key, make)
 
     def _header_surface(self):
-        """顶栏底稿：白→浅青渐变 + 程序化青色 Hero + 底部绿→青强调线。"""
+        """顶栏底稿：白→浅青渐变 + 程序化青色 Hero + 底部绿→青强调线。
+
+        半透明光带必须画在独立的 overlay 上再正常 blit。直接往 SRCALPHA
+        表面上画半透明图形会把该像素的 alpha 覆盖成低值，等于在 Hero 上
+        "打穿"一个洞，看起来就是刺眼的白色三角。
+        """
         w, h = W - 2 * MARGIN_X, HEADER_H
         key = ("header", w, h)
 
@@ -1720,50 +1727,75 @@ class TrainerApp:
                                          x / max(1, w - 1))
                 self.pg.draw.line(surf, color, (x, 0), (x, h))
 
-            # 右侧约 62% 宽的程序化 Hero：纵向青色渐变，左侧淡入
-            hero_w = int(w * 0.62)
+            # 右侧约 66% 宽的程序化 Hero：纵向青色渐变
+            hero_w = int(w * 0.66)
             hero = self.pg.Surface((hero_w, h), self.pg.SRCALPHA)
             for y in range(h):
                 color = self._lerp_color((44, 181, 232), CYAN,
                                          y / max(1, h - 1))
                 self.pg.draw.line(hero, color, (0, y), (hero_w, y))
+
+            glow = self.pg.Surface((hero_w, h), self.pg.SRCALPHA)
+            # 三条柔和斜向光带：中间亮、两侧透明，旋转后没有硬边
+            for fx, peak, band_w in ((0.26, 26, 84), (0.48, 20, 120),
+                                     (0.72, 24, 68)):
+                band = self.pg.Surface((band_w, h * 2), self.pg.SRCALPHA)
+                for x in range(band_w):
+                    t = 1.0 - abs(x - band_w / 2.0) / (band_w / 2.0)
+                    alpha = int(peak * max(0.0, t) ** 1.4)
+                    if alpha > 0:
+                        self.pg.draw.line(band, (255, 255, 255, alpha),
+                                          (x, 0), (x, band.get_height()))
+                band = self.pg.transform.rotate(band, -22)
+                glow.blit(band, (int(hero_w * fx) - band.get_width() // 2,
+                                 -band.get_height() // 3))
+
+            # 线框足球：完全落在顶栏内，避免被裁成奇怪的白色三角
+            bx, by, br = hero_w - 190, int(h * 0.52), 46
+            self.pg.draw.circle(glow, (255, 255, 255, 52), (bx, by), br, 2)
+            pent = []
+            for i in range(5):
+                ang = math.radians(-90 + i * 72)
+                pent.append((bx + math.cos(ang) * br * 0.34,
+                             by + math.sin(ang) * br * 0.34))
+            self.pg.draw.polygon(glow, (255, 255, 255, 38), pent, 1)
+            for px, py in pent:
+                ang = math.atan2(py - by, px - bx)
+                self.pg.draw.line(
+                    glow, (255, 255, 255, 26), (px, py),
+                    (bx + math.cos(ang) * br * 0.92,
+                     by + math.sin(ang) * br * 0.92), 1)
+
+            hero.blit(glow, (0, 0))
+
+            # 左侧柔和淡入：Hero 从 5% 处开始出现，35% 处完全实心
             fade = self.pg.Surface((hero_w, h), self.pg.SRCALPHA)
             for x in range(hero_w):
-                t = (x / max(1, hero_w) - 0.45) / 0.20
+                t = (x / max(1, hero_w) - 0.05) / 0.35
                 alpha = int(255 * (0.0 if t < 0.0 else 1.0 if t > 1.0 else t))
                 self.pg.draw.line(fade, (255, 255, 255, alpha), (x, 0),
                                   (x, h))
             hero.blit(fade, (0, 0), special_flags=self.pg.BLEND_RGBA_MULT)
             surf.blit(hero, (w - hero_w, 0))
 
-            # 三到四条低 alpha 白色斜向条带
-            for i in range(4):
-                x0 = int(hero_w * (0.28 + i * 0.18))
-                self.pg.draw.polygon(
-                    surf, (255, 255, 255, 22),
-                    [(w - hero_w + x0, h), (w - hero_w + x0 + 52, 0),
-                     (w - hero_w + x0 + 92, 0), (w - hero_w + x0 + 40, h)])
+            # 先画 1px 卡片描边，底部强调线再压上去
+            self.pg.draw.rect(surf, LINE, (0, 0, w, h), 1, border_radius=14)
 
-            # 一个大的白色圆形轮廓线，表示球（无照片 / 无商标 / 无人物）
-            self.pg.draw.circle(surf, (255, 255, 255, 64),
-                                (w - int(hero_w * 0.30), int(h * 0.46)),
-                                int(h * 0.88), 2)
-
-            # 底部 2px 的绿→青强调线
+            # 底部 2px 的绿→青强调线：同样画在 overlay 上正常混合
+            line = self.pg.Surface((w, 2), self.pg.SRCALPHA)
             for x in range(w):
                 t = x / max(1, w - 1)
                 if t <= 0.24:
-                    color, alpha = (0, 200, 83), int(153 * t / 0.24)
+                    color, alpha = (0, 200, 83), int(160 * t / 0.24)
                 elif t <= 0.64:
                     color = self._lerp_color((0, 200, 83), CYAN,
                                              (t - 0.24) / 0.40)
-                    alpha = int(153 + (133 - 153) * (t - 0.24) / 0.40)
+                    alpha = int(160 + (145 - 160) * (t - 0.24) / 0.40)
                 else:
-                    color, alpha = CYAN, int(133 * (1.0 - (t - 0.64) / 0.36))
-                if alpha <= 0:
-                    continue
-                self.pg.draw.line(surf, color + (alpha,), (x, h - 2),
-                                  (x, h - 1))
+                    color, alpha = CYAN, int(145 * (1.0 - (t - 0.64) / 0.36))
+                if alpha > 0:
+                    self.pg.draw.line(line, color + (alpha,), (x, 0), (x, 1))
+            surf.blit(line, (0, h - 2))
 
             surf.blit(self._round_mask(w, h, 14), (0, 0),
                       special_flags=self.pg.BLEND_RGBA_MULT)
@@ -1782,8 +1814,19 @@ class TrainerApp:
         """
         return cx + x * radius, cy + y * radius
 
+    def _header_pill(self, rect, title: str, sub: str, title_color) -> None:
+        """顶栏右侧状态胶囊：和计时胶囊同形，避免小 chip 飘在 Hero 上。"""
+        self._card(rect, CARD, 13, LINE_STRONG, True)
+        self._text(title, rect.centerx, rect.y + 11, 13, title_color,
+                   bold=True, anchor="midtop")
+        self._text(sub, rect.centerx, rect.y + 37, 9.5, MUTED,
+                   anchor="midtop")
+
     def _draw_header(self, now: float) -> None:
         rect = self.pg.Rect(MARGIN_X, MARGIN_Y, W - 2 * MARGIN_X, HEADER_H)
+        self.screen.blit(
+            self._shadow_surface(rect.width, rect.height, 14),
+            (rect.x, rect.y + 2))
         self.screen.blit(self._header_surface(), rect.topleft)
 
         x = rect.x + 22
@@ -1804,7 +1847,9 @@ class TrainerApp:
             device = "未连接"
             backend = ""
         dev_x = x + 26
-        device = self._fit(device, 11.5, rect.right - 150 - dev_x)
+        # 设备名最多占白色区的 260px；再长就会压到右侧 Hero 上
+        device = self._fit(device, 11.5,
+                           min(260, rect.right - 150 - dev_x))
         self._text(device, dev_x, icon_cy, 11.5, MUTED, anchor="midleft")
         if backend:
             name_w = self._fonts.get(11.5).size(device)[0]
@@ -1816,23 +1861,13 @@ class TrainerApp:
 
         right = rect.right - 18
         if self.config_error is not None:
-            text = "配置有错误"
-            width = self._fonts.get(10.5, True).size(text)[0] + 14
-            self._chip(right - width, rect.y + 20, text, RED, RED_SOFT,
-                       size=10.5)
-            hint = "R 重新加载"
-            hint_w = self._fonts.get(11).size(hint)[0] + 16
-            pill = self.pg.Rect(right - hint_w, rect.y + 43, hint_w, 20)
-            self.pg.draw.rect(self.screen, CARD, pill, border_radius=7)
-            self._text(hint, right - 8, rect.y + 47, 11, MUTED,
-                       anchor="topright")
+            cap = self.pg.Rect(right - 104, rect.centery - 30, 104, 60)
+            self._header_pill(cap, "配置有错误", "R 重新加载", RED)
             return
 
         if self.engine is None:
-            text = "未连接手柄"
-            width = self._fonts.get(10.5, True).size(text)[0] + 14
-            self._chip(right - width, rect.y + 22, text, MUTED,
-                       (242, 242, 245), size=10.5)
+            cap = self.pg.Rect(right - 104, rect.centery - 30, 104, 60)
+            self._header_pill(cap, "未连接手柄", "等待连接", MUTED)
             return
 
         # 计时胶囊：白色卡片 + 轻阴影，压在青色 Hero 上
@@ -1854,16 +1889,20 @@ class TrainerApp:
         self._card(panel)
         self._text("动作熟练度", panel.x + 16, panel.y + 14, 11.5, MUTED,
                    bold=True)
-        self._text("点按切换 · 1–5", panel.right - 16, panel.y + 15, 10.5,
+        skills = self.engine.skills
+        hint = (f"点按切换 · 1–{min(9, len(skills))}" if len(skills) <= 9
+                else "点按切换专项")
+        self._text(hint, panel.right - 16, panel.y + 15, 10.5,
                    FAINT, anchor="topright")
 
-        skills = self.engine.skills
         n = max(1, len(skills))
         top = panel.y + 40
-        gap = 6
+        gap = 6 if n <= 8 else 4
         avail = panel.height - 40 - 10
         row_h = int((avail - gap * (n - 1)) / n)
-        row_h = max(52, min(90, row_h))
+        # 用户往配置里加动作时行会变矮；低于 58px 走单行紧凑布局，
+        # 否则 7 个以上动作会顶出面板、压到下面的卡片上。
+        row_h = max(26, min(90, row_h))
 
         self._modifier_hits = []
         self._focus_hits = []
@@ -1892,6 +1931,21 @@ class TrainerApp:
 
         # 顶行：中文名 + 英文名 / 成功次数 + 本组进度
         cn, en = self._split_name(self._short_name(active.skill.name))
+        group = min(active.group_hits, Engine.GROUP_SIZE)
+        ratio = f"{group}/{Engine.GROUP_SIZE}"
+        ratio_color = GREEN if group > 0 and not dimmed else FAINT
+
+        # 动作多到行高不足时只留一行：名字 + 进度，保证所有行都落在面板内
+        if rect.height < 58:
+            self._text(self._fit(cn, 12, rect.width - 80, bold=True),
+                       rect.x + 10, rect.centery, 12,
+                       MUTED if dimmed else TEXT, bold=True,
+                       anchor="midleft")
+            self._text(ratio, rect.right - 10, rect.centery, 12.5,
+                       ratio_color, bold=True, anchor="midright")
+            self._focus_hits.append((rect, active))
+            return
+
         self._text(self._fit(cn, 13.5, rect.width - 150, bold=True),
                    rect.x + 10, rect.y + 8, 13.5,
                    MUTED if dimmed else TEXT, bold=True)
@@ -1900,23 +1954,22 @@ class TrainerApp:
             self._text(self._fit(en, 10.5, rect.width - 150 - cn_w),
                        rect.x + 15 + cn_w, rect.y + 11, 10.5, FAINT)
 
-        group = min(active.group_hits, Engine.GROUP_SIZE)
-        ratio = f"{group}/{Engine.GROUP_SIZE}"
-        ratio_color = GREEN if group > 0 and not dimmed else FAINT
         ratio_w = self._fonts.get(13.5, True).size(ratio)[0]
         self._text(ratio, rect.right - 10, rect.y + 6, 13.5, ratio_color,
                    bold=True, anchor="topright")
         self._text(f"成功 {active.hits}", rect.right - 22 - ratio_w,
                    rect.y + 9, 10.5, MUTED, anchor="topright")
 
-        # 进度条：本组做满 10 个由引擎清零
-        bar = pg.Rect(rect.x + 10, rect.y + 31, rect.width - 20, 4)
-        pg.draw.rect(self.screen, LINE, bar, border_radius=2)
-        if group > 0:
-            fill_w = max(2, int(bar.width * group / Engine.GROUP_SIZE))
-            self.screen.blit(
-                self._hgrad_surface(fill_w, 4, GREEN_FILL, (59, 226, 124), 2),
-                (bar.x, bar.y))
+        # 进度条：本组做满 10 个由引擎清零。行太矮时省略，避免压住底行文字
+        if rect.height >= 66:
+            bar = pg.Rect(rect.x + 10, rect.y + 31, rect.width - 20, 4)
+            pg.draw.rect(self.screen, LINE, bar, border_radius=2)
+            if group > 0:
+                fill_w = max(2, int(bar.width * group / Engine.GROUP_SIZE))
+                self.screen.blit(
+                    self._hgrad_surface(fill_w, 4, GREEN_FILL,
+                                        (59, 226, 124), 2),
+                    (bar.x, bar.y))
 
         # 右侧键帽：数字键（专项）+ 可点的修饰键；行高太矮时不画
         keys_w = 0
@@ -1977,10 +2030,13 @@ class TrainerApp:
                        bold=True)
             self._chip(panel.x + 90, panel.y + 54, "等待尝试", FAINT,
                        (242, 242, 245), size=11.5)
+            pg.draw.line(self.screen, LINE, (panel.x + 22, panel.y + 84),
+                         (panel.right - 22, panel.y + 84), 1)
             self._text("推右摇杆做出动作；做对了会震一下。",
                        panel.x + 22, panel.y + 96, 14, TEXT_SOFT)
             self._text("失败不会震，只会在这里告诉你差在哪儿。",
-                       panel.x + 22, panel.y + 121, 12.5, MUTED)
+                       panel.x + 22, panel.y + 150, 12.5, MUTED,
+                       bold=True)
             return
 
         ok = outcome.ok
@@ -1993,10 +2049,15 @@ class TrainerApp:
 
         cn, en = self._split_name(self._short_name(outcome.skill_name))
         title_x = panel.x + 90
+        # 给右侧毫秒数留 116px；长动作名截断，不能压到时间上
+        title_max = panel.right - 22 - 116 - title_x
+        cn = self._fit(cn, 24, max(40, title_max), bold=True)
         self._text(cn, title_x, panel.y + 18, 24, TEXT, bold=True)
         if en:
             cn_w = self._fonts.get(24, True).size(cn)[0]
-            self._text(en, title_x + cn_w + 8, panel.y + 34, 12, FAINT)
+            en_max = panel.right - 22 - 116 - (title_x + cn_w + 8)
+            self._text(self._fit(en, 12, max(20, en_max)),
+                       title_x + cn_w + 8, panel.y + 34, 12, FAINT)
         if ok:
             self._chip(title_x, panel.y + 54, "做对了", GREEN_DEEP, GREEN_SOFT,
                        size=11.5)
@@ -2057,8 +2118,8 @@ class TrainerApp:
         self.history_scroll = max(0, min(max_off, self.history_scroll))
 
         # 一行一条：时间 / 对勾叉 / 动作名 / 毫秒 + 说明，成功灰、失败红
-        row_h = 28
-        top = panel.y + 42
+        row_h = 27
+        top = panel.y + 44
         for i in range(self._HISTORY_ROWS):
             idx = self.history_scroll + i
             if idx >= len(self.history):
@@ -2071,7 +2132,9 @@ class TrainerApp:
             color = GREEN if outcome.ok else RED
             self._text(stamp, panel.x + 16, y + 8, 10.5, FAINT)
             self._mark(panel.x + 80, y + 9, 11, outcome.ok, color, 2)
-            name = self._fit(self._short_name(outcome.skill_name), 12, 220)
+            name = self._fit(
+                self._split_name(self._short_name(outcome.skill_name))[0],
+                12, 220)
             self._text(name, panel.x + 100, y + 7, 12, TEXT)
 
             ms = f"{outcome.elapsed_ms:.0f} ms"
@@ -2156,7 +2219,7 @@ class TrainerApp:
         if rs_on:
             if facing_ok:
                 rel = angle_diff(state.rs_angle, facing)
-                sub = f"右摇杆 相对 {rel:.0f}°"
+                sub = f"右摇杆 · 相对 {rel:.0f}°"
             else:
                 sub = "右摇杆 · 已推（无朝向基准）"
         else:
@@ -2174,7 +2237,7 @@ class TrainerApp:
         # 右侧一列：快捷键 / 提示行 / 配置文件路径
         right = rect.right - 18
         self._draw_hotkeys(right, rect.y + 9)
-        hint = self.notice or ("点卡片＝专项 · 数字键 1–5 · T 切修饰键 · "
+        hint = self.notice or ("点卡片＝专项 · 数字键选专项 · T 切修饰键 · "
                                "修饰键动作先按键再推杆")
         self._text(self._fit(hint, 10.5, 520), right, rect.y + 35, 10.5,
                    ACCENT if self.notice else FAINT, anchor="topright")
@@ -2198,9 +2261,10 @@ class TrainerApp:
             key_w = max(22, key_font.size(key)[0] + 10)
             width = key_w + 6 + label_font.size(label)[0]
             rect = self.pg.Rect(x - width, y, width, 20)
-            self._kbd(rect.x, rect.y, key, w=key_w, h=20)
-            self._text(label, rect.x + key_w + 6, rect.centery, 11.5, MUTED,
-                       anchor="midleft")
+            hover = rect.collidepoint(self._mouse)
+            self._kbd(rect.x, rect.y, key, active=hover, w=key_w, h=20)
+            self._text(label, rect.x + key_w + 6, rect.centery, 11.5,
+                       ACCENT if hover else MUTED, anchor="midleft")
             self._hotkey_hits.append((rect, action))
             x -= width + 16
 
@@ -2226,7 +2290,7 @@ class TrainerApp:
 
         icon = pg.Rect(panel.x + 26, panel.y + 20, 40, 40)
         pg.draw.rect(self.screen, ACCENT_SOFT, icon, border_radius=10)
-        self._icon_gear(icon.centerx, icon.centery, 22, ACCENT)
+        self._icon_gamepad(icon.centerx, icon.centery, 24, ACCENT)
         self._text("按键校准", icon.right + 14, icon.y + 2, 17, TEXT,
                    bold=True)
         tip = ("按下手柄上的键，就绑到高亮的那一项。绿色搓射只要对准 "
@@ -2238,14 +2302,14 @@ class TrainerApp:
                    panel.x + 26, panel.y + 90, 11.5, FAINT)
 
         col_w = (panel.width - 52 - 16) // 2
-        row_h = 40
-        top = panel.y + 112
+        row_h = 42
+        top = panel.y + 116
         self._cal_hits = []
         index = 0
         for col, names in enumerate(_CAL_COLUMNS):
             for row, name in enumerate(names):
                 box = pg.Rect(panel.x + 26 + col * (col_w + 16),
-                              top + row * row_h, col_w, 34)
+                              top + row * row_h, col_w, 36)
                 selected = (index == self._cal_sel)
                 if selected:
                     pg.draw.rect(self.screen, ACCENT_SOFT, box,
@@ -2265,13 +2329,13 @@ class TrainerApp:
                            bold=value is not None, anchor="midright")
                 if selected:
                     label_w = self._fonts.get(13, value is not None).size(label)[0]
-                    self._text("按手柄键…", box.right - 24 - label_w,
+                    self._text("按手柄键…", box.right - 28 - label_w,
                                box.centery, 11, AMBER, anchor="midright")
                 self._cal_hits.append((box, index))
                 index += 1
 
         raw = ",".join(str(i) for i in sorted(self._cal_prev_raw)) or "无"
-        y = panel.bottom - 120
+        y = panel.bottom - 142
         if self._cal_message:
             self._text(self._fit(self._cal_message, 12, panel.width - 52),
                        panel.x + 26, y, 12, GREEN)
@@ -2285,7 +2349,7 @@ class TrainerApp:
         left = self._draw_cal_buttons(panel, panel.bottom - 38)
         hint = "点一行选中它 · 选中后按手柄上的键就能绑定 · ↑↓ 也能换行"
         self._text(self._fit(hint, 10, max(120, left - panel.x - 38)),
-                   panel.x + 26, panel.bottom - 32, 10, MUTED)
+                   panel.x + 26, panel.bottom - 58, 10, MUTED)
 
     def _draw_cal_buttons(self, panel, y: int) -> int:
         """校准面板底部的保存/清除/关闭按钮。返回最左边的 x。"""
@@ -2335,7 +2399,7 @@ class TrainerApp:
             x += key_w + 6 + label_w + 18
 
     def _draw_opening(self) -> None:
-        panel = self.pg.Rect(MARGIN_X, BODY_Y, W - 2 * MARGIN_X, GRID_H)
+        panel = self.pg.Rect(MARGIN_X, BODY_Y, W - 2 * MARGIN_X, FULL_H)
         self._card(panel)
         box = self.pg.Rect(panel.centerx - 28, panel.centery - 96, 56, 56)
         self.pg.draw.rect(self.screen, ACCENT_SOFT, box, border_radius=14)
@@ -2347,22 +2411,26 @@ class TrainerApp:
 
     def _draw_no_device(self) -> None:
         pg = self.pg
-        panel = pg.Rect(MARGIN_X, BODY_Y, W - 2 * MARGIN_X, GRID_H)
+        panel = pg.Rect(MARGIN_X, BODY_Y, W - 2 * MARGIN_X, FULL_H)
         self._card(panel)
 
-        icon = pg.Rect(panel.x + 48, panel.y + 40, 52, 52)
+        # 右侧淡色手柄水印：大卡片下半部不空，也不抢正文
+        self._icon_gamepad(panel.right - 150, panel.y + 360, 150,
+                           (231, 239, 249))
+
+        icon = pg.Rect(panel.x + 48, panel.y + 56, 52, 52)
         pg.draw.rect(self.screen, ACCENT_SOFT, icon, border_radius=12)
         self._icon_gamepad(icon.centerx, icon.centery, 28, ACCENT)
         self._text("未检测到手柄", icon.right + 16, icon.y + 10, 22, TEXT,
                    bold=True)
 
-        y = panel.y + 120
+        y = panel.y + 140
         message = self.error or "请确认手柄已连接并开机。"
-        for line in self._wrap_lines(message, 14, panel.width - 96)[:4]:
+        for line in self._wrap_lines(message, 14, panel.width - 210)[:4]:
             self._text(line, panel.x + 48, y, 14, MUTED)
             y += 22
 
-        y = max(y + 24, panel.y + 220)
+        y = max(y + 28, panel.y + 230)
         tips = []
         if sys.platform == "darwin":
             tips = [
@@ -2383,34 +2451,48 @@ class TrainerApp:
             y += 24
 
         self._text("插上手柄后会自动重试，也可以按 R 立即重试。",
-                   panel.centerx, panel.bottom - 74, 12.5, ACCENT,
+                   panel.centerx, panel.bottom - 84, 12.5, ACCENT,
                    anchor="midtop")
-        self._keycap_row(panel.centerx, panel.bottom - 44,
+        self._keycap_row(panel.centerx, panel.bottom - 52,
                          (("R", "重试"), ("C", "配置文件夹"), ("Esc", "退出")))
 
     def _draw_config_error(self) -> None:
         pg = self.pg
-        panel = pg.Rect(MARGIN_X, BODY_Y, W - 2 * MARGIN_X, GRID_H)
+        panel = pg.Rect(MARGIN_X, BODY_Y, W - 2 * MARGIN_X, FULL_H)
         self._card(panel)
 
-        icon = pg.Rect(panel.x + 48, panel.y + 32, 52, 52)
+        # 右侧淡色警告水印：短报错时卡片下半部不空
+        self._icon_warning(panel.right - 140, panel.y + 340, 150,
+                           (252, 235, 236))
+
+        icon = pg.Rect(panel.x + 52, panel.y + 52, 52, 52)
         pg.draw.rect(self.screen, RED_SOFT, icon, border_radius=12)
-        self._icon_gear(icon.centerx, icon.centery, 28, RED)
+        self._icon_warning(icon.centerx, icon.centery, 28, RED)
         self._text("配置文件有错误", icon.right + 16, icon.y + 10, 22, RED,
                    bold=True)
 
-        box = pg.Rect(panel.x + 48, panel.y + 96, panel.width - 96,
-                      panel.height - 96 - 84)
+        lines = self._wrap_lines(self.config_error or "", 13.5,
+                                 panel.width - 140)[:10]
+        box_h = max(76, 20 + 22 * len(lines))
+        box = pg.Rect(panel.x + 52, panel.y + 128, panel.width - 104,
+                      min(box_h, panel.height - 270))
         pg.draw.rect(self.screen, CARD_SOFT, box, border_radius=10)
+        pg.draw.rect(self.screen, LINE, box, border_radius=10, width=1)
         y = box.y + 12
-        for line in self._wrap_lines(self.config_error or "", 13.5,
-                                     box.width - 32)[:10]:
-            self._text(line, box.x + 16, y, 13.5, TEXT)
+        for line in lines:
+            self._text(line, box.x + 18, y, 13.5, TEXT)
             y += 22
 
+        tip_y = box.bottom + 18
+        self._text("常见原因：少了逗号或引号、括号没闭合、动作参数超出范围。",
+                   panel.x + 52, tip_y, 11.5, FAINT)
+        self._text(self._fit(f"配置文件：{self.config_path}", 10,
+                             panel.width - 104),
+                   panel.x + 52, tip_y + 24, 10, FAINT)
+
         self._text("改好保存后按 R 重新加载。", panel.centerx,
-                   panel.bottom - 70, 12.5, ACCENT, anchor="midtop")
-        self._keycap_row(panel.centerx, panel.bottom - 42,
+                   panel.bottom - 84, 12.5, ACCENT, anchor="midtop")
+        self._keycap_row(panel.centerx, panel.bottom - 52,
                          (("R", "重新加载"), ("C", "配置文件夹"),
                           ("Esc", "退出")))
 
