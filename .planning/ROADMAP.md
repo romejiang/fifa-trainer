@@ -17,7 +17,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 1: 仓库拆分 + 配置单一真源 + 桌面回归闸门** - `desktop/` + `mobile/` + `shared/`，桌面 230 项检查全绿，配置漂移可被脚本抓住 (completed 2026-11-04)
 - [x] **Phase 2: 安卓工具链 + 真机冒烟 APK** - 签名 APK 能装能启动，中文不豆腐，`*.json` 真进包，能读到手柄原始轴 (completed 2026-11-05)
 - [x] **Phase 3: 纯核心地基** - 几何 / 领域模型 / 配置校验 / 无头运行 / 架构 lint，零引擎依赖 (completed 2026-11-05)
-- [ ] **Phase 4: 设备输入层 + 绿色搓射竖切** - 引导式配对、轴探测、校准、布局确认，真机上产出第一次判定
+- [x] **Phase 4: 设备输入层 + 绿色搓射竖切** - 引导式配对、轴探测、校准、布局确认，真机上产出第一次判定 (completed 2026-11-06)
 - [ ] **Phase 5: 全动作判定对等性** - 三类检测器 + 引擎仲裁 1:1 移植，5 个动作黄金向量逐条一致，抽稀不漂移
 - [ ] **Phase 6: 训练循环** - 10 次一组、免触摸自动推进、待触发/冷却可见、暂停恢复
 - [ ] **Phase 7: 反馈呈现** - 实测 vs 区间时序条、实时轨迹、音效、支架距离可读布局
@@ -134,7 +134,7 @@ Decimal phases appear between their surrounding integers in numeric order.
   4. 布局建议（Xbox / PlayStation）自动给出，但必须用户按键确认后才进入练习，未确认不前进一步
   5. 在真机上做一次绿色搓射，屏幕产出且仅产出一次判定并显示成功或失败原因；快速连做两次得到两次独立判定（事件流保住了帧内反转）
 
-**Plans**: 11 plans, 11 waves
+**Plans**: 11/11 plans complete, 11 waves
 **Wave 1**
 - [x] 04-01-PLAN.md — tap 检测器逐行移植 + Python 生成黄金夹具 + `TAP_GOLDEN_DETECTOR` 哨兵（成功标准 1）(completed 2026-11-05)
 
@@ -290,7 +290,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 →
 | 1. 仓库拆分 + 配置单一真源 + 桌面回归闸门 | 5/5 | Complete    | 2026-11-04 |
 | 2. 安卓工具链 + 真机冒烟 APK | 5/5 | Complete    | 2026-11-05 |
 | 3. 纯核心地基 | 6/6 | Complete    | 2026-11-05 |
-| 4. 设备输入层 + 绿色搓射竖切 | 5/7 | In progress | - |
+| 4. 设备输入层 + 绿色搓射竖切 | 11/11 | Complete    | 2026-11-06 |
 | 5. 全动作判定对等性 | 0/0 | Not started | - |
 | 6. 训练循环 | 0/0 | Not started | - |
 | 7. 反馈呈现 | 0/0 | Not started | - |

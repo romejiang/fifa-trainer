@@ -1,19 +1,20 @@
 ---
 gsd_state_version: "1.0"
-current_phase: 4
-current_phase_name: 设备输入层 + 绿色搓射竖切
-status: executing
-stopped_at: 04-11 已交付（新 APK 27,079,510 B）— X/Y 退出设置页、A 有保存门、布局必须 Start+A 确认、旧默认校准档案失效、诊断页 Y 清除档案；D0–D6 仍待 04-07 用新包重走
-last_updated: "2026-11-05T15:52:00.000Z"
-last_activity: 2026-11-05
-last_activity_desc: 04-11 完成：保存门 + 布局确认 + 旧档案失效 + 按键重排 + 诊断页清除；新 APK 27,079,510 B
-state_head: 32cc0f1
+current_phase: 5
+current_phase_name: 全动作判定对等性 — 三类检测器 + 引擎仲裁 + 抽稀矩阵
+current_plan: Not started
+status: planning
+stopped_at: Phase 4 complete, ready to plan Phase 5
+last_updated: "2026-11-05T16:09:16.609Z"
+last_activity: 2026-11-06
+last_activity_desc: Phase 4 complete, transitioned to Phase 5
+state_head: ab3698597cd865de5dc81ed5400e181017c6320d
 progress:
   total_phases: 10
-  completed_phases: 3
-  total_plans: 25
-  completed_plans: 25
-  percent: 32
+  completed_phases: 4
+  total_plans: 27
+  completed_plans: 26
+  percent: 40
 ---
 
 # Project State
@@ -27,19 +28,19 @@ See: .planning/PROJECT.md (updated 2026-11-04)
 
 ## Current Position
 
-Current Plan: 11
+Current Plan: Not started
 Total Plans in Phase: 11
-Phase: 4 (设备输入层 + 绿色搓射竖切) — 代码侧已收口，真机清单未闭合
+Phase: 5 — 全动作判定对等性 — 三类检测器 + 引擎仲裁 + 抽稀矩阵
 Plan: 11 of 11（04-01…04-06、04-08…04-11 完成；04-07 是 Wave 8 的真机走查，两次尝试都失败）
-Status: Blocked — 04-11 已修三个真机缺陷并重建 APK；等 04-07 用新包重走 D0–D6
-Last activity: 2026-11-05 23:31–23:49 — 04-11：保存门 + 布局确认 + 旧档案失效 + 按键重排 + 诊断页清除；新 APK 27,079,510 B（证书不变）
+Status: Ready to plan
+Last activity: 2026-11-06 — Phase 4 complete, transitioned to Phase 5
 
-Progress: [███░░░░░░░] 32%
+Progress: [████░░░░░░] 40%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 18
+- Total plans completed: 27
 - Average duration: — min
 - Total execution time: 0.9 hours
 
@@ -50,6 +51,7 @@ Progress: [███░░░░░░░] 32%
 | 1 | 5 | - | - |
 | 2 | 5 | - | - |
 | 3 | 6 | - | - |
+| 4 | 11 | - | - |
 
 **Recent Trend:**
 - Last 5 plans: —
@@ -308,5 +310,5 @@ Items acknowledged and deferred at milestone close, most recent first:
 ## Session Continuity
 
 Last session: 2026-11-05T15:52:00.000Z
-Stopped at: 04-11 完成 —— 设置页保存门（量程未满不写档案）+ 布局必须 Start 切换 / A 确认 + 旧默认校准档案失效 + X/Y 退出设置页 + 诊断页 Y 清除档案；新 APK 27,079,510 B（证书 `e1841a17…32e046` 不变）。D0–D6 待 04-07 用新包重走，成功标准 2/3/4/5 仍未闭合
+Stopped at: Phase 4 complete, ready to plan Phase 5
 Resume file: None
