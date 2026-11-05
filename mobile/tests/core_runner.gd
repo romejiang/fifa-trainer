@@ -49,6 +49,7 @@ const SUITES := {
 	"config_validator": preload("res://tests/unit/test_config_validator.gd"),
 	"device_profile": preload("res://tests/unit/test_device_profile.gd"),
 	"geometry": preload("res://tests/unit/test_geometry.gd"),
+	"green_slice": preload("res://tests/unit/test_green_slice.gd"),
 	"models": preload("res://tests/unit/test_models.gd"),
 	"onboarding_flow": preload("res://tests/unit/test_onboarding_flow.gd"),
 	"overlay_merge": preload("res://tests/unit/test_overlay_merge.gd"),
