@@ -49,6 +49,7 @@ const SUITES := {
 	"config_validator": preload("res://tests/unit/test_config_validator.gd"),
 	"device_profile": preload("res://tests/unit/test_device_profile.gd"),
 	"geometry": preload("res://tests/unit/test_geometry.gd"),
+	"gesture_detector": preload("res://tests/unit/test_gesture_detector.gd"),
 	"green_slice": preload("res://tests/unit/test_green_slice.gd"),
 	"input_log": preload("res://tests/unit/test_input_log.gd"),
 	"input_setup": preload("res://tests/unit/test_input_setup.gd"),

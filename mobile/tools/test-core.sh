@@ -69,6 +69,14 @@ if ! python3 "$repo_root/tools/gen_tap_golden.py" --check; then
     exit 1
 fi
 
+# 手势夹具同样必须在 Godot 之前校验：夹具被手改时，回放只是「与手改后的自己一致」。
+# 这条校验同时覆盖 detector 与 runtime 两类期望，且 `--check` 绝不写盘。
+echo "▸ 校验手势黄金夹具未漂移…"
+if ! python3 "$repo_root/tools/gen_gesture_golden.py" --check; then
+    echo "  运行 python3 tools/gen_gesture_golden.py 重新生成黄金夹具后再试。" >&2
+    exit 1
+fi
+
 # 轴枚举常量的零出现断言（INPUT-02）。纯文本、毫秒级、零 Godot 依赖 —— 放在导入
 # 之前，反例自测才能在几秒内变红，而不必跑完整个 Godot 套件。
 # 注意：这条断言**扫描注释**，所以源码里解释这条规则时必须用中文，不能把常量名写进
@@ -176,5 +184,15 @@ if ! grep -qE '^TAP_GOLDEN_RUNTIME cases=[1-9][0-9]* mismatches=0$' "$tmp/tests.
     exit 1
 fi
 echo "✓ tap 运行时回放：$(grep -E '^TAP_GOLDEN_RUNTIME ' "$tmp/tests.log")"
+
+# 手势回放的正向哨兵：与 tap 分开，tap 的 18 条用例不能替手势语料作证。
+# 没有这一行，等于「夹具没被读过」也能绿；mismatches 必须为 0，cases 至少 1
+# （真空绿的反面）。阈值与套件 _check_scale 的下限是同一个数字。
+if ! grep -qE '^GESTURE_GOLDEN cases=[1-9][0-9]* mismatches=0$' "$tmp/tests.log"; then
+    echo "✗ 没有 GESTURE_GOLDEN cases=N mismatches=0（夹具未回放或跨语言判定有差异）" >&2
+    grep -E '^GESTURE_GOLDEN ' "$tmp/tests.log" >&2 || true
+    exit 1
+fi
+echo "✓ 手势回放：$(grep -E '^GESTURE_GOLDEN ' "$tmp/tests.log")"
 
 echo "✓ 核心闸门通过：配置一致、边界干净、黄金未漂移、tap 回放一致、运行时判定一致、核心套件全绿"
