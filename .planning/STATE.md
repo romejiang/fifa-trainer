@@ -2,18 +2,18 @@
 gsd_state_version: "1.0"
 current_phase: 5
 current_phase_name: 全动作判定对等性 — 三类检测器 + 引擎仲裁 + 抽稀矩阵
-current_plan: 4
+current_plan: 5
 status: executing
-stopped_at: Completed 05-03-PLAN.md
-last_updated: "2026-11-05T19:21:18.000Z"
+stopped_at: Completed 05-04-PLAN.md
+last_updated: "2026-11-05T20:21:47.000Z"
 last_activity: 2026-11-06
-last_activity_desc: Phase 5 plan 03 complete — 多技能 GestureEngine + 29 条仲裁语料，三次变异验证通过
-state_head: cd9126f605fb7b850554f9cc735452ca2b6f34eb
+last_activity_desc: Phase 5 plan 04 complete — measured{} 全链 + 12 组断言 + 三次变异验证
+state_head: 06b5a21c78f70a5e682a64dbdb86bd636acbce97
 progress:
   total_phases: 10
   completed_phases: 4
   total_plans: 34
-  completed_plans: 29
+  completed_plans: 30
   percent: 40
 ---
 
@@ -28,21 +28,21 @@ See: .planning/PROJECT.md (updated 2026-11-04)
 
 ## Current Position
 
-Current Plan: 4
+Current Plan: 5
 Total Plans in Phase: 7
 Phase: 5 (全动作判定对等性 — 三类检测器 + 引擎仲裁 + 抽稀矩阵) — EXECUTING
-Plan: 4 of 7
+Plan: 5 of 7
 Status: Executing Phase 5
-Last activity: 2026-11-06 — 05-03 完成：多技能 GestureEngine + 29 条仲裁语料 + 三次变异验证
+Last activity: 2026-11-06 — 05-04 完成：measured{} 全链（三检测器 + Outcome）+ 12 组断言 + 三次变异验证
 
 Progress: [████░░░░░░] 40%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 29
+- Total plans completed: 30
 - Average duration: — min
-- Total execution time: 2.1 hours
+- Total execution time: 2.8 hours
 
 **By Phase:**
 
@@ -52,7 +52,7 @@ Progress: [████░░░░░░] 40%
 | 2 | 5 | - | - |
 | 3 | 6 | - | - |
 | 4 | 11 | - | - |
-| 5 | 3 | - | - |
+| 5 | 4 | - | - |
 
 **Recent Trend:**
 - Last 5 plans: —
@@ -92,6 +92,7 @@ Progress: [████░░░░░░] 40%
 | Phase 5 P01 | 14min | 3 tasks | 16 files |
 | Phase 5 P02 | 13min | 3 tasks | 4 files |
 | Phase 5 P03 | 43min | 3 tasks | 12 files |
+| Phase 5 P04 | 39min | 3 tasks | 12 files |
 
 ## Accumulated Context
 
@@ -291,6 +292,10 @@ Recent decisions affecting current work:
 - [Phase 5]: 手势锁的 ±4ms 在 4ms 网格 + 「解锁帧必须回中」下不可直接表示：右摇杆 ≥ RELEASE_STICK 会清零计时，实测边界是 148ms（永不解锁）对 156ms（解锁帧之后再推）
 - [Phase 5]: `rt_lock_hold_no_recenter` 在拆掉 `_gesture_locked` 后仍绿（ArcDetector 自己的 armed=false 已挡住第二段弧）；锁的具名红色见证改用 `rt_lock_release_150_minus_4`
 - [Phase 5]: `_drain_failures` 必须遍历全部技能取走 pending、只记配置顺序第一个 owner；`rt_failure_owner_config_order` 用同帧的马赛 wrong_start + 磕球 too_slow 钉死没有 break
+- [Phase 5]: `measured` 只能随 Hit / Failure 一起产出；删除 Phase 4 的 `ArcDetector.measured()` 事后快照入口（键表与 RESEARCH §D.5 不一致，且一次判定只能有一份度量）
+- [Phase 5]: `distance_deg` 用圆周距离（`Geometry.angle_diff`，与 `_end_ok` 同尺）；测试选 50°/90° 让 `angle_diff` 与 `abs(end_rel - nearest)` 同为 40，组 6 仍按同源等式断言
+- [Phase 5]: 出厂弧线的终点窗覆盖扫掠中段，200° 成功与 wrong_end 不可达；组 1~6 改用同形状合成弧（只改终点目标/容差/上限），检测器代码零分叉
+- [Phase 5]: `_step_t` 存毫秒（`now * 1000.0`），字段名承诺 `t_done_ms`；它只出现在赋值与 measured 构造里，不进任何判定分支
 
 ### Pending Todos
 
@@ -329,6 +334,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-11-05T19:21:18.000Z
-Stopped at: Completed 05-03-PLAN.md
+Last session: 2026-11-05T20:21:47.000Z
+Stopped at: Completed 05-04-PLAN.md
 Resume file: None
