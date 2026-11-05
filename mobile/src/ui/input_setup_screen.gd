@@ -34,6 +34,8 @@ const MOVING_SPAN := 0.05
 const TITLE_TEXT := "输入设置"
 const HELP_TEXT := "A 保存并开始    B 清空重来    X 反转 X    Y 反转 Y    LB/RB 换轴对"
 const NO_DEVICE_HELP := "打开手柄电源 → 长按配对键 → 在系统蓝牙里选择它 → 按手柄任意键唤醒"
+## 底部固定提示：日志不随 B 清空，测试者按完可以直接用 adb 取。
+const LOG_HINT := "日志：files/input_log.txt（按 B 清空本页，不删日志）"
 
 @onready var _title: Label = %Title
 @onready var _axes: Label = %Axes
@@ -239,8 +241,8 @@ func _render_no_device() -> void:
 
 func _footer_text() -> String:
 	if _sampler == null or _sampler.buffer.device < 0:
-		return "设备：未连接"
-	return "设备：%s" % _sampler.device_name()
+		return "设备：未连接\n%s" % LOG_HINT
+	return "设备：%s\n%s" % [_sampler.device_name(), LOG_HINT]
 
 
 static func axis_line(axis: int, value: float, span: Vector2, moving: bool) -> String:

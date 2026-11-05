@@ -73,6 +73,8 @@ var _diag_accum: float = 0.0
 func _ready() -> void:
 	# 默认每帧 flush 一次累积输入；必须关掉，事件时间戳才有亚帧意义。
 	Input.set_use_accumulated_input(false)
+	# 输入事件日志的会话头：每次启动一行，日志按进程分段。写入失败不影响任何判定。
+	InputLog.start_session(str(ProjectSettings.get_setting("application/config/version", "0.1.0")))
 	_config_error.visible = false
 	_onboarding.visible = false
 	_practice_container.visible = false
