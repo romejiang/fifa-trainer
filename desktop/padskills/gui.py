@@ -307,7 +307,8 @@ def _build_rumble(cfg: AppConfig, source: GamepadSource) -> Tuple[RumbleEngine, 
     joy = getattr(source, "_joy", None)
     candidates = build_backends(
         cfg.rumble.backend, joystick=joy,
-        joystick_index=cfg.input.joystick_index, verbose=False)
+        joystick_index=getattr(source, "xinput_slot", cfg.input.joystick_index),
+        verbose=False)
     if not candidates:
         return RumbleEngine(None, enabled=False), "不可用"
 
