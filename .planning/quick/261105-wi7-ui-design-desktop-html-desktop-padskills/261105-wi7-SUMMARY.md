@@ -18,7 +18,7 @@ affects: [desktop-ui, design-system, gui-redraw]
 actuals:
   tokens: 26725        # 106900 chars / 4，最终 gui.py
   tasks: 3
-  commits: 6
+  commits: 7
 
 tech-stack:
   added: []
@@ -50,9 +50,9 @@ metrics:
   tasks: 3
   files: 1
 status: complete
-commits: 6
+commits: 7
 plan_head_before: c8f97a7f041f0bce9251fcafe025dcb3a3d006ff
-plan_head_after: 25a2a26
+plan_head_after: e5e94df
 ---
 
 # Quick Task 261105-wi7: 桌面版亮色 UI 重做 Summary
@@ -85,6 +85,7 @@ Each task was committed atomically:
 4. **精修：英雄区光带 / 状态胶囊 / 次级页面 / 紧凑布局** - `f7eba38` (fix)
 5. **边界处理：长动作名 / 空动作列表** - `5d114d0` (fix)
 6. **专项开关 + 模式条 + 黑白足球** - `25a2a26` (feat)
+7. **顶栏球场照片 + 打包资源** - `e5e94df` (feat)
 
 _Note: 文档提交（SUMMARY/STATE/PLAN）由 orchestrator 处理，本 executor 未提交任何 .planning 产物。_
 
