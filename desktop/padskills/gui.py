@@ -1890,10 +1890,22 @@ class TrainerApp:
         self._text("动作熟练度", panel.x + 16, panel.y + 14, 11.5, MUTED,
                    bold=True)
         skills = self.engine.skills
-        hint = (f"点按切换 · 1–{min(9, len(skills))}" if len(skills) <= 9
-                else "点按切换专项")
+        if not skills:
+            hint = "没有启用的动作"
+        elif len(skills) <= 9:
+            hint = f"点按切换 · 1–{len(skills)}"
+        else:
+            hint = "点按切换专项"
         self._text(hint, panel.right - 16, panel.y + 15, 10.5,
                    FAINT, anchor="topright")
+
+        self._modifier_hits = []
+        self._focus_hits = []
+        if not skills:
+            self._text("没有启用的动作，检查配置里的 enabled",
+                       panel.centerx, panel.centery, 12, FAINT,
+                       anchor="center")
+            return
 
         n = max(1, len(skills))
         top = panel.y + 40
@@ -1904,8 +1916,6 @@ class TrainerApp:
         # 否则 7 个以上动作会顶出面板、压到下面的卡片上。
         row_h = max(26, min(90, row_h))
 
-        self._modifier_hits = []
-        self._focus_hits = []
         for i, active in enumerate(skills):
             rect = pg.Rect(panel.x + 8, top + i * (row_h + gap),
                            panel.width - 16, row_h)
@@ -1946,13 +1956,18 @@ class TrainerApp:
             self._focus_hits.append((rect, active))
             return
 
-        self._text(self._fit(cn, 13.5, rect.width - 150, bold=True),
-                   rect.x + 10, rect.y + 8, 13.5,
+        name = self._fit(cn, 13.5, rect.width - 150, bold=True)
+        self._text(name, rect.x + 10, rect.y + 8, 13.5,
                    MUTED if dimmed else TEXT, bold=True)
         if en:
-            cn_w = self._fonts.get(13.5, True).size(cn)[0]
-            self._text(self._fit(en, 10.5, rect.width - 150 - cn_w),
-                       rect.x + 15 + cn_w, rect.y + 11, 10.5, FAINT)
+            # 中文名被截断时不再画英文名，否则会把 "…" 画到行外
+            cn_w = self._fonts.get(13.5, True).size(name)[0]
+            en_room = rect.width - 150 - cn_w
+            if en_room >= 24:
+                en = self._fit(en, 10.5, en_room)
+                if en != "…":
+                    self._text(en, rect.x + 15 + cn_w, rect.y + 11,
+                               10.5, FAINT)
 
         ratio_w = self._fonts.get(13.5, True).size(ratio)[0]
         self._text(ratio, rect.right - 10, rect.y + 6, 13.5, ratio_color,
@@ -2055,9 +2070,12 @@ class TrainerApp:
         self._text(cn, title_x, panel.y + 18, 24, TEXT, bold=True)
         if en:
             cn_w = self._fonts.get(24, True).size(cn)[0]
-            en_max = panel.right - 22 - 116 - (title_x + cn_w + 8)
-            self._text(self._fit(en, 12, max(20, en_max)),
-                       title_x + cn_w + 8, panel.y + 34, 12, FAINT)
+            en_room = panel.right - 22 - 116 - (title_x + cn_w + 8)
+            if en_room >= 24:
+                en = self._fit(en, 12, en_room)
+                if en != "…":
+                    self._text(en, title_x + cn_w + 8, panel.y + 34,
+                               12, FAINT)
         if ok:
             self._chip(title_x, panel.y + 54, "做对了", GREEN_DEEP, GREEN_SOFT,
                        size=11.5)
@@ -2132,10 +2150,6 @@ class TrainerApp:
             color = GREEN if outcome.ok else RED
             self._text(stamp, panel.x + 16, y + 8, 10.5, FAINT)
             self._mark(panel.x + 80, y + 9, 11, outcome.ok, color, 2)
-            name = self._fit(
-                self._split_name(self._short_name(outcome.skill_name))[0],
-                12, 220)
-            self._text(name, panel.x + 100, y + 7, 12, TEXT)
 
             ms = f"{outcome.elapsed_ms:.0f} ms"
             if outcome.ok:
@@ -2145,10 +2159,20 @@ class TrainerApp:
                 cue = outcome.message or Detector.FAILURE_LABELS.get(
                     outcome.code, outcome.code)
                 cue_color = RED
+            cue = self._fit(cue, 10, 230) if cue else ""
+            cue_w = self._fonts.get(10).size(cue)[0] if cue else 0
+            ms_w = self._fonts.get(11.5, True).size(ms)[0]
+            right_w = (cue_w + 9 if cue else 0) + ms_w
+
+            # 先算右侧说明+毫秒占多宽，再把剩余宽度给动作名，长名字不会压住时间
+            name_room = panel.right - 16 - right_w - 10 - (panel.x + 100)
+            name = self._fit(
+                self._split_name(self._short_name(outcome.skill_name))[0],
+                12, max(40, name_room))
+            self._text(name, panel.x + 100, y + 7, 12, TEXT)
+
             cue_x = panel.right - 16
             if cue:
-                cue = self._fit(cue, 10, 230)
-                cue_w = self._fonts.get(10).size(cue)[0]
                 self._text(cue, cue_x, y + 8, 10, cue_color,
                            anchor="topright")
                 cue_x -= cue_w + 9
