@@ -3,11 +3,11 @@ gsd_state_version: "1.0"
 current_phase: 4
 current_phase_name: 设备输入层 + 绿色搓射竖切
 status: executing
-stopped_at: Completed 04-06-PLAN.md
-last_updated: "2026-11-05T11:18:26.000Z"
+stopped_at: 04-07 Task 2 blocked — 真机 D0 失败，D1–D6 未执行
+last_updated: "2026-11-05T12:42:28.000Z"
 last_activity: 2026-11-05
-last_activity_desc: 04-06 练习屏 + 结果横幅 + 60 Hz 集成竖切 + 真机记录表完成
-state_head: 8c1fc74e8b56e7e3531e314ace92673cab105376
+last_activity_desc: 04-07 真机走查：D0 失败（探针重试循环 + 停止屏 events_motion=1931），用户要求改单屏输入检测
+state_head: c350258bec1a544da5e4dee9345eceaa4b077965
 progress:
   total_phases: 10
   completed_phases: 3
@@ -27,10 +27,10 @@ See: .planning/PROJECT.md (updated 2026-11-04)
 
 ## Current Position
 
-Phase: 4 (设备输入层 + 绿色搓射竖切) — EXECUTING
-Plan: 7 of 7（Task 2 等待真机，checkpoint:human-verify / blocking-human）
-Status: Executing Phase 4
-Last activity: 2026-11-05 — 04-07 Task 1 导出签名 APK 并核对证书指纹；Task 2 因 `adb devices` 为空停在真机检查点
+Phase: 4 (设备输入层 + 绿色搓射竖切) — BLOCKED
+Plan: 7 of 7（Task 1 完成；Task 2 真机 D0 失败，D1–D6 未执行，checkpoint:human-verify / blocking-human）
+Status: Blocked — 等待重新规划（用户要求把多步引导改成单屏输入检测）
+Last activity: 2026-11-05 20:42 — 04-07 真机走查：D0 在探针重试循环与「没有收到摇杆事件（events_motion = 1931）」停止屏处失败；`run-as: package not debuggable` 使 D1/D2 不可执行
 
 Progress: [███░░░░░░░] 32%
 
@@ -236,6 +236,9 @@ Recent decisions affecting current work:
 - [Phase 4]: 字形闭世界两条边：`src/ui` 目录自动枚举 + `RENDER_SOURCES` 点名会渲染的 core 文案；清单 876 → 992 字符
 - [Phase 4]: `AppFont.tres` 显式 `variation_opentype wght=400`（UI-SPEC G11）；不改 cmap、不影响 `GLYPH_OK`
 - [Phase 4]: `test_green_slice` 用真实配置字节与 60 Hz 合成轴，七段各自新建运行时；不在测试里复刻 `select_taps_skill` 的筛选循环
+- [Phase 4]: 真机 D0 失败：探针连续拒绝（两轴同时动了 margin 0.001；上与右落在同一根轴 2/2；上下没有互为反号 上轴2符号-1/下轴3符号1），并在 20:15:50 出现停止屏「没有收到摇杆事件（events_motion = 1931）」；同一时段 `PAD_DIAG ev_m=2633`，停止屏文案与日志自相矛盾，是待修缺陷
+- [Phase 4]: release APK 不可调试：`adb shell run-as com.fifaskill.trainer ...` 返回 `run-as: package not debuggable`；D1/D2 的 `controllers.json` 读取与改写通道不存在，后续计划必须换证据出口或出 debuggable 构建
+- [Phase 4]: 用户否决多步引导，要求改成单屏输入检测：一屏显示所有按键与摇杆，无状态机、无第一步/第二步顺序依赖，按/推哪个就亮哪个，识别错了由用户指出；这是 Rule 4 架构变更，04-07 未实施，需重新规划与重建
 
 ### Pending Todos
 
@@ -243,7 +246,10 @@ None yet.
 
 ### Blockers/Concerns
 
-- **Phase 4 真机清单未执行（04-07 Task 2 停在 `checkpoint:human-verify`，gate=blocking-human）**：`adb devices` 为空。APK 已产出并通过独立验签/对齐/包内容核对（证书 `e1841a17…32e046`，27012856 字节，`a2617a4`），`mobile/ACCEPTANCE.md` 第 6 节 D0–D6 一格未填；成功标准 2/3/4/5 均不得勾选
+- **Phase 4 真机清单 D0 失败（04-07 Task 2，checkpoint:human-verify / blocking-human）**：手机 Motorola XT2175-2 / Android 12 已连上（`ZY22F5FXX9`），APK 已安装（证书 `e1841a17…32e046`，27012856 字节），但 D0 在探针重试循环失败：`两轴同时动了：margin 0.001 < 0.25`（20:15:38）/ `上与右落在同一根轴（2/2）`（20:15:46）/ `上下没有互为反号：上 (轴 2, 符号 -1)、下 (轴 3, 符号 1)`（20:18:22）；20:15:50 出现停止屏「没有收到摇杆事件（events_motion = 1931）」，与同一时段 `PAD_DIAG ev_m=2633` 矛盾。D1–D6 未执行；成功标准 2/3/4/5 均不得勾选
+- **D1/D2 的 `run-as` 通道不可用**：release APK 不可调试，`adb shell run-as com.fifaskill.trainer ...` 返回 `run-as: package not debuggable`；`controllers.json` 无法读取/改写。后续计划需出 debuggable 构建或换一个不依赖 `run-as` 的档案证据出口
+- **用户要求改架构（Rule 4，未实施）**：把多步引导（rest → 四步探针 → 中点/满量程校准 → 布局确认）改成单屏输入检测（所有按键 + 摇杆实时显示，无状态机、无第一步/第二步顺序依赖）；需新计划、重写 UI、重跑测试与重建 APK，之后重新做真机验收。用户原话：「一直显示重来重来重来」「不要弄成这种状态机的模式，就在一个屏里边把所有按键检测事解决了」
+- **D2 缺第二只手柄**：现场只有 Xbox Series X Controller（`getevent -pl` 仅列出 `Xbox Wireless Controller`）；拒绝面（DualSense 或另一只轴映射不同的手柄）未执行，成功标准 3 不得声称完整
 - Phase 2 / 4 之前需备齐 **2 台不同 OEM 手机 + Xbox 与 DualSense 手柄**；模拟器不能替代真机验证
 - **Phase 2 的人工验收全部未闭合，落点都在 `mobile/ACCEPTANCE.md`**：第 0 节四项前置条件、第 1 节两台 × 四项观察、第 4 节密钥库离线备份、第 5 节第二台干净机器重导出。`adb devices` 当前为空，`device-smoke.sh` 以 `DEVICE_SMOKE_FAIL` 退出（正确行为，不是缺陷）
 - 60 Hz 抽稀是否保住 `release_hold_ms = 120` 与 `global_cooldown_ms = 60` 尚未实测，由 Phase 5 的抽稀矩阵回答；在此之前不动任何阈值
@@ -267,6 +273,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-11-05T11:24:00.000Z
-Stopped at: 04-07 Task 2 真机检查点（checkpoint:human-verify / blocking-human）；APK 已产出，D0–D6 未填
+Last session: 2026-11-05T12:42:28.000Z
+Stopped at: 04-07 Task 2 blocked（checkpoint:human-verify / blocking-human）；D0 失败、D1–D6 未执行，`mobile/ACCEPTANCE.md` §6 已记录原文；下一步需重新规划单屏输入检测
 Resume file: None

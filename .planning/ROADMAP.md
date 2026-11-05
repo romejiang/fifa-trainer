@@ -155,6 +155,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 
 **Wave 7** *(blocked on Wave 6 completion)*
 - [ ] 04-07-PLAN.md — 签名 APK + 真机 D0–D6 清单（`checkpoint:human-verify`，无设备不得勾选）
+      — **2026-11-05 真机结果：D0 失败**（探针三次拒绝 + 停止屏「没有收到摇杆事件（events_motion = 1931）」）；D1–D6 未执行（`run-as: package not debuggable`；只有一只 Xbox 手柄）。用户要求把多步引导改成**单屏输入检测**，需重新规划与重建；成功标准 2/3/4/5 仍未闭合
 
 **UI hint**: yes
 
