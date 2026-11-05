@@ -186,9 +186,9 @@ fi
 echo "✓ tap 运行时回放：$(grep -E '^TAP_GOLDEN_RUNTIME ' "$tmp/tests.log")"
 
 # 手势回放的正向哨兵：与 tap 分开，tap 的 18 条用例不能替手势语料作证。
-# 没有这一行，等于「夹具没被读过」也能绿；mismatches 必须为 0，且 cases 至少 35
+# 没有这一行，等于「夹具没被读过」也能绿；mismatches 必须为 0，且 cases 至少 52
 # （真空绿的反面）。阈值与套件 _check_scale 的下限是同一个数字。
-if ! grep -qE '^GESTURE_GOLDEN cases=(3[5-9]|[4-9][0-9]|[1-9][0-9]{2,}) mismatches=0$' "$tmp/tests.log"; then
+if ! grep -qE '^GESTURE_GOLDEN cases=(5[2-9]|[6-9][0-9]|[1-9][0-9]{2,}) mismatches=0$' "$tmp/tests.log"; then
     echo "✗ 没有 GESTURE_GOLDEN cases=N mismatches=0（夹具未回放或跨语言判定有差异）" >&2
     grep -E '^GESTURE_GOLDEN ' "$tmp/tests.log" >&2 || true
     exit 1

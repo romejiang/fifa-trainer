@@ -37,6 +37,11 @@ const REQUIRED_DETECTOR_IDS: Array[String] = [
 	# 少了任何一条，「相对动作真的用了左摇杆基准」就重新变回不可证。
 	"det_roulette_relative_ls90_zero",
 	"det_roulette_absolute_ls90_ok",
+	# overshoot 在出厂配置下不可达（终点窗口覆盖 max_angle 区间），只由变体覆盖。
+	"det_roulette_overshoot",
+	# 重新武装的两个邻点：删掉任一条，「回中 120ms 才允许下一段」就测不到。
+	"det_arc_rearm_116",
+	"det_arc_rearm_124",
 ]
 
 var _mismatches := 0
@@ -109,8 +114,8 @@ func _check_meta(r, data: Dictionary) -> void:
 ## 规模与 id 下限：删空夹具、丢掉点名用例、复制 id 都必须变红。
 ## 下限与 `test-core.sh` 的 grep 是**同一个数字**：两层不一致等于允许删语料仍绿。
 func _check_scale(r, cases: Array) -> void:
-	r.check(cases.size() >= 35, "detector 用例至少 35 条（实际 %d）" % cases.size())
-	if cases.size() < 35:
+	r.check(cases.size() >= 52, "detector 用例至少 52 条（实际 %d）" % cases.size())
+	if cases.size() < 52:
 		_mismatches += 1
 	var ids: Dictionary = {}
 	for case in cases:

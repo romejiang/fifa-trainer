@@ -460,17 +460,19 @@ BOUNDARY_CASES = (
         ),
     },
     # 16. 保持 352ms（上邻点）→ ok。第 452ms 那一帧 held=352 >= 350。
+    #     成功之后 LB 松一帧再按回、摇杆**一直推着**：reset() 绝不能把
+    #     neutral 置回 true，否则这里会凭空多出第二条判定（D-10 变异验证）。
     {
         "id": "det_croqueta_hold_352",
         "kind": "detector",
         "skill": "油炸丸子 La Croqueta",
         "config": "shipped",
-        "end_ms": 560,
-        "buttons": ((0, ()), (4, ("LB",)), (456, ())),
+        "end_ms": 900,
+        "buttons": ((0, ()), (4, ("LB",)), (456, ()), (460, ("LB",))),
         "segments": (
             ("hold", 0, 96, 0.0, 0.0),
-            ("hold", 100, 452, 90.0, 0.9),
-            ("hold", 456, 560, 0.0, 0.0),
+            ("hold", 100, 896, 90.0, 0.9),
+            ("hold", 900, 900, 0.0, 0.0),
         ),
     },
     # 17. 容差 - 1°：目标偏 9°（<= tolerance_deg 10）→ 匹配 → ok。
@@ -607,6 +609,289 @@ VARIANT_CASES = (
             ("hold", 0, 96, 0.0, 0.0),
             ("hold", 100, 452, 180.0, 0.9),
             ("hold", 456, 560, 0.0, 0.0),
+        ),
+    },
+)
+
+
+# 20 条点名补充用例：失败码可达性、tap 窗口、踩单车终点容差的两支、
+# 马赛回旋的 overshoot 变体与「direction: any 不锁方向」。
+#
+# 每一条的目标结论都写进注释，但期望值一律由参考实现跑出；落不下来的条目
+# 按 Task 1 的「同族替换」规则处理（同族、同码、参考实现跑得出），绝不改阈值。
+EXTRA_CASES = (
+    # 1. 转 60° 后推住不动：motion 参考角停止刷新，超过 idle 250ms → stalled。
+    {
+        "id": "det_roulette_stalled",
+        "kind": "detector",
+        "skill": "马赛回旋 Roulette",
+        "config": "shipped",
+        "end_ms": 800,
+        "segments": (
+            ("hold", 0, 96, 0.0, 0.0),
+            ("sweep", 100, 200, 180.0, 240.0, 0.9),
+            ("hold", 304, 800, 240.0, 0.9),
+        ),
+    },
+    # 2. 踩单车 0→40° 后推住不动：同样只到 idle 就 stalled（swept 40 >= 5）。
+    {
+        "id": "det_stepover_stalled",
+        "kind": "detector",
+        "skill": "踩单车 Stepover",
+        "config": "shipped",
+        "end_ms": 800,
+        "segments": (
+            ("hold", 0, 96, 0.0, 0.0),
+            ("sweep", 100, 200, 0.0, 40.0, 0.9),
+            ("hold", 304, 800, 40.0, 0.9),
+        ),
+    },
+    # 3. 前 → 停：第一步完成后摇杆回中不再动，超过 idle 250ms 时
+    #    index=1 且不是超时 → incomplete。
+    {
+        "id": "det_heel_to_heel_incomplete",
+        "kind": "detector",
+        "skill": "磕球过人 Heel-to-Heel",
+        "config": "shipped",
+        "end_ms": 600,
+        "segments": (
+            ("hold", 0, 96, 0.0, 0.0),
+            ("hold", 100, 100, 0.0, 0.9),
+            ("hold", 104, 196, 90.0, 0.9),
+            ("hold", 200, 600, 0.0, 0.0),
+        ),
+    },
+    # 4. 每步都不闭合、但一直在动：从 90° 缓慢扫到 130°，既不是前（0±35）
+    #    也不是后（180±35），避开 idle 直到 (now-t0) > 600 → too_slow。
+    {
+        "id": "det_heel_to_heel_too_slow",
+        "kind": "detector",
+        "skill": "磕球过人 Heel-to-Heel",
+        "config": "shipped",
+        "end_ms": 800,
+        "segments": (
+            ("hold", 0, 96, 0.0, 0.0),
+            ("hold", 100, 100, 0.0, 0.9),
+            ("sweep", 104, 600, 90.0, 130.0, 0.9),
+            ("hold", 708, 800, 0.0, 0.0),
+        ),
+    },
+    # 5. 两下 X 间隔 396ms（< min 400）→ too_fast。
+    {
+        "id": "det_green_finesse_too_fast",
+        "kind": "detector",
+        "skill": "绿色搓射 Green Finesse",
+        "config": "shipped",
+        "end_ms": 600,
+        "buttons": (
+            (0, ()), (4, ("RB",)), (100, ("RB", "X")), (104, ("RB",)),
+            (496, ("RB", "X")), (500, ("RB",)),
+        ),
+        "segments": (("hold", 0, 600, 0.0, 0.0),),
+    },
+    # 6. 按下第一下 X 后中途松开 RB → reset 报 hold_short（elapsed 100ms）。
+    {
+        "id": "det_green_finesse_hold_short",
+        "kind": "detector",
+        "skill": "绿色搓射 Green Finesse",
+        "config": "shipped",
+        "end_ms": 400,
+        "buttons": (
+            (0, ()), (4, ("RB",)), (100, ("RB", "X")), (200, ("X",)),
+            (300, ()),
+        ),
+        "segments": (("hold", 0, 400, 0.0, 0.0),),
+    },
+    # 7. 间隔 596ms（最大 600 的下邻点）→ ok。
+    {
+        "id": "det_green_finesse_max_minus_4",
+        "kind": "detector",
+        "skill": "绿色搓射 Green Finesse",
+        "config": "shipped",
+        "end_ms": 800,
+        "buttons": (
+            (0, ()), (4, ("RB",)), (100, ("RB", "X")), (104, ("RB",)),
+            (696, ("RB", "X")), (700, ("RB",)),
+        ),
+        "segments": (("hold", 0, 800, 0.0, 0.0),),
+    },
+    # 8. 间隔 604ms（> 600，但仍在 grace 150 内）→ 第二下是 rising，
+    #    直接走 too_slow 分支，与 grace 无关。
+    {
+        "id": "det_green_finesse_max_plus_4",
+        "kind": "detector",
+        "skill": "绿色搓射 Green Finesse",
+        "config": "shipped",
+        "end_ms": 800,
+        "buttons": (
+            (0, ()), (4, ("RB",)), (100, ("RB", "X")), (104, ("RB",)),
+            (704, ("RB", "X")), (708, ("RB",)),
+        ),
+        "segments": (("hold", 0, 800, 0.0, 0.0),),
+    },
+    # 9. 间隔 404ms（最小 400 的上邻点）→ ok。
+    {
+        "id": "det_green_finesse_min_plus_4",
+        "kind": "detector",
+        "skill": "绿色搓射 Green Finesse",
+        "config": "shipped",
+        "end_ms": 700,
+        "buttons": (
+            (0, ()), (4, ("RB",)), (100, ("RB", "X")), (104, ("RB",)),
+            (504, ("RB", "X")), (508, ("RB",)),
+        ),
+        "segments": (("hold", 0, 700, 0.0, 0.0),),
+    },
+    # 10. 间隔 600ms（窗口右端）→ ok，证明右端是**包含**的。
+    {
+        "id": "det_green_finesse_max_exact_600",
+        "kind": "detector",
+        "skill": "绿色搓射 Green Finesse",
+        "config": "shipped",
+        "end_ms": 800,
+        "buttons": (
+            (0, ()), (4, ("RB",)), (100, ("RB", "X")), (104, ("RB",)),
+            (700, ("RB", "X")), (704, ("RB",)),
+        ),
+        "segments": (("hold", 0, 800, 0.0, 0.0),),
+    },
+    # 11. 一直没有第二下：超过 600+150=750 才报 too_slow；4ms 网格上第一个
+    #     大于 750 的间隔是 752ms。
+    {
+        "id": "det_green_finesse_grace_too_slow",
+        "kind": "detector",
+        "skill": "绿色搓射 Green Finesse",
+        "config": "shipped",
+        "end_ms": 900,
+        "buttons": (
+            (0, ()), (4, ("RB",)), (100, ("RB", "X")), (104, ("RB",)),
+        ),
+        "segments": (("hold", 0, 900, 0.0, 0.0),),
+    },
+    # 12. too_fast 之后必须真正松开 X 满 release_hold 120ms 才允许下一次：
+    #     500ms 松手后 60ms 就再按两下（560/590）→ 全部被忽略，只有 1 条判定。
+    {
+        "id": "det_green_finesse_release_hold",
+        "kind": "detector",
+        "skill": "绿色搓射 Green Finesse",
+        "config": "shipped",
+        "end_ms": 700,
+        "buttons": (
+            (0, ()), (4, ("RB",)), (100, ("RB", "X")), (104, ("RB",)),
+            (496, ("RB", "X")), (500, ("RB",)), (560, ("RB", "X")),
+            (564, ("RB",)), (588, ("RB", "X")), (592, ("RB",)), (700, ()),
+        ),
+        "segments": (("hold", 0, 700, 0.0, 0.0),),
+    },
+    # 13. 踩单车终点容差内：起手相对 318°（离 0° 为 42 <= 55），顺时针扫 78°
+    #     收在相对 36°（离 90° 差 54 <= 55），扫掠 78 在 [70,135]。
+    {
+        "id": "det_stepover_end_in_tol",
+        "kind": "detector",
+        "skill": "踩单车 Stepover",
+        "config": "shipped",
+        "end_ms": 500,
+        "segments": (
+            ("hold", 0, 96, 0.0, 0.0),
+            ("sweep", 100, 300, 318.0, 396.0, 0.9),
+            ("hold", 404, 500, 0.0, 0.0),
+        ),
+    },
+    # 14. 踩单车终点容差外：同样 318° 起手，扫 76° 收在 34°（离 90° 差 56 > 55，
+    #     也不在 270±55 的窗口）→ 松手 wrong_end。
+    {
+        "id": "det_stepover_end_out_tol",
+        "kind": "detector",
+        "skill": "踩单车 Stepover",
+        "config": "shipped",
+        "end_ms": 500,
+        "segments": (
+            ("hold", 0, 96, 0.0, 0.0),
+            ("sweep", 100, 300, 318.0, 394.0, 0.9),
+            ("hold", 404, 500, 0.0, 0.0),
+        ),
+    },
+    # 15. 踩单车终点走 end_angle:[90,270] 的第二支：54° 逆时针 89° 收在 325°，
+    #     325 = 270 + 55 正好是容差边界 → ok。逆时针用 -35（norm 后 325），
+    #     不能写 325 —— 线性插值 54→325 是顺时针 271°。
+    {
+        "id": "det_stepover_end_target_270",
+        "kind": "detector",
+        "skill": "踩单车 Stepover",
+        "config": "shipped",
+        "end_ms": 700,
+        "segments": (
+            ("hold", 0, 96, 0.0, 0.0),
+            ("sweep", 100, 500, 54.0, -35.0, 0.9),
+            ("hold", 604, 700, 0.0, 0.0),
+        ),
+    },
+    # 16. 马赛回旋从相对 100° 起手：离 180° 差 80，容差 65 外、claim 85 内
+    #     → wrong_start。
+    {
+        "id": "det_roulette_wrong_start_100",
+        "kind": "detector",
+        "skill": "马赛回旋 Roulette",
+        "config": "shipped",
+        "end_ms": 700,
+        "segments": (
+            ("hold", 0, 96, 0.0, 0.0),
+            ("sweep", 100, 500, 100.0, 300.0, 0.9),
+            ("hold", 604, 700, 0.0, 0.0),
+        ),
+    },
+    # 17. 从相对 90° 起手：离 180° 差 90 > 85，连 claim 都不成立 → 零判定。
+    {
+        "id": "det_roulette_start_outside_claim",
+        "kind": "detector",
+        "skill": "马赛回旋 Roulette",
+        "config": "shipped",
+        "end_ms": 700,
+        "segments": (
+            ("hold", 0, 96, 0.0, 0.0),
+            ("sweep", 100, 500, 90.0, 290.0, 0.9),
+            ("hold", 604, 700, 0.0, 0.0),
+        ),
+    },
+    # 18. 扫掠 68°（< min_angle 70，>= report_min_angle 24.5）→ too_short。
+    {
+        "id": "det_roulette_too_short_near_min",
+        "kind": "detector",
+        "skill": "马赛回旋 Roulette",
+        "config": "shipped",
+        "end_ms": 500,
+        "segments": (
+            ("hold", 0, 96, 0.0, 0.0),
+            ("sweep", 100, 300, 180.0, 248.0, 0.9),
+            ("hold", 404, 500, 0.0, 0.0),
+        ),
+    },
+    # 19. max_angle:120 变体下扫 150° → overshoot。起手 245°（离 180° 差 65，
+    #     正好在容差边界内），逆时针扫到 95°，全程不经过终点窗口。
+    {
+        "id": "det_roulette_overshoot",
+        "kind": "detector",
+        "skill": "马赛回旋 Roulette",
+        "config": "variant:roulette_max_angle_120",
+        "end_ms": 700,
+        "segments": (
+            ("hold", 0, 96, 0.0, 0.0),
+            ("sweep", 100, 500, 245.0, 95.0, 0.9),
+            ("hold", 604, 700, 0.0, 0.0),
+        ),
+    },
+    # 20. 同一段 200° 弧改成逆时针，出厂 direction:any 不锁方向 → ok。
+    #     -20 才是逆时针 200°；写 340 会被线性插值成顺时针 160°。
+    {
+        "id": "det_roulette_direction_any_ccw",
+        "kind": "detector",
+        "skill": "马赛回旋 Roulette",
+        "config": "shipped",
+        "end_ms": 700,
+        "segments": (
+            ("hold", 0, 96, 0.0, 0.0),
+            ("sweep", 100, 500, 180.0, -20.0, 0.9),
+            ("hold", 604, 700, 0.0, 0.0),
         ),
     },
 )
@@ -1040,6 +1325,8 @@ def build_payload(root: Path) -> dict:
             base_dict, "绿色搓射 Green Finesse", timeout_grace_ms=-50),
         "variant:croqueta_absolute": variant(
             base_dict, "油炸丸子 La Croqueta", relative_to_ls=False),
+        "variant:roulette_max_angle_120": variant(
+            base_dict, "马赛回旋 Roulette", max_angle=120),
     }
     variant_diffs = {
         "variant:roulette_cw": "马赛回旋 Roulette: params.direction 'any' → 'cw'",
@@ -1049,6 +1336,8 @@ def build_payload(root: Path) -> dict:
         "variant:green_negative_grace": (
             "绿色搓射 Green Finesse: params.timeout_grace_ms 150 → -50"),
         "variant:croqueta_absolute": "油炸丸子 La Croqueta: relative_to_ls true → false",
+        "variant:roulette_max_angle_120": (
+            "马赛回旋 Roulette: params.max_angle 230 → 120"),
     }
 
     parsed = {
@@ -1059,7 +1348,7 @@ def build_payload(root: Path) -> dict:
     used: dict[str, object] = {}
     cases = []
     seen: set[str] = set()
-    for case in CASES + BOUNDARY_CASES + VARIANT_CASES:
+    for case in CASES + BOUNDARY_CASES + VARIANT_CASES + EXTRA_CASES:
         case_id = case["id"]
         if case_id in seen:
             raise SystemExit(f"✗ 夹具 id 重复：{case_id}")
