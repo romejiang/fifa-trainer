@@ -14,6 +14,9 @@ extends Detector
 ##
 ## 状态成对表示，不用 `-1.0` 当哨兵：`_have_t0` + `_t0`、`_have_release_since` +
 ## `_release_since`。`-1.0` 是合法时间戳，用哨兵会在某些时间轴上变成「真的已建立」。
+##
+## `measured` 只由本类在产生 `Hit` / `Failure` 的那一刻构造（`_measured()`）：两下
+## 间隔、窗口、按键与修饰键都是判定现场的值。UI 不得二次计算，也不得从文案里抠数字。
 
 ## 要连按的键（规范名）。
 var button: String = "X"
@@ -73,6 +76,20 @@ func _required_label() -> String:
 	return "/".join(PackedStringArray(required))
 
 
+## 构造本次判定的结构化度量（JUDGE-05，RESEARCH §D.5 的 Tap 字段表）。
+##
+## 只在产生 `Hit` / `Failure` 的那一刻调用；`interval_ms` 用调用方已经算好的间隔，
+## 窗口与按键来自构造期已校验的值 —— 这里不重算、不解析文案。
+func _measured(interval_ms: float) -> Dictionary:
+	return {
+		"kind": "taps",
+		"interval_ms": interval_ms,
+		"window": {"min_ms": min_ms, "max_ms": max_ms},
+		"button": button,
+		"modifier": required[0] if not required.is_empty() else "",
+	}
+
+
 func _clear(armed: bool) -> void:
 	_have_t0 = false
 	_t0 = 0.0
@@ -101,6 +118,7 @@ func reset() -> void:
 			&"hold_short",
 			"保持不够：中途松开了 %s（两下 %s 之间要一直按住）" % [_required_label(), button],
 			elapsed_ms,
+			_measured(elapsed_ms),
 		))
 	_have_t0 = false
 	_t0 = 0.0
@@ -185,7 +203,7 @@ func update(frame: Frame) -> Hit:
 			var detail := "%s（%s 全程按住）" % [summary, _required_label()]
 			_clear(false)
 			_prev_pressed = pressed
-			return Hit.new(interval_ms, detail, summary)
+			return Hit.new(interval_ms, detail, summary, _measured(interval_ms))
 
 		if interval_ms < min_ms:
 			_emit(Failure.new(
@@ -193,6 +211,7 @@ func update(frame: Frame) -> Hit:
 				"太快了：两下 %s 只隔了 %.0fms（需要 %.0f~%.0fms）"
 					% [button, interval_ms, min_ms, max_ms],
 				interval_ms,
+				_measured(interval_ms),
 			))
 		else:
 			_emit(Failure.new(
@@ -200,6 +219,7 @@ func update(frame: Frame) -> Hit:
 				"太慢了：两下 %s 隔了 %.0fms（需要 %.0f~%.0fms）"
 					% [button, interval_ms, min_ms, max_ms],
 				interval_ms,
+				_measured(interval_ms),
 			))
 		_clear(false)
 		_prev_pressed = pressed
@@ -212,6 +232,7 @@ func update(frame: Frame) -> Hit:
 			"太慢了：等了 %.0fms 还没有第二下 %s（需要在 %.0f~%.0fms 内）"
 				% [interval_ms, button, min_ms, max_ms],
 			interval_ms,
+			_measured(interval_ms),
 		))
 		_clear(false)
 
