@@ -21,7 +21,7 @@
     {
       "number": "4",
       "name": "设备输入层 + 绿色搓射竖切",
-      "status": "pending"
+      "status": "in_progress"
     },
     {
       "number": "5",
@@ -56,8 +56,8 @@
   ],
   "next": {
     "command": "/gsd-progress --next",
-    "label": "Advance to the next step (plan phase 4)",
-    "reason": "Phase 4 of 10 — needs a plan"
+    "label": "Advance to the next step",
+    "reason": "Phase 4 of 10 · 30% · executing"
   },
-  "updated_at": "2026-11-04T20:17:51.385Z"
+  "updated_at": "2026-11-05T01:33:50.076Z"
 }
