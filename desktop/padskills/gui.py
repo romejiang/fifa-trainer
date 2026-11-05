@@ -1848,146 +1848,118 @@ class TrainerApp:
 
     def _draw_skills(self) -> None:
         assert self.engine is not None
-        panel = self.pg.Rect(MARGIN_X, BODY_Y, LEFT_W, GRID_H)
+        pg = self.pg
+        panel = pg.Rect(MARGIN_X, BODY_Y, LEFT_W, GRID_H)
         self._card(panel)
-        self._text("动作熟练度", panel.x + 16, panel.y + 12, 12, MUTED)
-        if self.engine.focus is not None:
-            label = f"专项：{self._short_name(self.engine.focus.skill.name)}"
-            self._text(self._fit(label, 11, 170), panel.right - 16,
-                       panel.y + 13, 11, ACCENT, anchor="topright")
-        else:
-            self._text("开关＝专项", panel.right - 16, panel.y + 14, 10,
-                       FAINT, anchor="topright")
+        self._text("动作熟练度", panel.x + 16, panel.y + 14, 11.5, MUTED,
+                   bold=True)
+        self._text("点按切换 · 1–5", panel.right - 16, panel.y + 15, 10.5,
+                   FAINT, anchor="topright")
 
         skills = self.engine.skills
         n = max(1, len(skills))
-        top = panel.y + 38
-        avail = panel.height - 38 - 14
-        gap = 8 if n <= 4 else 4
-        card_h = int((avail - gap * (n - 1)) / n)
-        card_h = max(30, min(92, card_h))
+        top = panel.y + 40
+        gap = 6
+        avail = panel.height - 40 - 10
+        row_h = int((avail - gap * (n - 1)) / n)
+        row_h = max(52, min(90, row_h))
 
         self._modifier_hits = []
         self._focus_hits = []
         for i, active in enumerate(skills):
-            rect = self.pg.Rect(panel.x + 12, top + i * (card_h + gap),
-                                panel.width - 24, card_h)
-            self._skill_card(active, rect)
+            rect = pg.Rect(panel.x + 8, top + i * (row_h + gap),
+                           panel.width - 16, row_h)
+            self._draw_skill_row(active, rect, i)
 
-    def _skill_card(self, active, rect) -> None:
+    def _draw_skill_row(self, active, rect, index: int) -> None:
+        """一个动作占一行：名字 / 成功数 / 进度条 / 最近一次 / 键帽。"""
         pg = self.pg
-        last = active.last_outcome
         focus = self.engine.focus if self.engine is not None else None
-        focused = focus is active
-        dimmed = focus is not None and not focused
+        selected = focus is active
+        dimmed = focus is not None and not selected
+        hover = rect.collidepoint(self._mouse)
 
-        accent = FAINT
-        if last is not None and not dimmed:
-            accent = GREEN if last.ok else RED
-        if focused:
-            accent = ACCENT
+        # 选中行：3px 蓝色外发光 + 白卡 + 蓝色描边；置灰只改文字颜色
+        if selected:
+            pg.draw.rect(self.screen, ACCENT_SOFT, rect.inflate(6, 6),
+                         border_radius=13)
+        pg.draw.rect(self.screen, HOVER if hover and not selected else CARD,
+                     rect, border_radius=10)
+        if selected:
+            pg.draw.rect(self.screen, BLUE_LINE, rect, border_radius=10,
+                         width=1)
 
-        # 亮色主题下置灰不再用深底：统一白卡，只靠文字颜色区分
-        pg.draw.rect(self.screen, CARD_SOFT if dimmed else CARD, rect,
-                     border_radius=10)
-        pg.draw.rect(self.screen, accent,
-                     pg.Rect(rect.x, rect.y + 10, 4, rect.height - 20),
-                     border_radius=2)
-        if focused:
-            pg.draw.rect(self.screen, ACCENT, rect, border_radius=10, width=2)
+        # 顶行：中文名 + 英文名 / 成功次数 + 本组进度
+        cn, en = self._split_name(self._short_name(active.skill.name))
+        self._text(self._fit(cn, 13.5, rect.width - 150, bold=True),
+                   rect.x + 10, rect.y + 8, 13.5,
+                   MUTED if dimmed else TEXT, bold=True)
+        if en:
+            cn_w = self._fonts.get(13.5, True).size(cn)[0]
+            self._text(self._fit(en, 10.5, rect.width - 150 - cn_w),
+                       rect.x + 15 + cn_w, rect.y + 11, 10.5, FAINT)
 
-        # 每 10 个正确动作一组：进度条只反映本组进度，做满 10 个由引擎清零。
         group = min(active.group_hits, Engine.GROUP_SIZE)
-        rate = 100.0 * group / Engine.GROUP_SIZE
-        rate_color = GREEN if group > 0 and not dimmed else FAINT
+        ratio = f"{group}/{Engine.GROUP_SIZE}"
+        ratio_color = GREEN if group > 0 and not dimmed else FAINT
+        ratio_w = self._fonts.get(13.5, True).size(ratio)[0]
+        self._text(ratio, rect.right - 10, rect.y + 6, 13.5, ratio_color,
+                   bold=True, anchor="topright")
+        self._text(f"成功 {active.hits}", rect.right - 22 - ratio_w,
+                   rect.y + 9, 10.5, MUTED, anchor="topright")
 
-        # 动作多了（用户自己往配置里加）卡片会变矮，按剩余高度决定显示几行
-        small = rect.height < 56
-        name_size = 12 if small else 14
+        # 进度条：本组做满 10 个由引擎清零
+        bar = pg.Rect(rect.x + 10, rect.y + 31, rect.width - 20, 4)
+        pg.draw.rect(self.screen, LINE, bar, border_radius=2)
+        if group > 0:
+            fill_w = max(2, int(bar.width * group / Engine.GROUP_SIZE))
+            self.screen.blit(
+                self._hgrad_surface(fill_w, 4, GREEN_FILL, (59, 226, 124), 2),
+                (bar.x, bar.y))
 
-        # 卡片最左边是"专项练习"开关：打开后其它动作全部置灰、不再参与判定
-        switch = pg.Rect(rect.x + 12, rect.y + (6 if small else 8), 36, 18)
-        self._draw_switch(switch, focused, dimmed)
-        self._focus_hits.append((switch, active))
-
-        name = self._fit(self._short_name(active.skill.name), name_size,
-                         rect.width - 160)
-        self._text(name, switch.right + 8, rect.y + (5 if small else 8),
-                   name_size, FAINT if dimmed else TEXT)
-        # 进度条上方：本次运行累计成功次数 + 大号"本组第几次/10"
-        hits_color = MUTED if dimmed and active.hits > 0 else (
-            TEXT if active.hits > 0 else FAINT)
-        self._text(f"成功 {active.hits}", rect.right - 66,
-                   rect.y + (6 if small else 10), 10, hits_color,
-                   anchor="topright")
-        self._text(f"{group}/{Engine.GROUP_SIZE}",
-                   rect.right - 12, rect.y + (4 if small else 7),
-                   15 if small else 16, rate_color, bold=True, anchor="topright")
-
-        # 可选修饰键（绿色搓射：RB / RT）。画在卡片右下角，点一下就切换；
-        # 选中的键用填充色高亮。状态文字要为它让出宽度，避免叠在一起。
+        # 右侧键帽：数字键（专项）+ 可点的修饰键；行高太矮时不画
+        keys_w = 0
         options = tuple(active.skill.params.get("modifier_options") or ())
-        selected = (active.skill.required_buttons[0]
-                    if active.skill.required_buttons else None)
-        reserve = 0
-        if len(options) > 1 and rect.height >= 50:
-            chip_font = self._fonts.get(10, True)
-            widths = [max(28, chip_font.size(opt)[0] + 14) for opt in options]
-            total = sum(widths) + 4 * (len(options) - 1)
-            x = rect.right - 12 - total
-            y = rect.bottom - 23
-            reserve = total + 10
-            for opt, width in zip(options, widths):
-                on = opt == selected
-                chip = pg.Rect(x, y, width, 18)
-                pg.draw.rect(self.screen, ACCENT if on else LINE,
-                             chip, border_radius=9)
-                self._text(opt, chip.centerx, chip.y + 2, 10,
-                           CARD if on else MUTED, bold=on, anchor="midtop")
-                self._modifier_hits.append((chip, active, opt))
-                x += width + 4
+        if rect.height >= 60:
+            key_y = rect.bottom - 27
+            num_x = rect.right - 10 - 22
+            self._kbd(num_x, key_y, str(index + 1), active=selected)
+            keys_w = 22 + 4
+            if len(options) > 1:
+                widths = [max(22, self._fonts.get(10, True).size(opt)[0] + 10)
+                          for opt in options]
+                total = sum(widths) + 4 * (len(options) - 1)
+                x = num_x - 4 - total
+                for opt, width in zip(options, widths):
+                    on = bool(active.skill.required_buttons) \
+                        and active.skill.required_buttons[0] == opt
+                    key_rect = self._kbd(x, key_y, opt, active=on, w=width)
+                    self._modifier_hits.append((key_rect, active, opt))
+                    x += width + 4
+                keys_w += 4 + total
 
-        if not small:
-            bar_x, bar_y = rect.x + 14, rect.y + 34
-            bar_w = rect.width - 28
-            pg.draw.rect(self.screen, LINE, pg.Rect(bar_x, bar_y, bar_w, 5),
-                         border_radius=3)
-            if rate > 0:
-                pg.draw.rect(self.screen, rate_color,
-                             pg.Rect(bar_x, bar_y, int(bar_w * rate / 100.0), 5),
-                             border_radius=3)
-
-        if rect.height >= 68 and not dimmed:
-            # 正在做这个动作时优先显示实时进度（"保持 210/350ms"、"方向不对…"），
-            # 这是排查"为什么识别不到"最直接的线索；否则显示最近一次结果。
-            status = active.detector.status()
-            if status and status != "待机":
-                self._text(self._fit(status, 11, rect.width - 28 - reserve),
-                           rect.x + 14, rect.y + 50, 11, ACCENT)
-            elif last is not None:
-                if last.ok:
-                    # √ / × 用的是中文标点区里的字符，雅黑/苹方都有，
-                    # 不会像 ✓ / ✗ 那样显示成方块
-                    detail, color = f"最近 √ {last.elapsed_ms:.0f}ms", GREEN
-                else:
-                    label = Detector.FAILURE_LABELS.get(last.code, last.code)
-                    detail, color = f"最近 × {label}", RED
-                self._text(self._fit(detail, 11, rect.width - 28 - reserve),
-                           rect.x + 14, rect.y + 50, 11, color)
-
-    def _draw_switch(self, rect, on: bool, dimmed: bool) -> None:
-        """卡片左边的专项练习开关。命中区由 _skill_card 记录。"""
-        pg = self.pg
-        if on:
-            track, knob = ACCENT, CARD
-        elif dimmed:
-            track, knob = LINE, LINE_STRONG
+        # 底行：实时状态 > 最近一次结果 > 还没有成功记录
+        text_w = rect.width - 20 - keys_w
+        base_y = rect.bottom - 26
+        status = active.detector.status()
+        if status and status != "待机":
+            self._text(self._fit(status, 10.5, text_w), rect.x + 10, base_y,
+                       10.5, FAINT if dimmed else ACCENT)
+        elif active.last_outcome is not None:
+            last = active.last_outcome
+            color = FAINT if dimmed else (GREEN if last.ok else RED)
+            self._mark(rect.x + 10, base_y + 1, 10, last.ok, color, 2)
+            if last.ok:
+                detail = f"最近 {last.elapsed_ms:.0f}ms"
+            else:
+                label = Detector.FAILURE_LABELS.get(last.code, last.code)
+                detail = f"最近 · {label}"
+            self._text(self._fit(detail, 10.5, text_w - 14), rect.x + 23,
+                       base_y, 10.5, color)
         else:
-            track, knob = LINE_STRONG, CARD
-        pg.draw.rect(self.screen, track, rect, border_radius=rect.height // 2)
-        knob_r = rect.height // 2 - 2
-        cx = (rect.right - rect.height // 2) if on else (rect.x + rect.height // 2)
-        pg.draw.circle(self.screen, knob, (cx, rect.centery), knob_r)
+            self._text("还没有成功记录", rect.x + 10, base_y, 10.5, FAINT)
+
+        self._focus_hits.append((rect, active))
 
     # -- 中央：最近一次结果 --------------------------------------------
 
@@ -1995,31 +1967,51 @@ class TrainerApp:
         pg = self.pg
         assert self.engine is not None
         panel = pg.Rect(RIGHT_X, BODY_Y, RIGHT_W, DETAIL_H)
-        self._card(panel)
-
         outcome = self.engine.last_outcome
-        self._text("最近一次", panel.x + 24, panel.y + 14, 12, MUTED)
 
         if outcome is None:
-            self._text("等待第一次尝试", panel.x + 24, panel.y + 64,
-                       26, TEXT, bold=True)
+            self._card(panel)
+            self._check_circle(panel.x + 48, panel.y + 44, 26, "idle")
+            self._text("等待第一次尝试", panel.x + 90, panel.y + 18, 24, TEXT,
+                       bold=True)
+            self._chip(panel.x + 90, panel.y + 54, "等待尝试", FAINT,
+                       (242, 242, 245), size=11.5)
             self._text("推右摇杆做出动作；做对了会震一下。",
-                       panel.x + 26, panel.y + 108, 15, MUTED)
+                       panel.x + 22, panel.y + 96, 14, TEXT_SOFT)
             self._text("失败不会震，只会在这里告诉你差在哪儿。",
-                       panel.x + 26, panel.y + 134, 13, FAINT)
+                       panel.x + 22, panel.y + 121, 12.5, MUTED)
             return
 
         ok = outcome.ok
-        color = GREEN if ok else RED
-        title = "做对了" if ok else "没做对"
+        if ok:
+            self._gradient_card(panel, (243, 254, 248), CARD, 14, GREEN_LINE)
+        else:
+            self._gradient_card(panel, (255, 247, 241), CARD, 14, RED_LINE)
+        self._check_circle(panel.x + 48, panel.y + 44, 26,
+                           "ok" if ok else "fail")
 
-        self._mark(panel.x + 22, panel.y + 36, 56, ok, color)
-        self._text(self._short_name(outcome.skill_name),
-                   panel.x + 96, panel.y + 40, 25, TEXT, bold=True)
-        self._text(title, panel.x + 97, panel.y + 76, 15, color)
-        self._text(f"{outcome.elapsed_ms:.0f} ms",
-                   panel.right - 24, panel.y + 40, 18, MUTED,
-                   anchor="topright")
+        cn, en = self._split_name(self._short_name(outcome.skill_name))
+        title_x = panel.x + 90
+        self._text(cn, title_x, panel.y + 18, 24, TEXT, bold=True)
+        if en:
+            cn_w = self._fonts.get(24, True).size(cn)[0]
+            self._text(en, title_x + cn_w + 8, panel.y + 34, 12, FAINT)
+        if ok:
+            self._chip(title_x, panel.y + 54, "做对了", GREEN_DEEP, GREEN_SOFT,
+                       size=11.5)
+        else:
+            self._chip(title_x, panel.y + 54, "没做对", RED, RED_SOFT,
+                       size=11.5)
+
+        # 右侧毫秒数 + 单位
+        unit_x = panel.right - 22
+        self._text("ms", unit_x, panel.y + 36, 11, MUTED, anchor="topright")
+        unit_w = self._fonts.get(11).size("ms")[0]
+        self._text(f"{outcome.elapsed_ms:.0f}", unit_x - unit_w - 3,
+                   panel.y + 22, 22, TEXT, bold=True, anchor="topright")
+
+        pg.draw.line(self.screen, LINE, (panel.x + 22, panel.y + 84),
+                     (panel.right - 22, panel.y + 84), 1)
 
         if ok:
             body = "动作识别成功，手柄已经震动过了。"
@@ -2031,14 +2023,14 @@ class TrainerApp:
             advice = _ADVICE.get(outcome.code, "再试一次，注意动作的起手和收尾。")
             advice_color = AMBER
 
-        y = panel.y + 122
-        for line in self._wrap(body, 17, panel.width - 48)[:2]:
-            self._text(line, panel.x + 24, y, 17, TEXT)
-            y += 26
-
+        y = panel.y + 96
+        for line in self._wrap(body, 14, panel.width - 44)[:2]:
+            self._text(line, panel.x + 22, y, 14, TEXT_SOFT)
+            y += 21
         if advice:
-            self._text(self._fit(advice, 13, panel.width - 48),
-                       panel.x + 24, panel.y + 186, 13, advice_color)
+            self._text(self._fit(advice, 12.5, panel.width - 44, bold=True),
+                       panel.x + 22, panel.y + 150, 12.5, advice_color,
+                       bold=True)
 
     # -- 中央：最近几次 -------------------------------------------------
 
@@ -2046,63 +2038,70 @@ class TrainerApp:
         pg = self.pg
         panel = pg.Rect(RIGHT_X, ATTEMPTS_Y, RIGHT_W, ATTEMPTS_H)
         self._card(panel)
-        self._text("最近的尝试", panel.x + 20, panel.y + 10, 12, MUTED)
+        self._text("最近的尝试", panel.x + 16, panel.y + 12, 11.5, MUTED,
+                   bold=True)
         if self.history:
-            hint = f"滚轮滚动 · 保留最近 {len(self.history)}/50 条"
-            self._text(hint, panel.right - 20, panel.y + 10, 10, FAINT,
+            meta = f"滚轮滚动 · 保留最近 {len(self.history)}/50 条"
+            self._text(meta, panel.right - 16, panel.y + 13, 10.5, FAINT,
                        anchor="topright")
 
         if not self.history:
-            self._text("还没有记录。", panel.x + 20, panel.y + 46, 13, FAINT)
+            self._icon_clock(panel.centerx, panel.y + 70, 24, (194, 194, 200))
+            self._text("暂无尝试记录，做对一个动作后会出现在这里。",
+                       panel.centerx, panel.y + 92, 11.5, FAINT,
+                       anchor="midtop")
             return
 
         max_off = max(0, len(self.history) - self._HISTORY_ROWS)
         self.history_scroll = max(0, min(max_off, self.history_scroll))
 
-        # 一行一条：左边是动作（时间 / ✓✗ / 名称），右边是详情
-        # （毫秒 + 旋转角度或失败原因），成功灰色、失败红色。
-        row_h = 26
-        top = panel.y + 32
+        # 一行一条：时间 / 对勾叉 / 动作名 / 毫秒 + 说明，成功灰、失败红
+        row_h = 28
+        top = panel.y + 42
         for i in range(self._HISTORY_ROWS):
             idx = self.history_scroll + i
             if idx >= len(self.history):
                 break
             stamp, outcome = self.history[idx]
             y = top + i * row_h
+            row = pg.Rect(panel.x + 8, y, panel.width - 22, row_h)
+            if row.collidepoint(self._mouse):
+                pg.draw.rect(self.screen, HOVER, row, border_radius=8)
             color = GREEN if outcome.ok else RED
-            self._text(stamp, panel.x + 20, y + 4, 10, FAINT)
-            self._mark(panel.x + 74, y + 2, 12, outcome.ok, color, 2)
-            name = self._fit(self._short_name(outcome.skill_name), 12, 150)
-            self._text(name, panel.x + 92, y + 2, 12, TEXT)
+            self._text(stamp, panel.x + 16, y + 8, 10.5, FAINT)
+            self._mark(panel.x + 80, y + 9, 11, outcome.ok, color, 2)
+            name = self._fit(self._short_name(outcome.skill_name), 12, 220)
+            self._text(name, panel.x + 100, y + 7, 12, TEXT)
 
-            # 详情从动作名右边开始排，右对齐到面板边缘；空间够就不截断
-            name_w = self._fonts.get(12, False).size(name)[0]
-            detail_x = panel.x + 92 + name_w + 14
-            detail_w = max(120, panel.right - 20 - detail_x)
-            detail = f"{outcome.elapsed_ms:.0f} ms"
+            ms = f"{outcome.elapsed_ms:.0f} ms"
             if outcome.ok:
-                if outcome.detail:
-                    detail += f" · {outcome.detail}"
-                detail_color = MUTED
+                cue = outcome.detail
+                cue_color = MUTED
             else:
-                message = outcome.message or Detector.FAILURE_LABELS.get(
+                cue = outcome.message or Detector.FAILURE_LABELS.get(
                     outcome.code, outcome.code)
-                detail += f" · {message}"
-                detail_color = RED
-            self._text(self._fit(detail, 10, detail_w),
-                       panel.right - 20, y + 4, 10, detail_color,
+                cue_color = RED
+            cue_x = panel.right - 16
+            if cue:
+                cue = self._fit(cue, 10, 230)
+                cue_w = self._fonts.get(10).size(cue)[0]
+                self._text(cue, cue_x, y + 8, 10, cue_color,
+                           anchor="topright")
+                cue_x -= cue_w + 9
+            self._text(ms, cue_x, y + 6, 11.5, TEXT, bold=True,
                        anchor="topright")
 
         if len(self.history) > self._HISTORY_ROWS:
-            track_x = panel.right - 8
+            track_x = panel.right - 7
             track_top = top
             track_h = self._HISTORY_ROWS * row_h - 4
             thumb_h = max(16, int(track_h * self._HISTORY_ROWS / len(self.history)))
             span = max(1, max_off)
             thumb_y = track_top + int((track_h - thumb_h) * self.history_scroll / span)
-            pg.draw.rect(self.screen, LINE,
-                         pg.Rect(track_x, track_top, 3, track_h), border_radius=2)
-            pg.draw.rect(self.screen, ACCENT,
+            pg.draw.rect(self.screen, LINE_STRONG,
+                         pg.Rect(track_x, track_top, 3, track_h),
+                         border_radius=2)
+            pg.draw.rect(self.screen, (210, 210, 216),
                          pg.Rect(track_x, thumb_y, 3, thumb_h), border_radius=2)
 
     # -- 底部：摇杆可视化 + 快捷键 --------------------------------------
