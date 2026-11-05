@@ -2,18 +2,18 @@
 gsd_state_version: "1.0"
 current_phase: 5
 current_phase_name: 全动作判定对等性 — 三类检测器 + 引擎仲裁 + 抽稀矩阵
-current_plan: 3
+current_plan: 4
 status: executing
-stopped_at: Completed 05-02-PLAN.md
-last_updated: "2026-11-05T18:37:00.000Z"
+stopped_at: Completed 05-03-PLAN.md
+last_updated: "2026-11-05T19:21:18.000Z"
 last_activity: 2026-11-06
-last_activity_desc: Phase 5 plan 02 complete — 55 条手势语料全绿，四次变异验证通过
-state_head: ec7f35e5da2a5e83441eed80bb277519a74f444b
+last_activity_desc: Phase 5 plan 03 complete — 多技能 GestureEngine + 29 条仲裁语料，三次变异验证通过
+state_head: cd9126f605fb7b850554f9cc735452ca2b6f34eb
 progress:
   total_phases: 10
   completed_phases: 4
   total_plans: 34
-  completed_plans: 28
+  completed_plans: 29
   percent: 40
 ---
 
@@ -28,21 +28,21 @@ See: .planning/PROJECT.md (updated 2026-11-04)
 
 ## Current Position
 
-Current Plan: 3
+Current Plan: 4
 Total Plans in Phase: 7
 Phase: 5 (全动作判定对等性 — 三类检测器 + 引擎仲裁 + 抽稀矩阵) — EXECUTING
-Plan: 3 of 7
+Plan: 4 of 7
 Status: Executing Phase 5
-Last activity: 2026-11-06 — 05-02 完成：55 条检测器语料 + 四次变异验证
+Last activity: 2026-11-06 — 05-03 完成：多技能 GestureEngine + 29 条仲裁语料 + 三次变异验证
 
 Progress: [████░░░░░░] 40%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 28
+- Total plans completed: 29
 - Average duration: — min
-- Total execution time: 1.4 hours
+- Total execution time: 2.1 hours
 
 **By Phase:**
 
@@ -52,6 +52,7 @@ Progress: [████░░░░░░] 40%
 | 2 | 5 | - | - |
 | 3 | 6 | - | - |
 | 4 | 11 | - | - |
+| 5 | 3 | - | - |
 
 **Recent Trend:**
 - Last 5 plans: —
@@ -90,6 +91,7 @@ Progress: [████░░░░░░] 40%
 | Phase 4 P11 | 18min | 2 tasks | 16 files |
 | Phase 5 P01 | 14min | 3 tasks | 16 files |
 | Phase 5 P02 | 13min | 3 tasks | 4 files |
+| Phase 5 P03 | 43min | 3 tasks | 12 files |
 
 ## Accumulated Context
 
@@ -285,6 +287,11 @@ Recent decisions affecting current work:
 - [Phase 4]: 04-11：默认 `scale=1.0 / center=0` 与「真的推到 ±1.0」在数值上不可区分，所以不能靠校准数值识别默认校准 —— 只能靠保存时量程是否真的推满
 - [Phase 4]: 04-11：诊断覆盖层按 Y 调 `ProfileStore.clear()`（只删 `user://profiles/controllers.json`、不存在视为成功、`res://` 返回 ERR_UNAUTHORIZED）并发信号回设置页；覆盖层从「只读」变为「正常渲染只读，唯一例外是 Y 清除」
 
+- [Phase 5]: TapRuntime 只做「一个技能 → 单技能 AppConfig」的参数翻译，tick/_record/status 全部继承 GestureEngine；Phase 4 的 19 套件 / 2044 条断言零改动全绿，是机制替换不改变行为的机械证明
+- [Phase 5]: 手势锁的 ±4ms 在 4ms 网格 + 「解锁帧必须回中」下不可直接表示：右摇杆 ≥ RELEASE_STICK 会清零计时，实测边界是 148ms（永不解锁）对 156ms（解锁帧之后再推）
+- [Phase 5]: `rt_lock_hold_no_recenter` 在拆掉 `_gesture_locked` 后仍绿（ArcDetector 自己的 armed=false 已挡住第二段弧）；锁的具名红色见证改用 `rt_lock_release_150_minus_4`
+- [Phase 5]: `_drain_failures` 必须遍历全部技能取走 pending、只记配置顺序第一个 owner；`rt_failure_owner_config_order` 用同帧的马赛 wrong_start + 磕球 too_slow 钉死没有 break
+
 ### Pending Todos
 
 None yet.
@@ -322,6 +329,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-11-05T18:37:00.000Z
-Stopped at: Completed 05-02-PLAN.md
+Last session: 2026-11-05T19:21:18.000Z
+Stopped at: Completed 05-03-PLAN.md
 Resume file: None

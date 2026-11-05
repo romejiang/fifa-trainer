@@ -197,7 +197,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] 05-02-PLAN.md — 检测器语料扩到 52+ 条（实际 55）：六类边界 + 变体配置 + 反向对照 + 四次变异验证
 
 **Wave 3** *(blocked on Wave 2 completion)*
-- [ ] 05-03-PLAN.md — `GestureEngine` + `ActiveSkill` + `TapRuntime` 子类 + 29 条引擎语料（`GESTURE_RUNTIME`）
+- [x] 05-03-PLAN.md — `GestureEngine` + `ActiveSkill` + `TapRuntime` 子类 + 29 条引擎语料（`GESTURE_RUNTIME`）
 
 **Wave 4** *(blocked on Wave 3 completion)*
 - [ ] 05-04-PLAN.md — `measured{}` 全链（三检测器 + `Outcome`）+ `test_measured`（`MEASURED`）
@@ -311,7 +311,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 →
 | 2. 安卓工具链 + 真机冒烟 APK | 5/5 | Complete    | 2026-11-05 |
 | 3. 纯核心地基 | 6/6 | Complete    | 2026-11-05 |
 | 4. 设备输入层 + 绿色搓射竖切 | 11/11 | Complete    | 2026-11-06 |
-| 5. 全动作判定对等性 | 1/7 | In progress | - |
+| 5. 全动作判定对等性 | 3/7 | In progress | - |
 | 6. 训练循环 | 0/0 | Not started | - |
 | 7. 反馈呈现 | 0/0 | Not started | - |
 | 8. 长期使用韧性 | 0/0 | Not started | - |
