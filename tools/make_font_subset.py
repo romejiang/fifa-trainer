@@ -35,12 +35,17 @@ from typing import Dict, List, Optional
 #   desktop/padskills/gui.py       —— _ADVICE 里的失败建议文案
 #   desktop/padskills/detectors.py —— FAILURE_LABELS 的失败短标签
 #   mobile/src/smoke/*             —— 首屏验收面板本身（最长中文串 / 符号 / 轴读数）
+#   mobile/src/ui/*                —— 组合根与引导屏（练习屏在 04-06 加入）
 CHAR_SOURCES = (
     Path("shared") / "skills_config.json",
     Path("desktop") / "padskills" / "gui.py",
     Path("desktop") / "padskills" / "detectors.py",
     Path("mobile") / "src" / "smoke" / "smoke_screen.gd",
     Path("mobile") / "src" / "smoke" / "smoke_screen.tscn",
+    Path("mobile") / "src" / "ui" / "main.gd",
+    Path("mobile") / "src" / "ui" / "main.tscn",
+    Path("mobile") / "src" / "ui" / "onboarding_screen.gd",
+    Path("mobile") / "src" / "ui" / "onboarding_screen.tscn",
 )
 
 # 成功标准 2 写死的五个符号。它们不必出现在源文件里，但必须进子集。
@@ -89,12 +94,47 @@ def repo_root() -> Path:
     return Path(__file__).resolve().parent.parent
 
 
+def assert_ui_sources_registered(root: Path) -> None:
+    """``mobile/src/ui`` 下的每个 ``.gd`` / ``.tscn`` 都必须登记在 CHAR_SOURCES 里。
+
+    为什么需要这条断言：CHAR_SOURCES 是闭世界的硬编码元组。新 UI 文件忘了登记时，
+    清单与子集彼此自洽、``glyph_coverage.gd`` 照旧 ``GLYPH_OK``，真机上却是豆腐 ——
+    这正是本阶段唯一一处「闸门假绿」。把「忘了登记」变成一条会失败的断言，
+    才谈得上闭世界。
+
+    本函数由 ``collect_chars()`` 的第一句调用，所以 ``sync()`` 与 ``--check`` 两条
+    路径都必然执行；只挂在 ``sync()`` 里会让 ``--check`` 继续假绿。
+    """
+    ui_dir = root / "mobile" / "src" / "ui"
+    if not ui_dir.is_dir():
+        return
+    registered = {rel.as_posix() for rel in CHAR_SOURCES}
+    missing: List[str] = []
+    for path in sorted(ui_dir.rglob("*")):
+        if not path.is_file() or path.suffix not in (".gd", ".tscn"):
+            continue
+        rel = path.relative_to(root).as_posix()
+        if rel not in registered:
+            missing.append(rel)
+    if not missing:
+        return
+    lines = "\n".join(f"  ✗ {rel}" for rel in missing)
+    raise SystemExit(
+        "✗ mobile/src/ui 下有未登记进 CHAR_SOURCES 的文件：\n"
+        f"{lines}\n"
+        "新 UI 文件必须先登记进 CHAR_SOURCES，再运行本脚本重生成清单与子集；"
+        "否则字形闸门会在真机豆腐时保持绿色。"
+    )
+
+
 def collect_chars(root: Path) -> List[str]:
     """从全部字符来源里推导必需字符集（按码点排序、去重）。
 
     缺任何一个来源都直接报错：悄悄少扫一个文件，清单就会少字，而闸门对着
     少字的清单照样报绿 —— 那正是本脚本存在的原因。
     """
+    # 先证明闭世界没有缺口，再谈扫描：未登记的 UI 文件会让清单少字。
+    assert_ui_sources_registered(root)
     chars = set(EXTRA_SYMBOLS)
     chars.update(ASCII_PRINTABLE)
     for rel in CHAR_SOURCES:
