@@ -204,4 +204,14 @@ if ! grep -qE '^GESTURE_RUNTIME cases=(29|[3-9][0-9]|[1-9][0-9]{2,}) mismatches=
 fi
 echo "✓ 引擎回放：$(grep -E '^GESTURE_RUNTIME ' "$tmp/tests.log")"
 
-echo "✓ 核心闸门通过：配置一致、边界干净、黄金未漂移、tap 回放一致、运行时判定一致、核心套件全绿"
+# 结构化度量（JUDGE-05）的正向哨兵：桌面参考不产出 measured，因此它没有跨语言
+# oracle —— 只能由已知轨迹的独立断言证明。阈值 12 与套件 `_cases` 的下限是同一个
+# 数字：手删任何一组，套件自己先红，这里再兜一层「哨兵缺失 / mismatches 非 0」。
+if ! grep -qE '^MEASURED cases=(1[2-9]|[2-9][0-9]|[1-9][0-9]{2,}) mismatches=0$' "$tmp/tests.log"; then
+    echo "✗ 没有 MEASURED cases=N（≥12）mismatches=0（结构化度量未被独立断言，或字段算错）" >&2
+    grep -E '^MEASURED ' "$tmp/tests.log" >&2 || true
+    exit 1
+fi
+echo "✓ 结构化度量：$(grep -E '^MEASURED ' "$tmp/tests.log")"
+
+echo "✓ 核心闸门通过：配置一致、边界干净、黄金未漂移、tap 回放一致、运行时判定一致、结构化度量一致、核心套件全绿"

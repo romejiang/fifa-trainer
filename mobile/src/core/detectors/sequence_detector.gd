@@ -443,8 +443,9 @@ func update(frame: Frame) -> Hit:
 	neutral = false
 	# 记录**完成**这一步的时刻。纯增量：只有 measured.steps[].t_done_ms 读它，
 	# 任何判定分支都不读（T-05-15）。写在 `index += 1` 的同一处，语义是「刚完成
-	# 的是上一索引那一步」。
-	_step_t[index - 1] = now
+	# 的是上一索引那一步」。`Frame.now` 是秒，而字段对外承诺毫秒（`t_done_ms`），
+	# 换算只在这里做一次 —— 存秒会让下游每个消费者都可能漏乘 1000。
+	_step_t[index - 1] = now * 1000.0
 	_have_step_t = true
 	# 保持时长要在清零前取出来，否则成功摘要里永远是 0ms。
 	var fired_hold_ms := _best_hold_ms if step.hold_ms > 0.0 else 0.0
