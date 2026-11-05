@@ -4,16 +4,16 @@ current_phase: 4
 current_phase_name: 设备输入层 + 绿色搓射竖切
 status: executing
 stopped_at: 04-09 单页输入设置已交付（新 APK 27,067,065 B）— 首启不再有四步探针；D0–D6 仍待 04-07 用新包重走
-last_updated: "2026-11-05T13:58:00.000Z"
-last_activity: 2026-11-05
-last_activity_desc: 04-09 完成：InputSetup 纯逻辑 + 一页式 input_setup_screen + 组合根换首启路径 + 重建 APK；扳机静止值改为观测最小值
-state_head: 9cff008
+last_updated: "2026-11-05T16:36:26.519Z"
+last_activity: "2026-11-06 — 完成 quick task 261105-wi7：桌面版 UI 改为 design/desktop.html 的亮色风格（f7eba38）"
+state_head: f7eba38e98f924597cc376c855dd75a4a2f8d0f6
 progress:
   total_phases: 10
   completed_phases: 3
   total_plans: 24
   completed_plans: 24
   percent: 32
+last_activity_desc: 04-09 完成：InputSetup 纯逻辑 + 一页式 input_setup_screen + 组合根换首启路径 + 重建 APK；扳机静止值改为观测最小值
 ---
 
 # Project State
@@ -30,7 +30,7 @@ See: .planning/PROJECT.md (updated 2026-11-04)
 Phase: 4 (设备输入层 + 绿色搓射竖切) — 代码侧已收口，真机清单未闭合
 Plan: 9 of 9（04-01…04-06、04-08、04-09 完成；04-07 是 Wave 9 的真机走查，两次尝试都失败）
 Status: Blocked — 04-09 已把首启路径换成单页输入设置并重建 APK；等 04-07 用新包重走 D0–D6
-Last activity: 2026-11-05 21:35–21:56 — 04-09：`InputSetup` 纯逻辑 + 一页式 `input_setup_screen` + 组合根换首启路径；扳机静止值改为观测到的最小值；新 APK 27,067,065 B（证书不变）
+Last activity: 2026-11-06 — Completed quick task 261105-wi7: 桌面版 UI 改为 design/desktop.html 的亮色风格（f7eba38）
 
 Progress: [███░░░░░░░] 32%
 
@@ -281,6 +281,12 @@ None yet.
 - 引导状态机与组合根已在无头环境证明（04-05：14 套件 / 1175 断言 / main 场景 30 帧启动无错）；真机首启零触摸走完（D0）与断连重探（D2）仍在 04-07
 - 帧内反转的事件捕获已在无头层证明（04-04：同帧右→左→右三条 motion 事件全部保留）；真机 `events_motion` / `events_button` / `poll_edges` 的解释与 Δt p95 ≤ 20 ms 仍在 04-07（D5/D6），INPUT-05 不得提前勾选
 - `PadSampler._input` 是否在主线程未验证（M3）：`input_thread_id` / `process_thread_id` 已暴露，跨线程时在 `src/input/` 加一把 Mutex 即可
+
+### Quick Tasks Completed
+
+| # | Description | Date | Commit | Directory |
+|---|-------------|------|--------|-----------|
+| 261105-wi7 | 桌面版 UI 改为 design/desktop.html 的亮色风格 | 2026-11-06 | f7eba38 | [261105-wi7-ui-design-desktop-html-desktop-padskills](./quick/261105-wi7-ui-design-desktop-html-desktop-padskills/) |
 
 ## Deferred Items
 
