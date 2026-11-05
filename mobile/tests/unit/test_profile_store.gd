@@ -23,6 +23,7 @@ func run(r) -> void:
 	_check_one_bad_entry_discards_all(r)
 	_check_upsert_stamps_time(r)
 	_check_missing_file_is_quiet(r)
+	_check_clear(r)
 	_clean()
 	r.complete()
 
@@ -168,6 +169,25 @@ func _check_missing_file_is_quiet(r) -> void:
 		"文件不存在时错误码必须是 OK（实际 %d）" % int(loaded["error"]))
 	var profiles: Dictionary = loaded["profiles"]
 	r.check(profiles.is_empty(), "文件不存在时必须返回空档案")
+
+
+## 清除：只删目标文件、幂等；`res://` 路径必须先被守卫拦下（T-04-23）。
+func _check_clear(r) -> void:
+	_clean()
+	var store := _store()
+	r.check(store.save_all({_profile().key: _profile()}) == OK, "前置：先写一份档案")
+	r.check(FileAccess.file_exists(TEST_PROFILES), "前置：档案文件存在")
+	r.check(store.clear() == OK, "clear() 必须成功")
+	r.check(not FileAccess.file_exists(TEST_PROFILES), "clear() 之后文件必须不存在")
+	r.check(store.clear() == OK, "文件不存在时 clear() 仍然是 OK（幂等）")
+	r.check(not FileAccess.file_exists(TEST_PROFILES + ProfileStore.TEMP_SUFFIX),
+		"clear() 不得留下 .tmp")
+
+	var guarded := ProfileStore.new(FORBIDDEN_PATH)
+	r.check(guarded.clear() == ERR_UNAUTHORIZED,
+		"res:// 路径的 clear() 必须返回 ERR_UNAUTHORIZED")
+	r.check(not FileAccess.file_exists(FORBIDDEN_PATH),
+		"守卫失败后不得创建或删除任何 res:// 文件")
 
 
 func _store() -> ProfileStore:
