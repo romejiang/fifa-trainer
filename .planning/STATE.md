@@ -3,17 +3,17 @@ gsd_state_version: "1.0"
 current_phase: 4
 current_phase_name: 设备输入层 + 绿色搓射竖切
 status: executing
-stopped_at: Completed 04-01-PLAN.md
-last_updated: "2026-11-05T09:24:50.000Z"
+stopped_at: Completed 04-02-PLAN.md
+last_updated: "2026-11-05T09:38:00.000Z"
 last_activity: 2026-11-05
-last_activity_desc: 04-01 tap 检测器移植 + 黄金回放完成
-state_head: 26e565606711e38c42aae3acc3a600842e285150
+last_activity_desc: 04-02 TapRuntime 引擎子集 + 布局硬门 + 运行时回放完成
+state_head: ea99cadd18b9379d515239c4274dcd6846f4ba06
 progress:
   total_phases: 10
   completed_phases: 3
   total_plans: 23
-  completed_plans: 17
-  percent: 30
+  completed_plans: 18
+  percent: 31
 ---
 
 # Project State
@@ -28,16 +28,16 @@ See: .planning/PROJECT.md (updated 2026-11-04)
 ## Current Position
 
 Phase: 4 (设备输入层 + 绿色搓射竖切) — EXECUTING
-Plan: 2 of 7
+Plan: 3 of 7
 Status: Executing Phase 4
-Last activity: 2026-11-05 — 04-01 tap 检测器移植 + 黄金回放完成
+Last activity: 2026-11-05 — 04-02 TapRuntime 引擎子集 + 布局硬门 + 运行时回放完成
 
-Progress: [███░░░░░░░] 30%
+Progress: [███░░░░░░░] 31%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 17
+- Total plans completed: 18
 - Average duration: — min
 - Total execution time: 0.9 hours
 
@@ -75,6 +75,7 @@ Progress: [███░░░░░░░] 30%
 | Phase 3 P05 | 4min | 3 tasks | 6 files |
 | Phase 3 P06 | 3min | 3 tasks | 12 files |
 | Phase 4 P01 | 5min | 2 tasks | 16 files |
+| Phase 4 P02 | 10min | 3 tasks | 12 files |
 
 ## Accumulated Context
 
@@ -192,6 +193,13 @@ Recent decisions affecting current work:
 - [Phase 4]: 4ms 网格上取不到 450ms / 750ms：`det_success_mid_450` 用 448、`det_too_slow_boundary_750` 尾巴停在 748；超时严格大于由 752 的用例证明
 - [Phase 4]: `elapsed_ms` 的整性判据用 1e-6 容差 + `round()`，不用 `float.is_integer()`：`(548/1000 - 100/1000)*1000` 会带 1e-13 噪声
 - [Phase 4]: 正向哨兵 `TAP_GOLDEN_DETECTOR cases=N mismatches=0` 必须打印在 `r.complete()` 之前；`cases` 是实际回放的 detector 条数，`mismatches` 只统计真实比较差异
+- [Phase 4]: `layout_confirmed == false` 是 `TapRuntime.tick()` 的第一早退（在手势锁之前）；撤销确认调 `abandon()` 静默清场，断连不产 `too_slow` / `hold_short`
+- [Phase 4]: 结果用 `Array[Outcome]` 队列 + `pop_outcomes()` 全量 drain + 单调 `seq`；Python 的 `last_outcome` 会吞掉同帧第一条
+- [Phase 4]: 逐动作冷却吞掉时静默、全局冷却吞掉时 `suppressed += 1`；两个分支各有一条可达时序（900ms / 1000ms 合成运行时），不互相冒充
+- [Phase 4]: 运行时 counters 只从唯一的 `kind == "taps"` ActiveSkill 读；真实配置把绿色搓射排在最后，按 `skills[0]` 取永远是 0
+- [Phase 4]: 结构断言必须展开成逐帧 4ms 时间轴；稀疏变化点会让手势锁 / 重新武装的计时器永远等不到阈值
+- [Phase 4]: 新增的反向断言都要做一次变异验证（删锁 / 删门 / 改 suppressed），证明它真的会因为缺陷变红，而不是真空绿
+- [Phase 4]: `TAP_GOLDEN_RUNTIME cases=6 mismatches=0` 与 `TAP_GOLDEN_DETECTOR` 并列做正向哨兵；第 5 条反例 fixture_missing 用 sha256 证明夹具原样还原
 
 ### Pending Todos
 
@@ -207,6 +215,8 @@ None yet.
 - 干净 clone 的首次 `--import` 观察到 1/5 的段错误（`reimport | NotoSansSC-Subset.ttf`），4 次复跑全绿；**不加重试**，
   若在别的机器上高频率复现，先查 Godot 4.7.2 的字体导入线程崩溃，不要改闸门
 - `set_use_accumulated_input(false)` 在安卓上是否真的产生亚帧时间戳未验证（Phase 4 真机记录 `t_ms` 直方图）
+- 布局建议表 / 按键确认页未实现（04-03 / 04-05）：`INPUT-04` 只闭合了「未确认布局零判定」的运行时半边，不得据此宣布完成
+- 帧内反转的事件捕获未验证（04-04）：`INPUT-05` 只闭合了「一次一条 / 两次两条」的结构半边
 
 ## Deferred Items
 
@@ -218,6 +228,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-11-05T09:24:50.000Z
-Stopped at: Completed 04-01-PLAN.md
+Last session: 2026-11-05T09:38:00.000Z
+Stopped at: Completed 04-02-PLAN.md
 Resume file: None
