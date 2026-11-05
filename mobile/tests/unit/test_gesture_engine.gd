@@ -19,6 +19,23 @@ extends RefCounted
 ##
 ## 判据全部走 reporter 的 check / eq_float，不用 assert；最后一句必须是 r.complete()。
 ## 哨兵 `GESTURE_RUNTIME cases=N mismatches=0` 在 r.complete() **之前**打印。
+##
+## ## 变异验证（D-10，2026-11-06 实测）
+##
+## 语料「有牙齿」不是靠断言条数，而是靠「拆掉实现就红」证明。三次变异各自
+## 还原后重跑全绿（`git diff --exit-code -- mobile/src/core` 为空）：
+##
+## | 变异 | 红色见证 |
+## |------|----------|
+## | 命中分支不置 `_gesture_locked` | `rt_lock_release_150_minus_4`（多出第 2 条）+ Phase 4 的 `rt_gesture_lock` / `rt_release_hold_rearm` |
+## | 命中路径不调 `_discard_other_claims` | `rt_competition_stepover_wins`（多出磕球的迟到裁定） |
+## | 三道前置把 `observe` 与 `reset` 对调 | `rt_croqueta_hold_short`（elapsed 196 vs 200）+ `rt_one_verdict_per_attempt` |
+##
+## 计划原本点名 `rt_lock_hold_no_recenter` 作变异 1 的见证；实测它保持全绿 ——
+## 右摇杆一直推着时，ArcDetector 自己的 `armed=false` 已经挡住第二段弧，手势锁
+## 不是唯一闸门。真正能区分「有锁 / 无锁」的是 `rt_lock_release_150_minus_4`：
+## 摘掉锁后它在 744ms 推的第二段弧会被检测器接受（已重新武装），多出第 2 条判定。
+
 
 const GOLDEN_PATH := "res://tests/fixtures/gesture_golden.json"
 const TOL := 1e-6
