@@ -327,7 +327,7 @@ func _flush_button_edges() -> void:
 ##
 ## `_profile` 的生命周期在这里设：保存成功后重新按 key 查一次档案，取不到就保持
 ## `null`（画面仍进练习，但相对技能 inert）。不在回调里直接拼一份内存档案 ——
-## 磁盘上的那一份才是 `ProfileStore` 与 `can_enter_practice()` 共同承认的事实。
+## 文件里的那一份才是 `ProfileStore` 与 `can_enter_practice()` 共同承认的事实。
 func _on_profile_saved(layout: StringName) -> void:
 	_profile = _profile_store.find(
 		DeviceProfile.make_key(_sampler.device_guid(), _sampler.device_name()))
