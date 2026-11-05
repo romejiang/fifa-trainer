@@ -3005,6 +3005,10 @@ def main_gui(config_path: Optional[str] = None, index: Optional[int] = None,
     # 让 SDL 把窗口摆到屏幕中央：否则 Windows 会从左上角往下排，
     # 在小屏幕上底部那行快捷键会被任务栏/屏幕边缘挡住。
     os.environ.setdefault("SDL_VIDEO_CENTERED", "1")
+    if sys.platform == "win32":
+        # Windows 10+：声明 per-monitor DPI aware，高 DPI 窗口才能拿到
+        # 真实的物理像素面；不声明会被系统整窗拉伸，又回到锯齿。
+        os.environ.setdefault("SDL_WINDOWS_DPI_AWARENESS", "permonitorv2")
 
     pygame.display.init()
     pygame.font.init()
