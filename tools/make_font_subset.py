@@ -50,6 +50,8 @@ CHAR_SOURCES = (
     Path("mobile") / "src" / "smoke" / "smoke_screen.tscn",
     Path("mobile") / "src" / "ui" / "main.gd",
     Path("mobile") / "src" / "ui" / "main.tscn",
+    Path("mobile") / "src" / "ui" / "input_setup_screen.gd",
+    Path("mobile") / "src" / "ui" / "input_setup_screen.tscn",
     Path("mobile") / "src" / "ui" / "onboarding_screen.gd",
     Path("mobile") / "src" / "ui" / "onboarding_screen.tscn",
     Path("mobile") / "src" / "ui" / "diagnostics_overlay.gd",

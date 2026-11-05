@@ -1,0 +1,144 @@
+[gd_scene load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://src/ui/input_setup_screen.gd" id="1_setup"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_dot"]
+bg_color = Color(0.0705882, 0.0823529, 0.105882, 1)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.298039, 0.329412, 0.380392, 1)
+corner_radius_top_left = 120
+corner_radius_top_right = 120
+corner_radius_bottom_right = 120
+corner_radius_bottom_left = 120
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_marker"]
+bg_color = Color(1, 0.780392, 0.25098, 1)
+corner_radius_top_left = 7
+corner_radius_top_right = 7
+corner_radius_bottom_right = 7
+corner_radius_bottom_left = 7
+
+[node name="InputSetupScreen" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+script = ExtResource("1_setup")
+
+[node name="Title" type="Label" parent="."]
+unique_name_in_owner = true
+layout_mode = 0
+offset_left = 48.0
+offset_top = 16.0
+offset_right = 1040.0
+offset_bottom = 80.0
+theme_override_font_sizes/font_size = 40
+
+[node name="Axes" type="Label" parent="."]
+unique_name_in_owner = true
+layout_mode = 0
+offset_left = 48.0
+offset_top = 88.0
+offset_right = 720.0
+offset_bottom = 420.0
+theme_override_font_sizes/font_size = 28
+
+[node name="Dot" type="Panel" parent="."]
+unique_name_in_owner = true
+layout_mode = 0
+offset_left = 780.0
+offset_top = 88.0
+offset_right = 1020.0
+offset_bottom = 328.0
+theme_override_styles/panel = SubResource("StyleBoxFlat_dot")
+
+[node name="CrossV" type="ColorRect" parent="Dot"]
+layout_mode = 0
+offset_left = 119.0
+offset_top = 20.0
+offset_right = 121.0
+offset_bottom = 220.0
+color = Color(0.298039, 0.329412, 0.380392, 1)
+
+[node name="CrossH" type="ColorRect" parent="Dot"]
+layout_mode = 0
+offset_left = 20.0
+offset_top = 119.0
+offset_right = 220.0
+offset_bottom = 121.0
+color = Color(0.298039, 0.329412, 0.380392, 1)
+
+[node name="Marker" type="Panel" parent="Dot"]
+layout_mode = 0
+offset_left = 113.0
+offset_top = 113.0
+offset_right = 127.0
+offset_bottom = 127.0
+theme_override_styles/panel = SubResource("StyleBoxFlat_marker")
+
+[node name="Pair" type="Label" parent="."]
+unique_name_in_owner = true
+layout_mode = 0
+offset_left = 780.0
+offset_top = 340.0
+offset_right = 1252.0
+offset_bottom = 384.0
+theme_override_font_sizes/font_size = 32
+
+[node name="Signs" type="Label" parent="."]
+unique_name_in_owner = true
+layout_mode = 0
+offset_left = 780.0
+offset_top = 388.0
+offset_right = 1252.0
+offset_bottom = 432.0
+theme_override_font_sizes/font_size = 32
+
+[node name="Range" type="Label" parent="."]
+unique_name_in_owner = true
+layout_mode = 0
+offset_left = 48.0
+offset_top = 444.0
+offset_right = 1252.0
+offset_bottom = 484.0
+theme_override_font_sizes/font_size = 28
+
+[node name="Center" type="Label" parent="."]
+unique_name_in_owner = true
+layout_mode = 0
+offset_left = 48.0
+offset_top = 486.0
+offset_right = 1252.0
+offset_bottom = 526.0
+theme_override_font_sizes/font_size = 28
+
+[node name="Trigger" type="Label" parent="."]
+unique_name_in_owner = true
+layout_mode = 0
+offset_left = 48.0
+offset_top = 528.0
+offset_right = 1252.0
+offset_bottom = 568.0
+theme_override_font_sizes/font_size = 28
+
+[node name="Help" type="Label" parent="."]
+unique_name_in_owner = true
+layout_mode = 0
+offset_left = 48.0
+offset_top = 580.0
+offset_right = 1252.0
+offset_bottom = 650.0
+autowrap_mode = 2
+theme_override_font_sizes/font_size = 28
+
+[node name="Footer" type="Label" parent="."]
+unique_name_in_owner = true
+layout_mode = 0
+offset_left = 48.0
+offset_top = 664.0
+offset_right = 1252.0
+offset_bottom = 706.0
+theme_override_font_sizes/font_size = 22

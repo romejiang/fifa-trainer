@@ -1,22 +1,31 @@
 extends Control
 
-## 组合根：加载配置 → 建对象图 → 把设备事件交给 OnboardingFlow → 按状态切屏。
+## 组合根：加载配置 → 建对象图 → 把设备事件交给「单页输入设置」或「练习屏」。
 ##
-## 这里是**唯一**的接线处（零 autoload）：
-##   * `ConfigStore` 读配置，`TapRuntime.select_taps_skill` 只挑 `kind == taps` 的
-##     那条动作。「只练绿色搓射」由这条筛选实现，`shared/skills_config.json` 是
-##     唯一真源，一个字节都不改。
-##   * `PadSampler` 是唯一碰引擎输入单例的节点；本文件只消费它快照下来的
-##     `button_edges()` 与 `pressed_dict()`，不自己读设备。
-##   * `OnboardingFlow` 是纯状态机；本文件把「哪一屏可见」与「按键分派」翻译成
-##     对状态机的调用，不在这里长第二套判定逻辑。
-##   * `TapRuntime` 的 `tick()` 只在组合根这一处推进；引导屏与练习屏都不调。
+## 2026-11-05 的两次真机失败（04-07）之后，首启路径从「四步探针 + 中点/满量程校准 +
+## 布局确认」换成一页式输入设置（04-09）。用户的硬要求原文是「不要用这种一步，这种
+## 进步式的测试。你要不你就做成一个页面。就不要有状态改变，我可以反复地测。」
+## 因此本文件里**没有** `OnboardingFlow` 的分派：`%Onboarding` 节点仍留在场景里
+## （`onboarding_screen.gd` 与 `OnboardingFlow` 一并保留，供复用门的后续工作），
+## 但它永远不可见、也永远不 `setup()` —— 它的 `_process` 在 `_flow == null` 时早退。
+##
+## 这里仍然是**唯一**的接线处（零 autoload）：
+##   * `PadSampler` 是唯一碰引擎输入单例的节点；
+##   * 按钮边沿只有一个消费者（`_flush_button_edges`），按当前可见的屏分派；
+##   * `TapRuntime.tick()` 只在练习屏可见时推进 —— 输入设置页零 Outcome 的机械保证
+##     （运行时另有 `layout_confirmed` 硬门，两层都在）。
+##
+## 复用：启动时若本设备（guid 优先）已有档案、且结构可用（rs 映射齐全 + 校准存在 +
+## 有布局）→ 直接进练习；否则显示输入设置页。没有「先探一次再逐项比较」的窗口 ——
+## 那正是被用户否掉的分步流程。四项 index+sign 的复用门仍在 `DeviceProfile.can_reuse`
+## 里，供将来重新引入「探一次」的界面使用，本文件不再驱动它。
 ##
 ## 时间单位：`Frame.now` 是**秒**（`Time.get_ticks_usec()` 除以一百万），与
 ## `TapDetector` / `TapRuntime` 的 `* 1000.0` 换算一致。`PadSampler` 的
 ## `_now_ms()` 是**事件时间戳**，单位毫秒；两者不能混用，也不要在本文件里换算。
 
 const PRACTICE_SCENE := preload("res://src/ui/practice_screen.tscn")
+const INPUT_SETUP_SCENE := preload("res://src/ui/input_setup_screen.tscn")
 const DIAGNOSTICS_SCENE := preload("res://src/ui/diagnostics_overlay.tscn")
 ## 诊断覆盖层的组合键：LB + RB 同时按住 0.8 秒。
 ##
@@ -24,27 +33,26 @@ const DIAGNOSTICS_SCENE := preload("res://src/ui/diagnostics_overlay.tscn")
 ## D3 的布局页也在用这两个索引。
 ##
 ## 为什么永远不会和 tap 手势撞车：tap 是「按住 RB 连按两下 X」，本组合键只用到 9 / 10、
-## 从不按 X（索引 2），所以既凑不出 `Hit` 也凑不出 `Failure`；按下与松开 9 / 10 在
-## 判定里只是修饰键状态变化，不产生任何动作。
+## 从不按 X（索引 2），所以既凑不出 `Hit` 也凑不出 `Failure`。
 ##
-## 已知且可接受的副作用：在 `device_ready` 屏上按组合键时，第一次按下仍会被
-## `on_any_button()` 当成「任意键」推进一屏。覆盖层的使用场合是探针 / 校准 / 练习页，
-## 那三处没有「任意键」分派。
+## 已知且可接受的副作用：在输入设置页按组合键时，先按下的那只键会被页面当成
+## 换轴对（输入设置屏对「两键同时按住」另有一道守卫，见 `handle_button`）。
 const DIAGNOSTICS_CHORD_SECONDS := 0.8
 const DIAGNOSTICS_CHORD_BUTTONS: Array[int] = [9, 10]
 
 
 @onready var _config_error: Label = %ConfigError
+## 04-09 之前的首启屏。保留节点与脚本，但不参与任何路径；`_ready` 里第一件事就是隐藏。
 @onready var _onboarding: Control = %Onboarding
 @onready var _practice_container: Control = %Practice
 
-var _flow: OnboardingFlow = null
 var _runtime: TapRuntime = null
 var _sampler: PadSampler = null
 var _profile_store: ProfileStore = null
-## 练习屏脚本没有 `class_name`，必须保持无类型引用才能在运行时调 `setup`。
+## 输入设置屏脚本没有 `class_name`，必须保持无类型引用才能在运行时调 `setup` /
+## `handle_button`。练习屏与诊断覆盖层同理。
+var _setup = null
 var _practice = null
-## 诊断覆盖层同理：脚本没有 `class_name`，只能无类型引用 + `call(...)`。
 var _diagnostics = null
 ## 组合键已经按住多久、本轮是否已经触发过（按住不放只开一次，不会来回抖）。
 var _chord_hold: float = 0.0
@@ -54,7 +62,10 @@ var _layout_was_confirmed: bool = false
 
 ## 已消费到第几条按钮边沿。边沿数组只追加，游标只前进。
 var _seen_edges: int = 0
-var _practice_entered: bool = false
+## 是否已经进入练习屏。进入之前 `TapRuntime` 一帧都不推进。
+var _in_practice: bool = false
+## 复用检查只做一次（每次换设备重置）：同一只手柄不会在练习中途被拽回设置页。
+var _reuse_checked: bool = false
 ## 1 Hz 诊断日志的累加器（D5/D6 的抄录来源）。
 var _diag_accum: float = 0.0
 
@@ -63,66 +74,73 @@ func _ready() -> void:
 	# 默认每帧 flush 一次累积输入；必须关掉，事件时间戳才有亚帧意义。
 	Input.set_use_accumulated_input(false)
 	_config_error.visible = false
-	_onboarding.visible = true
+	_onboarding.visible = false
 	_practice_container.visible = false
 
 	var result := ConfigStore.new().load_config()
 	if not result.ok():
 		_show_config_error(result.to_text())
-		_flow = null
 		return
 	var skill := TapRuntime.select_taps_skill(result.config)
 	if skill == null:
 		# 零个或多个 taps 动作都不可用：不回退到别的动作，也不猜。
 		_show_config_error("配置里没有唯一的 taps 动作：只练绿色搓射需要恰好一条启用的 taps 动作。")
-		_flow = null
 		return
 
 	_runtime = TapRuntime.new(skill, result.config.global_cooldown_ms,
 		result.config.input.gesture_release_ms, false)
 	_profile_store = ProfileStore.new()
-	_flow = OnboardingFlow.new()
 	_sampler = PadSampler.new()
-	# 顺序即正确性：先 connect 再 add_child。PadSampler._ready() 会 emit 一次
-	# 当前设备列表；晚接一行就错过这次初始 emit。之后再用 connected_devices()
-	# 主动播种一次，两次都走 bind() 的幂等分支。
+	# 顺序即正确性：先建三块屏，再 connect，最后 add_child。
+	#   * `add_child(_sampler)` 会让 `PadSampler._ready()` 立刻 emit 设备列表；
+	#     回调里可能直接进入练习（复用档案），所以练习屏必须先存在。
+	#   * 设置屏必须在 `add_child(_sampler)` 之前建好，回调里要能安全地隐藏它。
+	#   * 诊断覆盖层最后建，画在最上面。
+	_build_input_setup()
+	_build_practice_screen()
+	_build_diagnostics()
 	_sampler.device_list_changed.connect(_on_device_list_changed)
 	add_child(_sampler)
 	_on_device_list_changed(_sampler.connected_devices())
-	_onboarding.call("setup", _flow, _sampler)
-	_build_practice_screen()
-	_build_diagnostics()
-	_refresh_screens()
 
 
 func _process(delta: float) -> void:
 	# 配置错误屏上没有判定：不推进、不分派。
-	if _flow == null:
+	if _runtime == null:
 		return
 	# 组合键计时必须在 `_flush_button_edges()` 之前：本帧按住的 9 / 10 要先把
-	# 「组合键进行中」置位，边沿分派才会跳过它们。顺序反过来时，按下的第一帧
-	# 就会被当成一次普通按键派发出去（在布局页上等于顺手选了布局）。
+	# 「组合键进行中」置位，边沿分派才会跳过它们。
 	_tick_diagnostics_chord(delta)
 	if _diagnostics != null and _diagnostics.visible:
-		# 覆盖层可见期间：只翻页，不 tick 运行时、不分派引导按键、不推进判定。
-		# 这是「覆盖层自身产出 0 条 Outcome」的第二层机械保证（第一层是打开时的
-		# `set_layout_confirmed(false)`）。
+		# 覆盖层可见期间：只翻页，不 tick 运行时、不分派按键、不推进判定。
 		_flush_diagnostics_edges()
 		_diagnostics.call("tick", delta)
 		return
 	_flush_button_edges()
+	_log_diagnostics(delta)
+	if not _in_practice:
+		# 输入设置页零 Outcome：连 `tick()` 都不调用。运行时的 `layout_confirmed`
+		# 硬门是第二层保证，但这一层是结构上的 —— 没有调用就没有产出。
+		return
 	var frame := Frame.new()
 	frame.now = Time.get_ticks_usec() / 1_000_000.0
 	frame.buttons = _sampler.buffer.pressed_dict()
 	_runtime.tick(frame)
-	_refresh_screens()
-	_log_diagnostics(delta)
 
 
-## 实例化练习屏进 `%Practice` 容器。**这里不调 `setup`**：`add_child` 会先跑练习屏
-## 的 `_ready`，但此刻 `flow` 可能还没到 layout_confirm，注入要等首次进入练习。
-## 04-05 的占位 Label 必须真正 `queue_free()`：它没有任何数据源，压在真屏下面
-## 只会让人误以为屏幕上那行字也是判定的一部分。
+## 实例化一页式输入设置。**必须排在 `add_child(_sampler)` 之前**：采样节点 `_ready`
+## 会 emit 设备列表，回调里会碰设置屏。
+func _build_input_setup() -> void:
+	_setup = INPUT_SETUP_SCENE.instantiate()
+	add_child(_setup)
+	# 首启就是这一页：默认可见。只有「复用档案 / 保存成功」才会隐藏它。
+	_setup.visible = true
+	_setup.connect("profile_saved", _on_profile_saved)
+	_setup.call("setup", _sampler, _profile_store)
+
+
+## 实例化练习屏进 `%Practice` 容器。**这里不调 `setup`**：进入练习的第一步才注入。
+## 04-05 的占位 Label 必须真正 `queue_free()`：它没有任何数据源。
 func _build_practice_screen() -> void:
 	_practice = PRACTICE_SCENE.instantiate()
 	_practice_container.add_child(_practice)
@@ -132,8 +150,8 @@ func _build_practice_screen() -> void:
 		placeholder.queue_free()
 
 
-## 实例化诊断覆盖层。**必须排在练习屏之后**：同一个父节点下后加的子节点画在上面，
-## 否则诊断文本会被练习屏的字盖住，screencap 取证就白拍了。
+## 实例化诊断覆盖层。**必须排在最后**：同一个父节点下后加的子节点画在上面，
+## 否则诊断文本会被别的屏盖住，screencap 取证就白拍了。
 func _build_diagnostics() -> void:
 	_diagnostics = DIAGNOSTICS_SCENE.instantiate()
 	add_child(_diagnostics)
@@ -141,9 +159,7 @@ func _build_diagnostics() -> void:
 	_diagnostics.call("setup", _sampler.buffer, _sampler)
 
 
-## 组合键计时。读的是**当前按住状态**，不是边沿数组：边沿只说明「这一帧变了」，
-## 判断「两个键同时按住多久」必须看状态。
-##
+## 组合键计时。读的是**当前按住状态**，不是边沿数组。
 ## 任一个松开就立刻清零并解除 latch —— 下一次组合键必须重新按满 0.8 秒。
 func _tick_diagnostics_chord(delta: float) -> void:
 	if _sampler == null or _diagnostics == null:
@@ -165,13 +181,8 @@ func _tick_diagnostics_chord(delta: float) -> void:
 
 
 ## 打开覆盖层 = **静默放弃当前这一下**。
-##
 ## `set_layout_confirmed(false)` 会在运行时里 `abandon()` 未完成的手势并清空尚未取走
-## 的 Outcome：覆盖层打开期间屏幕上绝不会冒出一条判定。关闭时再恢复打开前的值，
-## 于是「打开诊断」本身对这局练习没有任何影响。
-##
-## `_seen_edges` 前进到当前长度，把打开组合键自己的边沿吃掉 —— 否则关闭之后这些
-## 边沿会被重新分派一次（在布局页上等于顺手选了一次布局）。
+## 的 Outcome：覆盖层打开期间屏幕上绝不会冒出一条判定。
 func _open_diagnostics() -> void:
 	_layout_was_confirmed = _runtime.layout_confirmed
 	_runtime.set_layout_confirmed(false)
@@ -187,7 +198,6 @@ func _close_diagnostics() -> void:
 
 
 ## 覆盖层可见期间的边沿消费者：只认十字键左 / 右（13 / 14）翻页，其余一律丢弃。
-## 覆盖层是零触摸的，翻页也必须用手柄。
 func _flush_diagnostics_edges() -> void:
 	var edges: Array = _sampler.buffer.button_edges()
 	var total := edges.size()
@@ -206,8 +216,7 @@ func _flush_diagnostics_edges() -> void:
 
 
 ## 1 Hz 诊断日志：D5 / D6 的抄录来源（adb logcat -s godot:I）。
-## 只在已绑定设备时打印 —— 无设备时 `buffer` 的 min/max 是哨兵值（INF / -INF），
-## 打出来只会误导。每根轴一行是必须的：扳机静止值与满量程都要能从日志里读回来。
+## 只在已绑定设备时打印 —— 无设备时 `buffer` 的 min/max 是哨兵值（INF / -INF）。
 func _log_diagnostics(delta: float) -> void:
 	_diag_accum += delta
 	if _diag_accum < 1.0:
@@ -229,12 +238,14 @@ func _log_diagnostics(delta: float) -> void:
 			axis, buffer.axis_value(axis), span.x, span.y,
 		])
 	print("PAD_DEV name=%s guid=%s" % [_sampler.device_name(), _sampler.device_guid()])
+	if not _in_practice and _setup != null:
+		# 输入设置页的「认了哪一对、符号是什么、量程到没到」——没有 run-as 时
+		# 这一行就是可核对的原文（04-07 的 D1 通道）。
+		print("INPUT_SETUP %s" % String(_setup.call("debug_line")))
 
 
-## 唯一的按钮边沿消费者。引导屏不读边沿数组，避免同一次按下被解释两次。
-##
-## 组合键按住期间跳过 9 / 10 的分派：那两下是「开诊断面」的一部分，不该顺手
-## 在布局页上选一次布局，也不该推进任何引导状态。
+## 唯一的按钮边沿消费者。练习中不消费任何边沿：tap 手势走 `pressed_dict()`，
+## 两次解释同一次按下会让「按住 RB 连按两下 X」多出一条边沿。
 func _flush_button_edges() -> void:
 	var edges: Array = _sampler.buffer.button_edges()
 	var total := edges.size()
@@ -246,130 +257,97 @@ func _flush_button_edges() -> void:
 			continue
 		if _chord_hold > 0.0 and DIAGNOSTICS_CHORD_BUTTONS.has(int(edge["index"])):
 			continue
-		_handle_button_edge(edge)
+		if _in_practice or _setup == null:
+			continue
+		_setup.call("handle_button", int(edge["index"]))
 	_seen_edges = total
 
 
-func _handle_button_edge(edge: Dictionary) -> void:
-	if _flow == null:
+## 设置屏按 A 保存成功之后的唯一后续动作。
+func _on_profile_saved(layout: StringName) -> void:
+	_enter_practice(layout)
+
+
+## 进入练习。布局为空时按 Xbox 兜底：设置页总会写一个非空布局，走到这里说明
+## 档案来自更早的版本 —— 空布局会让练习屏进入「请返回引导重选」的死角。
+func _enter_practice(layout: StringName) -> void:
+	if _practice == null or _setup == null:
 		return
-	var index := int(edge["index"])
-	match _flow.state:
-		OnboardingFlow.STATE_DEVICE_READY:
-			_flow.on_any_button()
-		OnboardingFlow.STATE_PROBE_INTRO:
-			if index == 0:
-				_flow.begin_probe()
-		OnboardingFlow.STATE_PROBE_FAILED:
-			if index == 1:
-				_flow.retry_probe_step()
-		OnboardingFlow.STATE_REUSE_CHECK:
-			if index == 1:
-				# B：放弃复验，走完整四步探针。
-				_flow.begin_probe()
-		OnboardingFlow.STATE_LAYOUT_CONFIRM:
-			_handle_layout_edge(edge)
-		_:
-			pass
+	var effective := layout
+	if effective == &"":
+		effective = DeviceProfile.LAYOUT_XBOX
+	_in_practice = true
+	# 成功标准 4 的机械落点：只有走到这里（设置页按 A / 复用已存在档案）才置为已确认。
+	_runtime.set_layout_confirmed(true)
+	_practice.setup(_runtime, effective, _sampler.buffer)
+	_practice.visible = true
+	_practice_container.visible = true
+	if _setup != null:
+		_setup.visible = false
+	# 吞掉进入练习这一下自己的边沿，返回设置页时不会重放。
+	_seen_edges = _sampler.buffer.button_edges().size()
 
 
-## 布局页分派：保留键优先，其余每一次按下都把**实际索引**交给状态机。
+## 回到设置页（断连 / 换手柄）。运行时静默清场：断连不是一次尝试。
+func _leave_practice() -> void:
+	if _setup == null or _practice == null:
+		return
+	_in_practice = false
+	_runtime.set_layout_confirmed(false)
+	_practice.visible = false
+	_practice_container.visible = false
+	_setup.visible = true
+	_seen_edges = _sampler.buffer.button_edges().size()
+
+
+## 复用：本设备已有档案且结构可用 → 直接进练习。
 ##
-## 索引 1 = B（显式接受当前布局）；13 / 14 = 十字键上/下，9 / 10 = LB / RB ——
-## 两套都认，因为某些手柄把十字键报成 hat 而不是 button。写死确认索引会让
-## `button_index_ok` 永远为真，那条真实设备自检就形同虚设。
-func _handle_layout_edge(edge: Dictionary) -> void:
-	var index := int(edge["index"])
-	match index:
-		13, 9:
-			_flow.choose_layout(DeviceProfile.LAYOUT_XBOX)
-			return
-		14, 10:
-			_flow.choose_layout(DeviceProfile.LAYOUT_PLAYSTATION)
-			return
-		1:
-			_flow.accept_layout_anyway()
-			return
-	_flow.confirm_layout(int(edge["index"]), 0)
+## 只判「结构可用」而不逐项比较四项 index+sign：没有探针就没有「本次观测值」，
+## 拿档案自己的值去比自己是假绿。`DeviceProfile.can_reuse` 的四项比较仍在，
+## 留给将来重新引入「探一次」的界面（那是 04-05 的 REUSE_CHECK，本计划不驱动它）。
+func _try_reuse_profile() -> void:
+	if _reuse_checked or _in_practice or _sampler.buffer.device < 0:
+		return
+	_reuse_checked = true
+	var key := DeviceProfile.make_key(_sampler.device_guid(), _sampler.device_name())
+	var profile := _profile_store.find(key)
+	if not _profile_usable(profile):
+		return
+	_enter_practice(profile.layout)
+
+
+func _profile_usable(profile: DeviceProfile) -> bool:
+	return profile != null and profile.axes != null and profile.axes.has_rs() \
+		and profile.calibration != null and profile.layout != &""
 
 
 ## 设备列表信号与主动播种共用的唯一回调体。
 func _on_device_list_changed(devices: Array) -> void:
-	if _flow == null:
+	if _runtime == null:
 		return
 	if devices.is_empty():
 		if _sampler.buffer.device >= 0:
 			_sampler.unbind()
 			_seen_edges = 0
-			_runtime.set_layout_confirmed(false)
-			_flow.on_device_lost()
-			_practice_entered = false
-		else:
-			_flow.on_device_list_changed([], "", "")
+			_reuse_checked = false
+			_leave_practice()
+			_setup.call("reset_stats")
 		return
 
 	var first := int(devices[0])
 	if _sampler.buffer.device >= 0 and _sampler.buffer.device != first:
-		# 换了一只手柄：上一只手的布局、校准与进度全部作废。
-		_runtime.set_layout_confirmed(false)
-		_flow.on_device_lost()
-		_practice_entered = false
+		# 换了一只手柄：上一只的轴对、符号、量程全部作废。
+		_leave_practice()
+		_reuse_checked = false
+		_setup.call("reset_stats")
 	# 只在设备真的换了时才重绑：同一设备的重复列表不得清掉按键状态、
 	# 也不得把 _seen_edges 归零后重放已经分派过的边沿。
-	if _sampler.buffer.device != devices[0]:
+	if _sampler.buffer.device != first:
 		_sampler.bind(first)
 		_seen_edges = 0
-	_flow.on_device_list_changed(devices, _sampler.device_name(), _sampler.device_guid())
-
-	# 复用门：只在 device_ready 尝试一次，避免练习中重复进入 REUSE_REST。
-	if _flow.state == OnboardingFlow.STATE_DEVICE_READY:
-		var key := DeviceProfile.make_key(_sampler.device_guid(), _sampler.device_name())
-		var profile := _profile_store.find(key)
-		if profile != null:
-			_flow.offer_profile(profile)
-
-
-func _refresh_screens() -> void:
-	if _flow == null:
-		return
-	if _flow.can_enter_practice():
-		if not _practice_entered:
-			var layout := _flow.effective_layout()
-			if layout == &"":
-				# 空布局 = 组合根被绕过或布局未确认：留在引导屏，绝不把空值
-				# 当成「默认 Xbox」去 setup。屏上的错误态也只在 setup 收到空值时出现。
-				print("LAYOUT_ERROR 空布局不能进练习")
-				_practice_container.visible = false
-				_onboarding.visible = true
-				return
-			_practice_entered = true
-			# 成功标准 4 的机械落点：只有五条同时成立时才把运行时置为已确认。
-			_runtime.set_layout_confirmed(true)
-			_practice.setup(_runtime, layout, _sampler.buffer)
-			_onboarding.visible = false
-			_practice_container.visible = true
-			# 容器可见不够：练习屏 _process 开头的 `if not visible: return` 会把
-			# pop_outcomes() 的 drain、横幅与 %DebugPanel 一起挡在屏幕外。
-			_practice.visible = true
-			_commit_profile()
-		return
-	_practice_container.visible = false
-	_onboarding.visible = true
-	if _practice_entered:
-		# 回到引导（例如刚刚断连）：运行时必须静默清场，不能带着旧进度继续判。
-		_practice_entered = false
-		_runtime.set_layout_confirmed(false)
-
-
-## 进入练习的第一刻落盘档案。失败只记录，不阻塞判定、不弹窗。
-func _commit_profile() -> void:
-	var profile := _flow.build_profile()
-	if profile == null:
-		print("PROFILE_ERROR 构建失败，判定继续但不落盘")
-		return
-	var err := _profile_store.upsert(profile)
-	if err != OK:
-		print("PROFILE_ERROR 档案落盘失败（错误码 %d），判定继续" % err)
+		_reuse_checked = false
+		_setup.call("reset_stats")
+	_try_reuse_profile()
 
 
 func _show_config_error(text: String) -> void:
@@ -377,3 +355,5 @@ func _show_config_error(text: String) -> void:
 	_config_error.visible = true
 	_onboarding.visible = false
 	_practice_container.visible = false
+	if _setup != null:
+		_setup.visible = false

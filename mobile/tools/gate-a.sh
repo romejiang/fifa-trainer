@@ -101,6 +101,7 @@ for script in \
     "res://src/smoke/smoke_screen.gd" \
     "res://tools/check_pack.gd" \
     "res://src/ui/main.gd" \
+    "res://src/ui/input_setup_screen.gd" \
     "res://src/ui/onboarding_screen.gd" \
     "res://src/ui/diagnostics_overlay.gd" \
     "res://src/ui/practice_screen.gd"; do
