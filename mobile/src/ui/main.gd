@@ -12,8 +12,10 @@ extends Control
 ## 这里仍然是**唯一**的接线处（零 autoload）：
 ##   * `PadSampler` 是唯一碰引擎输入单例的节点；
 ##   * 按钮边沿只有一个消费者（`_flush_button_edges`），按当前可见的屏分派；
-##   * `TapRuntime.tick()` 只在练习屏可见时推进 —— 输入设置页零 Outcome 的机械保证
-##     （运行时另有 `layout_confirmed` 硬门，两层都在）。
+##   * `GestureEngine.tick()` 只在练习屏可见时推进 —— 输入设置页零 Outcome 的机械保证
+##     （运行时另有 `layout_confirmed` 硬门，两层都在）；
+##   * raw 轴 → `Frame` 的唯一换算入口是 `FrameBuilder`：本文件**不准**出现第二份
+##     「减中点除量程」，也不准绕过它直接做校准归一化（T-05-23）。
 ##
 ## 复用：启动时若本设备（guid 优先）已有档案、且 `DeviceProfile.can_enter_practice()`
 ## 为真（rs 映射齐全 + 校准合理 + 布局已确认 + `quality.range_ready` 标记）→ 直接进练习；
@@ -21,7 +23,7 @@ extends Control
 ## 因此会被丢弃、设置页重新出现 —— 这是 04-11 的第二个真机缺陷修法。
 ##
 ## 时间单位：`Frame.now` 是**秒**（`Time.get_ticks_usec()` 除以一百万），与
-## `TapDetector` / `TapRuntime` 的 `* 1000.0` 换算一致。`PadSampler` 的
+## 检测器的 `* 1000.0` 换算一致。`PadSampler` 的
 ## `_now_ms()` 是**事件时间戳**，单位毫秒；两者不能混用，也不要在本文件里换算。
 
 const PRACTICE_SCENE := preload("res://src/ui/practice_screen.tscn")
@@ -48,7 +50,15 @@ const BACK_HOLD_SECONDS := 1.0
 @onready var _onboarding: Control = %Onboarding
 @onready var _practice_container: Control = %Practice
 
-var _runtime: TapRuntime = null
+## 多动作引擎：全部启用技能由**一个**实例驱动（D-11）。本文件不区分「当前练哪个动作」，
+## 自由练习的标题与动作名由引擎 / 判定结果提供。
+var _runtime: GestureEngine = null
+## 已校验的配置。`_process` 每帧要用 `input.deadzone`，不能在热路径里重复加载。
+var _config: AppConfig = null
+## 当前设备的档案。`null` = 无档案：`FrameBuilder` 把四个角度/幅度字段写 0，
+## 相对左摇杆的技能保持 inert。生命周期见 `_try_reuse_profile` / `_on_profile_saved` /
+## `_on_device_list_changed` —— 设与清都必须显式。
+var _profile: DeviceProfile = null
 var _sampler: PadSampler = null
 var _profile_store: ProfileStore = null
 ## 输入设置屏脚本没有 `class_name`，必须保持无类型引用才能在运行时调 `setup` /
@@ -66,7 +76,7 @@ var _layout_was_confirmed: bool = false
 
 ## 已消费到第几条按钮边沿。边沿数组只追加，游标只前进。
 var _seen_edges: int = 0
-## 是否已经进入练习屏。进入之前 `TapRuntime` 一帧都不推进。
+## 是否已经进入练习屏。进入之前 `GestureEngine` 一帧都不推进。
 var _in_practice: bool = false
 ## 复用检查只做一次（每次换设备重置）：同一只手柄不会在练习中途被拽回设置页。
 var _reuse_checked: bool = false
@@ -87,14 +97,9 @@ func _ready() -> void:
 	if not result.ok():
 		_show_config_error(result.to_text())
 		return
-	var skill := TapRuntime.select_taps_skill(result.config)
-	if skill == null:
-		# 零个或多个 taps 动作都不可用：不回退到别的动作，也不猜。
-		_show_config_error("配置里没有唯一的 taps 动作：只练绿色搓射需要恰好一条启用的 taps 动作。")
-		return
-
-	_runtime = TapRuntime.new(skill, result.config.global_cooldown_ms,
-		result.config.input.gesture_release_ms, false)
+	# 全技能自由练习：不再要求「恰好一条 taps 动作」。动作选择器属于 Phase 6。
+	_config = result.config
+	_runtime = GestureEngine.new(_config, false)
 	_profile_store = ProfileStore.new()
 	_sampler = PadSampler.new()
 	# 顺序即正确性：先建三块屏，再 connect，最后 add_child。
@@ -149,7 +154,21 @@ func _process(delta: float) -> void:
 	var frame := Frame.new()
 	frame.now = Time.get_ticks_usec() / 1_000_000.0
 	frame.buttons = _sampler.buffer.pressed_dict()
+	# 无档案时传 null：`FrameBuilder` 把四个字段写 0，相对技能 inert，不崩。
+	var mapping: AxisMapping = _profile.axes if _profile != null else null
+	var calibration: Calibration = _profile.calibration if _profile != null else null
+	FrameBuilder.fill(frame, _raw_axes(), mapping, calibration, _config.input.deadzone)
 	_runtime.tick(frame)
+
+
+## 八根原始轴。数据源只有 `PadStateBuffer.axis_value()` —— 本文件**不新增轮询通道**
+## （INPUT-05），也不在这里做任何归一化。
+func _raw_axes() -> PackedFloat32Array:
+	var raw := PackedFloat32Array()
+	raw.resize(PadStateBuffer.MAX_AXIS)
+	for axis in PadStateBuffer.MAX_AXIS:
+		raw[axis] = _sampler.buffer.axis_value(axis)
+	return raw
 
 
 ## 实例化一页式输入设置。**必须排在 `add_child(_sampler)` 之前**：采样节点 `_ready`
@@ -305,7 +324,13 @@ func _flush_button_edges() -> void:
 
 
 ## 设置屏按 A 保存成功之后的唯一后续动作。
+##
+## `_profile` 的生命周期在这里设：保存成功后重新按 key 查一次档案，取不到就保持
+## `null`（画面仍进练习，但相对技能 inert）。不在回调里直接拼一份内存档案 ——
+## 磁盘上的那一份才是 `ProfileStore` 与 `can_enter_practice()` 共同承认的事实。
 func _on_profile_saved(layout: StringName) -> void:
+	_profile = _profile_store.find(
+		DeviceProfile.make_key(_sampler.device_guid(), _sampler.device_name()))
 	_enter_practice(layout)
 
 
@@ -354,7 +379,9 @@ func _try_reuse_profile() -> void:
 	var key := DeviceProfile.make_key(_sampler.device_guid(), _sampler.device_name())
 	var profile := _profile_store.find(key)
 	if not _profile_usable(profile):
+		# 不可用就保持 null：无档案 = 无输入，不降级、不猜。
 		return
+	_profile = profile
 	_enter_practice(profile.layout)
 
 
@@ -373,6 +400,8 @@ func _on_device_list_changed(devices: Array) -> void:
 			_sampler.unbind()
 			_seen_edges = 0
 			_reuse_checked = false
+			# 设备没了：旧档案的轴对绝不能留在内存里。
+			_profile = null
 			_leave_practice()
 			_setup.call("reset_stats")
 		return
@@ -380,12 +409,14 @@ func _on_device_list_changed(devices: Array) -> void:
 	var first := int(devices[0])
 	if _sampler.buffer.device >= 0 and _sampler.buffer.device != first:
 		# 换了一只手柄：上一只的轴对、符号、量程全部作废。
+		_profile = null
 		_leave_practice()
 		_reuse_checked = false
 		_setup.call("reset_stats")
 	# 只在设备真的换了时才重绑：同一设备的重复列表不得清掉按键状态、
 	# 也不得把 _seen_edges 归零后重放已经分派过的边沿。
 	if _sampler.buffer.device != first:
+		_profile = null
 		_sampler.bind(first)
 		_seen_edges = 0
 		_reuse_checked = false

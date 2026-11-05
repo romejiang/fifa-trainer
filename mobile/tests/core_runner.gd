@@ -61,6 +61,7 @@ const SUITES := {
 	"onboarding_ui": preload("res://tests/unit/test_onboarding_ui.gd"),
 	"overlay_merge": preload("res://tests/unit/test_overlay_merge.gd"),
 	"pad_sampler": preload("res://tests/unit/test_pad_sampler.gd"),
+	"practice_wiring": preload("res://tests/unit/test_practice_wiring.gd"),
 	"profile_store": preload("res://tests/unit/test_profile_store.gd"),
 	"tap_detector": preload("res://tests/unit/test_tap_detector.gd"),
 	"tap_runtime": preload("res://tests/unit/test_tap_runtime.gd"),
