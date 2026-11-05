@@ -336,6 +336,12 @@ DEFAULT_CONFIG: Dict[str, Any] = {
         "input.invert：如果某个摇杆方向和实物相反（比如右摇杆上推却显示成后），",
         "  在这里单独翻转，不用重写整套 axis_layout。例：{\"rs_y\": true}",
         "  可用键：ls_x / ls_y / rs_x / rs_y。先跑 --debug 看角度再改。",
+        "",
+        "input.button_names：按键校准表，窗口里按 B 就能自动生成，一般不用手写。",
+        "  设备不被 SDL 认识时，按键名是按 Xbox 顺序猜的，猜错就表现为"
+        "\"摇杆动作都能识别，按键类的怎么按都没反应\"。",
+        "  写成 {\"X\": 9, \"RB\": 4} 这样的 {名字: 原始键编号}，覆盖自动识别。",
+        "  一个编号只能属于一个名字；写 null（默认）表示完全用自动识别。",
     ],
 
     "input": {
@@ -720,9 +726,30 @@ def _parse_input(raw: Any) -> InputConfig:
         cfg.invert = {str(k).strip().lower(): v for k, v in invert.items()}
 
     names = raw.get("button_names")
-    if names is not None and not isinstance(names, dict):
-        raise ValueError("input.button_names 必须是对象或 null")
-    cfg.button_names = names
+    if names is not None:
+        if not isinstance(names, dict):
+            raise ValueError("input.button_names 必须是对象或 null")
+        from .input_source import canonical_button
+        parsed_names: Dict[str, int] = {}
+        for key, value in names.items():
+            try:
+                canon = canonical_button(key)
+            except ValueError as exc:
+                raise ValueError(f"input.button_names: {exc}") from None
+            if isinstance(value, bool) or not isinstance(value, int):
+                raise ValueError(
+                    f"input.button_names.{key} 必须是整数编号，收到 {value!r}")
+            if value < 0:
+                raise ValueError(f"input.button_names.{key} 不能是负数")
+            if canon in parsed_names:
+                raise ValueError(f"input.button_names 里的 {canon} 写了两遍")
+            if value in parsed_names.values():
+                owner = next(k for k, v in parsed_names.items() if v == value)
+                raise ValueError(
+                    f"input.button_names 里 {owner} 和 {canon} 用了同一个编号 "
+                    f"#{value}，一个物理键只能对应一个名字")
+            parsed_names[canon] = value
+        cfg.button_names = parsed_names
     return cfg
 
 

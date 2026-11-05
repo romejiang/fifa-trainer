@@ -22,6 +22,7 @@ from padskills.detectors import ArcDetector, Frame, SequenceDetector, TapDetecto
 from padskills.engine import Engine
 from padskills.input_source import (
     AxisLayout, GamepadSource, PadState, apply_axis_inverts,
+    apply_button_names,
 )
 from padskills.rumble import RumbleBackend, RumbleEngine
 
@@ -824,6 +825,157 @@ def test_button_taps(cfg) -> None:
           "等第二下" in status and "400~600" in status, status)
 
 
+def test_focus_mode(cfg) -> None:
+    """专项练习：只喂选中的那一个动作，其它动作完全不出结果。"""
+    print()
+    print("[6c] 专项练习 —— 只判定选中的那一个动作")
+
+    def active(engine, fragment: str):
+        return next(a for a in engine.skills if fragment in a.skill.name)
+
+    def new_engine() -> Engine:
+        return Engine(cfg, NullSource(), RumbleEngine(None, enabled=False),
+                      debug=False)
+
+    engine = new_engine()
+    check("默认是自由练习：所有动作都参与判定",
+          engine.focus is None and len(engine.active_skills()) == len(engine.skills),
+          f"{len(engine.active_skills())} 个")
+
+    engine.set_focus(active(engine, "绿色"))
+    check("开专项后只剩一个动作参与判定",
+          engine.active_skills() == [active(engine, "绿色")],
+          str([a.skill.name for a in engine.active_skills()]))
+
+    # 绿射在专项练习里照常判定
+    for f in tap_frames(0.0, 450):
+        tick(engine, f.now, buttons=f.buttons, ls_mag=0.0)
+    check("专项练习中绿射照常判定",
+          active(engine, "绿色").hits == 1,
+          f"hits={active(engine, '绿色').hits}")
+
+    # 自由练习时按住 L1（别的动作的修饰键）会把马赛回旋整个跳过；
+    # 专项练习只看当前动作，不该受别的动作的修饰键影响。
+    def feed_roulette(target: Engine, extra, start_at: float = 0.0) -> None:
+        n = 125                       # 500ms @ 250Hz
+        for i in range(n + 1):
+            tick(target, start_at + i * 0.004,
+                 rs_angle=180.0 + 180.0 * i / n, rs_mag=0.95,
+                 buttons=extra, ls_angle=0.0, ls_mag=0.9)
+
+    # 注意这里**没有**先回中：切完专项立刻起手也要能判定
+    # （识别器被置为未武装的话，这一下会被静默吞掉）
+    focused = new_engine()
+    focused.set_focus(active(focused, "马赛回旋"))
+    feed_roulette(focused, {"LB"})
+    check("专项练习：切过去立刻起手也能判定（按住 L1 也一样）",
+          active(focused, "马赛回旋").hits == 1,
+          f"hits={active(focused, '马赛回旋').hits}")
+
+    free = new_engine()
+    feed_roulette(free, {"LB"})
+    check("自由练习：按住 L1 时马赛回旋按老规则不参与判定",
+          active(free, "马赛回旋").hits == 0,
+          f"hits={active(free, '马赛回旋').hits}")
+
+    # 专项练习外的手势不该产生结果；同一条轨迹在自由练习下必须会命中，
+    # 否则这条检查对"隔离失效"没有区分度（假通过）。
+    outsider = new_engine()
+    outsider.set_focus(active(outsider, "绿色"))
+    seq = outsider.outcome_seq
+    feed_roulette(outsider, ())
+    check("专项练习外的手势不产生任何结果（成功/失败都没有）",
+          outsider.outcome_seq == seq, f"新增 {outsider.outcome_seq - seq} 条")
+
+    control = new_engine()
+    feed_roulette(control, ())
+    check("同一条轨迹在自由练习下确实会命中（证明上一条不是假通过）",
+          control.outcome_seq > 0, f"新增 {control.outcome_seq} 条")
+
+    # 半路切换专项：半截进度要作废，切回来不能补一条"没做完"
+    mid = new_engine()
+    for i in range(60):           # 马赛回旋只画 100° 就停手
+        tick(mid, i * 0.004, rs_angle=180.0 + 100.0 * i / 59, rs_mag=0.95)
+    before = mid.outcome_seq
+    mid.set_focus(active(mid, "绿色"))
+    for i in range(100):
+        tick(mid, 0.5 + i * 0.004, rs_mag=0.0)
+    mid.set_focus(None)
+    for i in range(50):
+        tick(mid, 1.2 + i * 0.004, rs_mag=0.0)
+    check("切换专项会作废半截进度，切回来不会补一条失败",
+          mid.outcome_seq == before, f"新增 {mid.outcome_seq - before} 条")
+
+    # 暂停判定（校准面板打开时）：按键不能算成动作
+    paused = new_engine()
+    paused.set_paused(True)
+    for f in tap_frames(0.0, 450):
+        tick(paused, f.now, buttons=f.buttons, ls_mag=0.0)
+    check("暂停判定时按键不会被当成动作",
+          paused.outcome_seq == 0 and all(a.hits == 0 for a in paused.skills))
+    paused.set_paused(False)
+    for f in tap_frames(2.0, 450):
+        tick(paused, f.now, buttons=f.buttons, ls_mag=0.0)
+    check("恢复判定后绿射照常",
+          active(paused, "绿色").hits == 1,
+          f"hits={active(paused, '绿色').hits}")
+
+    engine.set_focus(active(engine, "马赛回旋"))
+    check("切换专项时清掉上一条结果，避免显示别的动作",
+          engine.last_outcome is None)
+    check("换一个动作后参与判定的也换过去了",
+          engine.active_skills() == [active(engine, "马赛回旋")])
+
+    engine.set_focus(None)
+    check("关掉专项练习后恢复自由练习",
+          engine.focus is None and len(engine.active_skills()) == len(engine.skills))
+
+
+def test_button_names() -> None:
+    """按键校准：配置校验 + 覆盖自动键表（设备不被识别时的救命功能）。"""
+    print()
+    print("[6d] 按键校准 —— input.button_names 覆盖猜测出来的键表")
+
+    layout = AxisLayout()
+    layout.buttons = {"A": 0, "B": 1, "X": 2, "Y": 3, "LB": 4, "RB": 5,
+                      "BACK": 6, "START": 7, "LS": 8, "RS": 9, "GUIDE": 10}
+    notes = apply_button_names(layout, {"X": 9})
+    check("把 X 改绑到 #9", layout.buttons["X"] == 9, str(layout.buttons))
+    check("同一个编号不能属于两个名字：原来的 RS 被摘掉",
+          "RS" not in layout.buttons, str(layout.buttons))
+    check("冲突会给出提示", any("RS" in n for n in notes), str(notes))
+
+    layout.buttons = {"X": 2, "RB": 5}
+    apply_button_names(layout, {"L1": 4})
+    check("别名 L1 自动规范成 LB", layout.buttons.get("LB") == 4,
+          str(layout.buttons))
+
+    def parse(button_names):
+        raw = dict(DEFAULT_CONFIG)
+        raw["input"] = dict(DEFAULT_CONFIG["input"], button_names=button_names)
+        return parse_config(raw)
+
+    cfg = parse({"X": 9, "RB": 4})
+    check("配置能解析 button_names",
+          cfg.input.button_names == {"X": 9, "RB": 4},
+          str(cfg.input.button_names))
+    check("不写 button_names 时是 None（完全用自动识别）",
+          parse(None).input.button_names is None)
+
+    for value, why in (
+        ({"X": 9, "RB": 9}, "两个名字用同一个编号"),
+        ({"L9": 3}, "按键名写错"),
+        ({"X": "九"}, "编号不是整数"),
+        ({"X": -1}, "编号是负数"),
+    ):
+        try:
+            parse(value)
+        except ValueError as exc:
+            check(f"button_names 非法（{why}）-> 报错", True, str(exc)[:60])
+        else:
+            check(f"button_names 非法（{why}）-> 报错", False)
+
+
 def test_engine_gesture_lock(cfg) -> None:
     """一次动作触发后要回中才允许下一个；长时间不动则清空进度。"""
     print("\n[8b] 引擎层：手势锁 + 全局空闲清零")
@@ -1466,6 +1618,8 @@ def main() -> int:
     test_engine_gesture_lock(cfg)
     test_engine_facing_and_group(cfg)
     test_button_taps(cfg)
+    test_focus_mode(cfg)
+    test_button_names()
     test_failure_diagnostics(cfg)
     test_rumble_state_machine()
     test_config_validation()

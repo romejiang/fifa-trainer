@@ -30,6 +30,7 @@ from .geometry import angle_of, magnitude
 __all__ = [
     "PadState", "AxisLayout", "GamepadSource", "PygameJoystickSource",
     "canonical_button", "list_devices", "CANONICAL_BUTTONS", "open_source",
+    "apply_button_names",
 ]
 
 CANONICAL_BUTTONS: Tuple[str, ...] = (
@@ -325,6 +326,39 @@ def apply_axis_inverts(layout: AxisLayout,
     return layout
 
 
+def apply_button_names(layout: AxisLayout,
+                       names: Optional[Dict[str, Any]]) -> List[str]:
+    """把用户校准过的 {"规范名": 原始键编号} 覆盖到布局的按键表上。
+
+    设备不被 SDL 认识时，按键名只能靠标准 Xbox 顺序去猜；猜错的表现就是
+    "摇杆动作全对，需要按键的动作怎么按都没反应"。校准面板写下来的表就是
+    用来盖掉这份猜测的。
+
+    一个物理键只能属于一个名字：如果新绑定的编号已经被别的名字占用，
+    就把旧名字摘掉（反查表按编号找名字，留两个只会有一个生效）。
+    返回给用户看的冲突说明，正常情况下是空列表。
+    """
+    notes: List[str] = []
+    if not isinstance(names, dict):
+        return notes
+    for raw_name, raw_index in names.items():
+        try:
+            canon = canonical_button(raw_name)
+            index = int(raw_index)
+        except (TypeError, ValueError):
+            notes.append(f"按键校准里的 {raw_name!r}={raw_index!r} 无效，已忽略")
+            continue
+        if index < 0:
+            notes.append(f"按键校准里 {canon} 的编号不能是负数，已忽略")
+            continue
+        for other, other_index in list(layout.buttons.items()):
+            if other_index == index and other != canon:
+                del layout.buttons[other]
+                notes.append(f"{other} 原本也绑在 #{index}，已改为未绑定")
+        layout.buttons[canon] = index
+    return notes
+
+
 def _deadzone(x: float, y: float, dz: float) -> Tuple[float, float]:
     """带重新缩放的死区处理：角度不变，可用行程被拉满。"""
     m = math.hypot(x, y)
@@ -360,7 +394,8 @@ class PygameJoystickSource(GamepadSource):
     def __init__(self, index: int = 0, layout: Optional[Dict[str, Any]] = None,
                  deadzone: float = 0.08, trigger_threshold: float = 0.35,
                  calibration_ms: int = 250, verbose: bool = True,
-                 invert: Optional[Dict[str, Any]] = None):
+                 invert: Optional[Dict[str, Any]] = None,
+                 button_names: Optional[Dict[str, Any]] = None):
         import pygame
 
         self._pygame = pygame
@@ -400,8 +435,42 @@ class PygameJoystickSource(GamepadSource):
         if self.axis_invert:
             apply_axis_inverts(self.layout, self.axis_invert)
 
+        # 按键校准：记下自动识别的原始表，用户改过的表叠在上面。
+        # 保留基线是为了让 GUI 里"清除某一项"能退回自动值，而不是越改越乱。
+        self._auto_buttons: Dict[str, int] = dict(self.layout.buttons)
+        self.button_names: Dict[str, int] = {}
+        self.button_notes: List[str] = []
+        self.set_button_names(button_names or {})
+
         if verbose:
             self._print_layout_report()
+
+    # -- 按键校准 ----------------------------------------------------------
+
+    def set_button_names(self, names: Dict[str, Any]) -> List[str]:
+        """用校准过的按键表覆盖自动识别结果，立刻生效（不用重开手柄）。
+
+        `names` 是完整的 {规范名: 原始编号}；传空 {} 就退回自动识别的表。
+        名字->编号的映射每帧都会反查，所以改完下一帧就能按到。
+        """
+        self.layout.buttons = dict(self._auto_buttons)
+        self.button_names = {}
+        for key, value in (names or {}).items():
+            try:
+                self.button_names[canonical_button(key)] = int(value)
+            except (TypeError, ValueError):
+                continue          # 非法项交给 apply_button_names 去提示
+        self.button_notes = apply_button_names(self.layout, names)
+        return self.button_notes
+
+    def button_overrides(self) -> Dict[str, int]:
+        """当前生效的按键里，跟自动识别不一样的那些。
+
+        校准面板写进配置的就是这张表：只存改过的项，换手柄时不会被
+        一台设备的编号永久钉死。
+        """
+        return {name: index for name, index in self.layout.buttons.items()
+                if self._auto_buttons.get(name) != index}
 
     # -- 初始化辅助 --------------------------------------------------------
 
@@ -635,6 +704,7 @@ def open_source(cfg: Any, verbose: bool = False) -> PygameJoystickSource:
         index=cfg.joystick_index,
         layout=cfg.axis_layout,
         invert=getattr(cfg, "invert", None),
+        button_names=getattr(cfg, "button_names", None),
         deadzone=cfg.deadzone,
         trigger_threshold=cfg.trigger_threshold,
         calibration_ms=cfg.calibration_ms,

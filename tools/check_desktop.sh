@@ -1,18 +1,18 @@
 #!/usr/bin/env bash
-# 桌面版回归闸门：230 项检查必须全绿，且检查项名称与搬迁前基线逐项一致。
+# 桌面版回归闸门：302 项检查必须全绿，且检查项名称与基线逐项一致。
 #
 #   bash tools/check_desktop.sh
 #
 # 一条命令同时证明四件事：配置副本与唯一真源一致、检查项基线未被重新生成、
-# 锁文件未漂移、桌面两套件 182 + 48 项全部通过。
+# 锁文件未漂移、桌面两套件 205 + 97 项全部通过。
 #
-# 基线 shared/expected_checks.txt 在搬迁前生成，本阶段禁止重新生成；若未来
-# 合法新增检查，必须同时显式修改下面的常量并在提交信息中说明理由。
+# 基线 shared/expected_checks.txt 只允许随「合法新增检查」重新生成；每次都要
+# 显式修改下面的常量，并在提交信息里说明理由。
 # 这条常量是「基线不可重写」的机械化落点：改基线而不改常量，闸门必红。
 
 set -euo pipefail
 
-BASELINE_SHA256=724b40a3904ddd37be432967f96ff99b8427e6b2e2e6369ef4b7b9f41a0a596a
+BASELINE_SHA256=414ccb727b85696b352164036a1f1d05f3216809e929cffa1c90d8ade920c3d4
 readonly BASELINE_SHA256
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -78,8 +78,8 @@ run_suite() {  # $1=相对 desktop 的测试脚本 $2=期望检查项数量
     cat "$out"
 }
 
-{ run_suite tests/test_detectors.py 182
-  run_suite tests/test_gui_smoke.py 48; } | LC_ALL=C sort > "$tmp/actual.txt"
+{ run_suite tests/test_detectors.py 205
+  run_suite tests/test_gui_smoke.py 97; } | LC_ALL=C sort > "$tmp/actual.txt"
 
 # set -e 下裸 diff 一旦有差异会直接退出，来不及打印中文提示，所以包进 if。
 if ! diff -u "$baseline" "$tmp/actual.txt"; then
@@ -87,4 +87,4 @@ if ! diff -u "$baseline" "$tmp/actual.txt"; then
     exit 1
 fi
 
-echo "✓ 230 项检查全部通过，名称与基线逐项一致"
+echo "✓ 302 项检查全部通过，名称与基线逐项一致"

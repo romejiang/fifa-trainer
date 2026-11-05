@@ -27,8 +27,9 @@ import pygame
 from padskills.config import dump_default_config, load_config
 from padskills.engine import Engine
 from padskills.gui import (
-    DemoSource, TrainerApp, W, H, find_cjk_font,
+    DemoSource, TrainerApp, W, H, _CAL_BUTTONS, find_cjk_font,
 )
+from padskills.input_source import AxisLayout, PadState, apply_button_names
 from padskills.rumble import RumbleEngine
 
 PASS = 0
@@ -237,6 +238,7 @@ def test_diagnostic_log() -> None:
           "RS=90.0°" in text and "raw=(+0.90,+0.00)" in text)
     check("诊断日志：记录了 La Croqueta 的保持进度",
           "La Croqueta=保持" in text and "350ms" in text)
+    # 演示模式没有真实布局，设备那几行用假手柄单独验证（见 test_session_log）
 
     # 没按 L1：提示应该写进日志，而不是只留在界面上
     app._diag_buttons = frozenset({"LB"})
@@ -251,6 +253,27 @@ def test_diagnostic_log() -> None:
     text2 = path.read_text(encoding="utf-8")
     check("诊断日志：没按 L1 时记下\"方向对了，要按住 L1\"",
           "方向对了，要按住 L1" in text2)
+
+    # 按了一颗映射表里没有的键：这是"按了没反应"最直接的证据
+    app._open_log(path)
+    odd = PadState(ls_x=0.0, ls_y=-0.9, raw_buttons=(11,))
+    app._diagnose(t0 + 3.0, odd)
+    app._close_log()
+    text3 = path.read_text(encoding="utf-8")
+    check("诊断日志：未映射的原始键会被标出来",
+          "原始按键=[11]" in text3 and "无对应按键名" in text3)
+
+    # 绿射第一下按下：状态变化要落进日志（打包版看不到卡片提示）
+    app._open_log(path)
+    for i in range(30):
+        buttons = frozenset({"RB", "X"}) if i >= 10 else frozenset({"RB"})
+        st = PadState(ls_x=0.0, ls_y=-0.9, buttons=buttons)
+        app.engine._tick(t0 + 4.0 + i * 0.004, st)
+        app._diagnose(t0 + 4.0 + i * 0.004, st)
+    app._close_log()
+    text4 = path.read_text(encoding="utf-8")
+    check("诊断日志：绿射按下第一下时状态落进日志",
+          "状态 绿色搓射 Green Finesse: 已按第一下 X" in text4)
 
 def test_config_error() -> None:
     tmp = Path(tempfile.mkdtemp(prefix="fifa-bad-"))
@@ -423,6 +446,343 @@ def test_modifier_switch() -> None:
     check("GUI：带选项的卡片能正常绘制", ok)
 
 
+def test_focus_switch() -> None:
+    """卡片左边的开关：打开后只判定这一个动作，其余卡片置灰。"""
+    screen = pygame.display.set_mode((W, H))
+    app = TrainerApp(pygame, str(_cfg_path), None, demo=True)
+    app.screen = screen
+    assert app._open_device() and app.engine is not None
+    app.state = DemoSource().poll()
+    app._draw(0.0)
+
+    green = next(a for a in app.engine.skills if "绿色" in a.skill.name)
+    switches = [(rect, active) for rect, active in app._focus_hits]
+    green_switch = next(rect for rect, active in switches if active is green)
+    check("GUI：每个动作卡片都有专项练习开关",
+          len(switches) == len(app.engine.skills), f"{len(switches)} 个")
+
+    pygame.event.post(pygame.event.Event(
+        pygame.MOUSEBUTTONDOWN, button=1, pos=green_switch.center))
+    app._handle_events("play")
+    check("GUI：点开关 -> 进入该动作的专项练习",
+          app.engine.focus is green, str(app.engine.focus))
+    check("GUI：其它动作不再参与判定",
+          app.engine.active_skills() == [green],
+          str([a.skill.name for a in app.engine.active_skills()]))
+    check("GUI：给出一句提示", "专项" in app.notice, app.notice)
+    check("GUI：切换专项后清掉上一条结果", app.engine.last_outcome is None)
+
+    ok = True
+    try:
+        app._draw(0.2)          # 置灰的卡片 + 高亮的卡片都要能画
+    except Exception as exc:
+        ok = False
+        print(f"    绘制异常: {type(exc).__name__}: {exc}")
+    check("GUI：专项练习界面能正常绘制", ok)
+
+    pygame.event.post(pygame.event.Event(
+        pygame.MOUSEBUTTONDOWN, button=1, pos=green_switch.center))
+    app._handle_events("play")
+    check("GUI：再点一次回到自由练习",
+          app.engine.focus is None
+          and len(app.engine.active_skills()) == len(app.engine.skills))
+
+    # 键盘也要能开专项：数字键 1 = 第一张卡片
+    pygame.event.post(pygame.event.Event(
+        pygame.KEYDOWN, key=pygame.K_1, mod=0, unicode="1", scancode=0))
+    app._handle_events("play")
+    check("GUI：数字键 1 等于点第一个开关",
+          app.engine.focus is app.engine.skills[0],
+          app.engine.focus.skill.name if app.engine.focus else "无")
+    pygame.event.post(pygame.event.Event(
+        pygame.KEYDOWN, key=pygame.K_1, mod=0, unicode="1", scancode=0))
+    app._handle_events("play")
+    check("GUI：再按数字键 1 关掉专项", app.engine.focus is None)
+
+    # T = 点绿色搓射卡片上的 RB / RT 徽章
+    before = green.skill.required_buttons
+    pygame.event.post(pygame.event.Event(
+        pygame.KEYDOWN, key=pygame.K_t, mod=0, unicode="t", scancode=0))
+    app._handle_events("play")
+    check("GUI：T 切换修饰键（RB <-> RT）",
+          green.skill.required_buttons != before
+          and green.detector.required == green.skill.required_buttons,
+          f"{before} -> {green.skill.required_buttons}")
+    pygame.event.post(pygame.event.Event(
+        pygame.KEYDOWN, key=pygame.K_t, mod=0, unicode="t", scancode=0))
+    app._handle_events("play")
+    check("GUI：再按 T 切回来", green.skill.required_buttons == before,
+          str(green.skill.required_buttons))
+
+
+class _FakePad:
+    """带 layout 的假手柄源：验证校准面板的绑定与写盘，不需要真手柄。"""
+
+    name = "测试手柄"
+    layout_source = "测试"
+    guid = "03000000deadbeef0000000000000000"
+    num_axes = 10
+    num_buttons = 12
+    num_hats = 1
+
+    def __init__(self) -> None:
+        self.auto = {"A": 0, "B": 1, "X": 2, "Y": 3, "LB": 4, "RB": 5,
+                     "BACK": 6, "START": 7, "LS": 8, "RS": 9, "GUIDE": 10}
+        self.layout = AxisLayout()
+        self.layout.buttons = dict(self.auto)
+        self.button_names = {}
+        self.button_notes = []
+        self._rest = [{"mean": 0.0}, {"mean": 0.0}, {"mean": 0.0},
+                      {"mean": 0.0}, {"mean": -1.0}, {"mean": -1.0}]
+        self.applied = {}
+
+    def set_button_names(self, names):
+        self.applied = dict(names)
+        self.layout.buttons = dict(self.auto)
+        return apply_button_names(self.layout, names)
+
+    def button_overrides(self):
+        return {name: index for name, index in self.layout.buttons.items()
+                if self.auto.get(name) != index}
+
+    def poll(self):
+        return PadState()
+
+    def close(self) -> None:
+        pass
+
+
+def test_calibration_panel() -> None:
+    """B 打开按键校准：按一下真键 -> 绑定 -> 写回 input.button_names。"""
+    tmp = Path(tempfile.mkdtemp(prefix="fifa-cal-"))
+    path = dump_default_config(tmp / "skills_config.json")
+    screen = pygame.display.set_mode((W, H))
+    app = TrainerApp(pygame, str(path), None, demo=True)
+    app.screen = screen
+    assert app._open_device() and app.engine is not None
+    app.state = PadState()
+
+    app._open_calibration()
+    check("GUI：演示模式（没有真实手柄）打不开按键校准",
+          not app._cal_open and app.engine.paused is False)
+
+    pad = _FakePad()
+    app.engine.source = pad
+    app._open_calibration()
+    check("GUI：B 打开按键校准面板", app._cal_open)
+    check("GUI：校准期间暂停判定（按的键不会被当成动作）",
+          app.engine.paused is True)
+    check("GUI：面板读出当前的自动键表", app._cal_map.get("X") == 2,
+          str(app._cal_map))
+
+    app._cal_sel = _CAL_BUTTONS.index("X")
+    app._cal_capture(1.0, PadState(raw_buttons=(9,)))
+    check("GUI：按一下原始键 #9 -> 绑定到 X", app._cal_map.get("X") == 9,
+          str(app._cal_map))
+    check("GUI：原本占着 #9 的 RS 被摘掉",
+          app._cal_map.get("RS") is None, str(app._cal_map))
+    check("GUI：绑定立即生效到手柄源", pad.applied.get("X") == 9,
+          str(pad.applied))
+
+    ok = True
+    try:
+        app._draw(1.0)
+    except Exception as exc:
+        ok = False
+        print(f"    绘制异常: {type(exc).__name__}: {exc}")
+    check("GUI：按键校准面板能正常绘制", ok)
+
+    buttons = {action: rect for rect, action in app._cal_btn_hits}
+    check("GUI：面板底部画出保存/清除/关闭三个按钮",
+          set(buttons) == {"save", "clear", "close"}, str(sorted(buttons)))
+
+    # 鼠标点『保存』（和按 S 等效）
+    pygame.event.post(pygame.event.Event(
+        pygame.MOUSEBUTTONDOWN, button=1, pos=buttons["save"].center))
+    app._handle_events("play")
+    saved = json.loads(path.read_bytes().decode("utf-8"))
+    check("GUI：点『保存』写进 input.button_names",
+          saved["input"]["button_names"].get("X") == 9,
+          str(saved["input"]["button_names"]))
+    check("GUI：只写改过的项，不把整张自动表钉进配置",
+          set(saved["input"]["button_names"]) == {"X"},
+          str(saved["input"]["button_names"]))
+    check("GUI：保存后配置文件还能正常解析",
+          load_config(path).input.button_names.get("X") == 9)
+
+    # 鼠标点一行选中它
+    row = next(rect for rect, index in app._cal_hits
+               if _CAL_BUTTONS[index] == "X")
+    pygame.event.post(pygame.event.Event(
+        pygame.MOUSEBUTTONDOWN, button=1, pos=row.center))
+    app._handle_events("play")
+    check("GUI：点一行就能选中它", _CAL_BUTTONS[app._cal_sel] == "X",
+          _CAL_BUTTONS[app._cal_sel])
+
+    # 鼠标点『清除』
+    pygame.event.post(pygame.event.Event(
+        pygame.MOUSEBUTTONDOWN, button=1, pos=buttons["clear"].center))
+    app._handle_events("play")
+    check("GUI：点『清除』后这一项退回自动识别", app._cal_map.get("X") == 2,
+          str(app._cal_map))
+
+    # 面板打开时要吞掉其它快捷键，免得在背后误触 R 清统计
+    app.history.append(("12:00:00", _fake_outcome()))
+    pygame.event.post(pygame.event.Event(
+        pygame.KEYDOWN, key=pygame.K_r, mod=0, unicode="r", scancode=0))
+    app._handle_events("play")
+    check("GUI：校准面板打开时吞掉其它快捷键", bool(app.history))
+
+    pygame.event.post(pygame.event.Event(
+        pygame.KEYDOWN, key=pygame.K_ESCAPE, mod=0, unicode="", scancode=0))
+    app._handle_events("play")
+    check("GUI：Esc 关闭面板、恢复判定且不退出程序",
+          not app._cal_open and app._running and app.engine.paused is False)
+
+    # 用鼠标把面板关掉（不用键盘）
+    app._open_calibration()
+    app._draw(2.0)
+    buttons = {action: rect for rect, action in app._cal_btn_hits}
+    pygame.event.post(pygame.event.Event(
+        pygame.MOUSEBUTTONDOWN, button=1, pos=buttons["close"].center))
+    app._handle_events("play")
+    check("GUI：点『关闭』就能退出校准面板（不需要键盘）",
+          not app._cal_open and app.engine.paused is False)
+
+    # 点面板外面的灰色区域也能关掉
+    app._open_calibration()
+    app._draw(2.1)
+    pygame.event.post(pygame.event.Event(
+        pygame.MOUSEBUTTONDOWN, button=1, pos=(10, 10)))
+    app._handle_events("play")
+    check("GUI：点面板外的灰色区域也能关闭", not app._cal_open)
+
+    # 把 RB 绑到 #4（原本是 LB）：油炸丸子要用的 LB 会被摘掉，必须当场提醒
+    app._open_calibration()
+    app._cal_sel = _CAL_BUTTONS.index("RB")
+    app._cal_capture(3.0, PadState(raw_buttons=(4,)))
+    check("GUI：抢走别的动作要用的键时给出警告",
+          "LB" in app._cal_warning and "失效" in app._cal_warning,
+          app._cal_warning)
+
+
+def test_session_log() -> None:
+    """启动时的设备/键位信息要够事后远程排查用。"""
+    screen = pygame.display.set_mode((W, H))
+    app = TrainerApp(pygame, str(_cfg_path), None, demo=True)
+    app.screen = screen
+    assert app._open_device() and app.engine is not None
+
+    pad = _FakePad()
+    app.engine.source = pad
+    tmp = Path(tempfile.mkdtemp(prefix="fifa-session-"))
+    path = tmp / "trainer.log"
+    app._open_log(path)
+    app._log_session(pad)
+    app._close_log()
+    text = path.read_text(encoding="utf-8")
+
+    check("诊断日志：写下手柄型号/GUID/轴键帽数量",
+          "GUID=03000000deadbeef" in text and "轴=10" in text
+          and "键=12" in text and "帽=1" in text)
+    check("诊断日志：写下轴布局与扳机来源",
+          "LT=轴4" in text and "RT=轴5" in text and "扳机静止值=" in text)
+    check("诊断日志：写下轴静止值",
+          "轴静止值 +0.00 +0.00 +0.00 +0.00 -1.00 -1.00" in text)
+    check("诊断日志：写下每个动作实际在等哪颗键",
+          "动作按键 绿色搓射 Green Finesse: 按住 RB=#5 + 连按 X=#2" in text,
+          "按住 RB + 连按 X")
+    check("诊断日志：taps 动作的日志不再是画弧字段",
+          "button=X" in text and "间隔=400~600ms" in text
+          and "start=None" not in text.split("绿色搓射")[1].splitlines()[0])
+
+
+def test_hotkey_buttons() -> None:
+    """底部快捷键做成按钮：鼠标点一下和按键盘等效。"""
+    screen = pygame.display.set_mode((W, H))
+    app = TrainerApp(pygame, str(_cfg_path), None, demo=True)
+    app.screen = screen
+    assert app._open_device() and app.engine is not None
+    app.state = DemoSource().poll()
+    app._draw(0.0)
+
+    keys = {action: rect for rect, action in app._hotkey_hits}
+    check("GUI：底部画出 5 个快捷键按钮",
+          set(keys) == {"reset", "calibrate", "snapshot", "folder", "quit"},
+          str(sorted(keys)))
+
+    app.history.append(("12:00:00", _fake_outcome()))
+    pygame.event.post(pygame.event.Event(
+        pygame.MOUSEBUTTONDOWN, button=1, pos=keys["reset"].center))
+    app._handle_events("play")
+    check("GUI：点『重置统计』等于按 R",
+          not app.history and "清零" in app.notice, app.notice)
+
+    pad = _FakePad()
+    app.engine.source = pad
+    tmp = Path(tempfile.mkdtemp(prefix="fifa-hotkey-"))
+    log = tmp / "trainer.log"
+    app._open_log(log)
+    pygame.event.post(pygame.event.Event(
+        pygame.MOUSEBUTTONDOWN, button=1, pos=keys["snapshot"].center))
+    app._handle_events("play")
+    app._close_log()
+    text = log.read_text(encoding="utf-8")
+    check("GUI：点『诊断快照』把完整状态写进日志",
+          "诊断快照" in text and "生效键表" in text and "原始轴" in text
+          and "动作按键 绿色搓射" in text,
+          text.split("诊断快照")[-1].splitlines()[0][:40] if "诊断快照" in text else "无")
+
+    pygame.event.post(pygame.event.Event(
+        pygame.MOUSEBUTTONDOWN, button=1, pos=keys["calibrate"].center))
+    app._handle_events("play")
+    check("GUI：点『按键校准』等于按 B", app._cal_open)
+    app._close_calibration()
+
+    pygame.event.post(pygame.event.Event(
+        pygame.MOUSEBUTTONDOWN, button=1, pos=keys["quit"].center))
+    app._handle_events("play")
+    check("GUI：点『退出』和按 Esc 等效", not app._running)
+
+
+def test_persist_button_names() -> None:
+    """写盘只动 input.button_names：空对象、null、BOM 都不能把配置写坏。"""
+    screen = pygame.display.set_mode((W, H))
+    cases = {
+        "空 input 对象": '{"input": {}, "skills": []}',
+        "只带空白的 input": '{"input": {\n  }, "skills": []}',
+        "input 为 null": '{"input": null, "skills": []}',
+        "已有 button_names": '{"input": {"button_names": null}, "skills": []}',
+        "readme 里提到 input": '{"_readme": ["input 段说明"], "input": {"poll_hz": 250}, "skills": []}',
+        "带 BOM": '\ufeff{"input": {"poll_hz": 250}, "skills": []}',
+    }
+    for label, text in cases.items():
+        root = Path(tempfile.mkdtemp(prefix="fifa-persist-"))
+        path = root / "skills_config.json"
+        path.write_text(text, encoding="utf-8")
+        app = TrainerApp(pygame, str(path), None, demo=True)
+        app.screen = screen
+        ok, message = app._persist_button_names({"X": 9})
+        try:
+            parsed = json.loads(path.read_bytes().decode("utf-8").lstrip("\ufeff"))
+            got = (parsed.get("input") or {}).get("button_names")
+        except Exception as exc:
+            parsed, got = {}, f"JSON 坏了: {exc}"
+        check(f"写盘：{label}", ok and got == {"X": 9},
+              f"ok={ok} got={got} {message}")
+
+    # 没有 input 段时应该安全地失败，而不是写坏文件
+    root = Path(tempfile.mkdtemp(prefix="fifa-persist-"))
+    path = root / "skills_config.json"
+    path.write_text('{"skills": []}', encoding="utf-8")
+    app = TrainerApp(pygame, str(path), None, demo=True)
+    app.screen = screen
+    ok, message = app._persist_button_names({"X": 9})
+    check("写盘：没有 input 段 -> 报错且不动文件",
+          not ok and path.read_text(encoding="utf-8") == '{"skills": []}',
+          message)
+
+
 def _fake_outcome():
     from padskills.engine import Outcome
     return Outcome(skill_name="测试", ok=False, code="too_fast",
@@ -449,10 +809,15 @@ def main() -> int:
     test_draw()
     test_stick_point()
     test_diagnostic_log()
+    test_session_log()
     test_config_error()
     test_hotkeys()
     test_history_scroll()
     test_modifier_switch()
+    test_focus_switch()
+    test_calibration_panel()
+    test_hotkey_buttons()
+    test_persist_button_names()
 
     pygame.quit()
 

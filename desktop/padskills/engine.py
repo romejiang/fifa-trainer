@@ -114,6 +114,12 @@ class Engine:
             ActiveSkill(skill=s, detector=build_detector(s))
             for s in cfg.enabled_skills()
         ]
+        # 专项练习：只让指定动作参与判定，其余动作完全不喂数据。
+        # 自由练习时几个动作会同时给出"方向对了/保持中"的提示，互相干扰；
+        # 专项模式下只有一个识别器在跑，提示和成败都只属于它。
+        self.focus: Optional[ActiveSkill] = None
+        # 暂停判定（按键校准面板打开时用），不影响采样和 GUI 刷新
+        self.paused = False
         self.facing = cfg.input.initial_facing_deg
         # 左摇杆回中时没有"球员朝向"，所有相对朝向判定的动作都不成立
         self.facing_valid = False
@@ -146,6 +152,50 @@ class Engine:
         # 最近一次尝试的结果；GUI 靠 outcome_seq 判断有没有新结果
         self.last_outcome: Optional[Outcome] = None
         self.outcome_seq = 0
+
+    # ------------------------------------------------------------------
+    # 专项练习
+    # ------------------------------------------------------------------
+
+    def active_skills(self) -> List[ActiveSkill]:
+        """当前参与判定的动作。专项练习时只有那一个。"""
+        return [self.focus] if self.focus is not None else self.skills
+
+    def set_focus(self, active: Optional[ActiveSkill]) -> None:
+        """开关专项练习。传 None 回到自由练习。
+
+        切换时把所有识别器的半截进度清掉：否则从"练绿射"切回自由练习，
+        上一段摇杆轨迹还挂在别的动作里，会立刻报一条莫名其妙的失败。
+        """
+        if active is not None and active not in self.skills:
+            return
+        self.focus = active
+        self._reset_progress()
+        self.last_outcome = None
+
+    def set_paused(self, paused: bool) -> None:
+        """暂停/恢复判定。恢复时清掉暂停期间攒下的半截进度。"""
+        paused = bool(paused)
+        if paused == self.paused:
+            return
+        self.paused = paused
+        if not paused:
+            self._reset_progress()
+
+    def _reset_progress(self) -> None:
+        """丢掉所有未完成的进度，并让动作可以立刻重新起手。
+
+        先 ``abandon()`` 静默清空（不会像 ``reset()`` 那样报"中途松手"），
+        再 ``on_idle()`` 把 armed 拉回 True。少了后半步，画弧/序列动作要等
+        摇杆回中 120~150ms 才重新武装，点完专项开关马上出手的第一下会被吃掉。
+        """
+        for item in self.skills:
+            item.detector.abandon()
+            item.detector.on_idle()
+        self._gesture_locked = False
+        self._lock_release_since = None
+        self._idle_since = None
+        self._idle_cleared = False
 
     # ------------------------------------------------------------------
     # 主循环
@@ -203,6 +253,12 @@ class Engine:
         if ls_ok:
             self.facing = state.ls_angle
 
+        if self.paused:
+            # 暂停判定（校准面板打开时）：照样采样，但不识别、不记结果、不震动，
+            # 否则校准用的按键会被当成真实动作，边校准边震。
+            self.rumble.update(now)   # 让已经开始的那一下自然震完
+            return
+
         frame = Frame(
             now=now,
             state=state,
@@ -234,9 +290,12 @@ class Engine:
 
         # 按住某个动作的修饰键（例如 L1）时，只判定需要这个键的动作：
         # 现在按着 L1 就只可能是油炸丸子，其他动作整个跳过，不参与竞争。
+        # 专项练习时只看得到当前动作：别的动作的修饰键被按住也不该影响判定
+        # （否则"练绿射时顺手按了 L1"会把绿射整个跳过）。
+        active_skills = self.active_skills()
         held_required = {
             b
-            for active in self.skills
+            for active in active_skills
             for b in active.skill.required_buttons
             if b in state.buttons
         }
@@ -247,14 +306,14 @@ class Engine:
                 self._idle_since = now
             if (not self._idle_cleared
                     and (now - self._idle_since) * 1000.0 >= self.cfg.input.idle_reset_ms):
-                for active in self.skills:
+                for active in active_skills:
                     active.detector.on_idle()
                 self._idle_cleared = True
         else:
             self._idle_since = None
             self._idle_cleared = False
 
-        for active in self.skills:
+        for active in active_skills:
             # 按住了别的动作的修饰键 -> 这个动作今天不参与判定；
             # 静默丢弃半截进度，不能让它过一会儿报"没做完"。
             if (held_required
@@ -324,14 +383,14 @@ class Engine:
         不清进度的话，一次"从正前起手的踩单车"会顺手把磕球过人的第一步
         匹配上，等摇杆回中后又被报成"磕球没做完"——明明是同一个动作。
         """
-        for active in self.skills:
+        for active in self.active_skills():
             if active is winner:
                 continue
             active.detector.abandon()
 
     def _drain_failures(self, now: float) -> None:
         owner: Optional[ActiveSkill] = None
-        for active in self.skills:
+        for active in self.active_skills():
             failure = active.detector.pop_failure()
             if failure is None:
                 continue
