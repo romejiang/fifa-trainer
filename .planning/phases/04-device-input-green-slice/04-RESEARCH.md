@@ -899,7 +899,7 @@ core (纯)  ←── input (引擎绑定)  ←── ui (场景/Control)
 **D2 换手柄必须重探（成功标准 3 的后半）**
 1. 断开手柄 A，连上手柄 B（最好是不同品牌）。
 2. 判据：应用**不直接进入练习**，而是回到 S2/S3 并重新走探针；`controllers.json` 里出现第二个 key，且 A 的条目未被改写。
-3. 反例：把 B 的 `device_name` 手工改成与 A 相同（模拟同型号）后重连 —— 复用门必须因为「实测轴/符号不符」而丢弃并重探。**这一条是「绝不沿用上一次映射」的真正证明。**
+3. 反例（**必须改外层 key**）：`ProfileStore.find()` 用 `DeviceProfile.make_key(device_guid, device_name)` 算出的**实时 key** 去查（guid 非空 → `guid:<小写 guid>`，否则 `name:<去空白小写名>`），而档案在 `controllers.json` 里**以外层 key 为索引**存。因此「只把 B 的 `device_name` 改成与 A 相同」不会命中：外层 key 仍是 A 的 guid，`find(B_key)` 查不到，应用会走完整四步探针（看起来像「总是重探」，证明不了复用门）。正确做法：保留 A 条目的 `axes` / `calibration`，把它的**外层 key** 与内部 `key` / `device_guid` / `device_name` 一并改成 B 的值，force-stop 后重连 —— 复用门必须因实测 `rs_x` / `rs_y` 的 index 或 sign 不符而显示 `reuse_mismatch` 并重走四步。**这一条是「绝不沿用上一次映射」的真正证明。** 完整可执行步骤见 `04-06-PLAN.md` Task 3 的 D2 与 `04-07-PLAN.md` Task 2 的 D2。
 
 **D3 布局建议 + 按键确认（成功标准 4）**
 1. Xbox：S11 应显示「检测到 Xbox 布局」；按 A 继续。
