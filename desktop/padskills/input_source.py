@@ -21,6 +21,8 @@
 from __future__ import annotations
 
 import math
+import os
+import sys
 import time
 from dataclasses import dataclass, field
 from typing import Any, Dict, FrozenSet, List, Optional, Sequence, Tuple
@@ -676,30 +678,94 @@ def _query_sdl_mapping(joy: Any) -> Optional[Dict[str, Any]]:
 # ---------------------------------------------------------------------------
 
 def list_devices() -> List[Dict[str, Any]]:
-    """列出所有手柄，供 --list 使用。"""
+    """列出所有手柄，供 --list 使用。
+
+    Windows 上把 XInput 槽位单独列出来：有些接收器在 XInput 模式下不往
+    HID/SDL 接口送数据，只能靠 XInput 看到。
+    """
     import pygame
 
-    pygame.init()
-    pygame.event.pump()
     out: List[Dict[str, Any]] = []
-    for i in range(pygame.joystick.get_count()):
-        joy = pygame.joystick.Joystick(i)
-        info: Dict[str, Any] = {
-            "index": i,
-            "name": joy.get_name(),
-            "guid": joy.get_guid(),
-            "axes": joy.get_numaxes(),
-            "buttons": joy.get_numbuttons(),
-            "hats": joy.get_numhats(),
-            "sdl_mapping": _query_sdl_mapping(joy) is not None,
-            "rumble": hasattr(joy, "rumble"),
-        }
-        out.append(info)
+
+    # 先列 XInput：它是 Windows 上 Xbox 兼容手柄最可靠的一条路。
+    try:
+        from .xinput_source import connected_slots
+        for slot in connected_slots():
+            out.append({
+                "index": slot,
+                "name": f"XInput 手柄 #{slot}",
+                "guid": f"XInput:{slot}",
+                "axes": 6,
+                "buttons": 11,
+                "hats": 1,
+                "sdl_mapping": True,
+                "rumble": True,
+                "backend": "xinput",
+            })
+    except Exception:
+        pass
+
+    try:
+        pygame.init()
+        pygame.event.pump()
+        for i in range(pygame.joystick.get_count()):
+            joy = pygame.joystick.Joystick(i)
+            info: Dict[str, Any] = {
+                "index": i,
+                "name": joy.get_name(),
+                "guid": joy.get_guid(),
+                "axes": joy.get_numaxes(),
+                "buttons": joy.get_numbuttons(),
+                "hats": joy.get_numhats(),
+                "sdl_mapping": _query_sdl_mapping(joy) is not None,
+                "rumble": hasattr(joy, "rumble"),
+                "backend": "sdl",
+            }
+            out.append(info)
+    except Exception:
+        pass
     return out
 
 
-def open_source(cfg: Any, verbose: bool = False) -> PygameJoystickSource:
-    """按配置打开手柄。verbose=True 时打印完整的布局/键位报告。"""
+def _backend_choice() -> str:
+    """读环境变量覆盖；正常情况下走 auto。"""
+    value = os.environ.get("FIFA_INPUT_BACKEND", "auto").strip().lower()
+    return value if value in ("auto", "pygame", "xinput") else "auto"
+
+
+def open_source(cfg: Any, verbose: bool = False) -> GamepadSource:
+    """按配置打开手柄。verbose=True 时打印完整的布局/键位报告。
+
+    Windows 上默认优先用原生 XInput：部分接收器在 XInput 模式下只往
+    XInput 接口送数据，SDL 会枚举到静默的 HID 接口。显式写了
+    `input.axis_layout` 时仍走 SDL，因为那份轴号是给 SDL/原始轴用的。
+    """
+    choice = _backend_choice()
+
+    if sys.platform == "win32" and choice in ("auto", "xinput") \
+            and cfg.axis_layout is None:
+        try:
+            from .xinput_source import XInputSource, connected_slots
+            slots = connected_slots()
+            if slots:
+                slot = cfg.joystick_index if cfg.joystick_index in slots else slots[0]
+                return XInputSource(
+                    slot=slot,
+                    invert=getattr(cfg, "invert", None),
+                    button_names=getattr(cfg, "button_names", None),
+                    deadzone=cfg.deadzone,
+                    trigger_threshold=cfg.trigger_threshold,
+                    verbose=verbose,
+                )
+            if choice == "xinput":
+                raise RuntimeError(
+                    "没有检测到任何 XInput 手柄。请确认手柄已连接、已开机，"
+                    "并切到 XInput 模式（有线或 2.4G 接收器）。"
+                )
+        except Exception:
+            if choice == "xinput":
+                raise
+
     return PygameJoystickSource(
         index=cfg.joystick_index,
         layout=cfg.axis_layout,

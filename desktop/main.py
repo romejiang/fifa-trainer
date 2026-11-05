@@ -93,12 +93,20 @@ def cmd_list() -> int:
         print_controller_hints()
         return 1
     for d in devices:
-        print(f"\n  [{d['index']}] {d['name']}")
+        backend = d.get("backend", "sdl")
+        label = f"XInput {d['index']}" if backend == "xinput" else f"SDL {d['index']}"
+        print(f"\n  [{label}] {d['name']}")
         print(f"      GUID      : {d['guid']}")
         print(f"      轴/键/帽  : {d['axes']} / {d['buttons']} / {d['hats']}")
-        print(f"      SDL 映射表: {'有（布局可自动识别）' if d['sdl_mapping'] else '无（将回退到静止值分类）'}")
+        if backend == "xinput":
+            print("      布局来源  : 内置 XInput 标准映射")
+        else:
+            print(f"      布局来源  : "
+                  f"{'SDL 映射表（自动识别）' if d['sdl_mapping'] else '静止值分类（SDL 无此设备映射表）'}")
+        print(f"      后端      : {'XInput（原生）' if backend == 'xinput' else 'SDL / pygame'}")
         print(f"      震动接口  : {'可用' if d['rumble'] else '不可用'}")
-    print("\n  用 --index N 选择设备，或改配置里的 input.joystick_index。")
+    print("\n  用 --index N 选择设备（Windows 上 XInput 优先），"
+          "或改配置里的 input.joystick_index。")
     return 0
 
 
@@ -138,8 +146,10 @@ def cmd_selftest(cfg: AppConfig, joystick_index: int) -> int:
 
     joy = getattr(source, "_joy", None)
     step("逐个尝试震动后端（每个后端会震一下，注意手感）")
-    candidates = build_backends("auto", joystick=joy, joystick_index=joystick_index,
-                                verbose=True)
+    candidates = build_backends(
+        "auto", joystick=joy,
+        joystick_index=getattr(source, "xinput_slot", joystick_index),
+        verbose=True)
     if not candidates:
         print("  没有可用的震动后端。")
         source.close()
@@ -287,9 +297,10 @@ def main(argv: Optional[List[str]] = None) -> int:
     rumble_label = "已关闭"
     if cfg.rumble.enabled:
         joy = getattr(source, "_joy", None)
-        candidates = build_backends(cfg.rumble.backend, joystick=joy,
-                                    joystick_index=cfg.input.joystick_index,
-                                    verbose=verbose)
+        candidates = build_backends(
+            cfg.rumble.backend, joystick=joy,
+            joystick_index=getattr(source, "xinput_slot", cfg.input.joystick_index),
+            verbose=verbose)
         if candidates:
             if cfg.rumble.startup_test:
                 # 自检会真震一下，这就是"连接成功"的提示
