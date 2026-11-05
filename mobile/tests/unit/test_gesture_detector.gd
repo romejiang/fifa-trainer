@@ -103,9 +103,10 @@ func _check_meta(r, data: Dictionary) -> void:
 
 
 ## 规模与 id 下限：删空夹具、丢掉点名用例、复制 id 都必须变红。
+## 下限与 `test-core.sh` 的 grep 是**同一个数字**：两层不一致等于允许删语料仍绿。
 func _check_scale(r, cases: Array) -> void:
-	r.check(cases.size() >= 10, "detector 用例至少 10 条（实际 %d）" % cases.size())
-	if cases.size() < 10:
+	r.check(cases.size() >= 28, "detector 用例至少 28 条（实际 %d）" % cases.size())
+	if cases.size() < 28:
 		_mismatches += 1
 	var ids: Dictionary = {}
 	for case in cases:

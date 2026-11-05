@@ -241,6 +241,269 @@ CASES = (
     },
 )
 
+# 六类边界（RESEARCH §B.3）：时长 / 角度 / 起手 / 重新武装 / 保持 / 容差。
+# 每一条都刻意把「刀口」放在最后一帧：参考实现是「到区间就成功」，
+# 若边界值在轨迹中途就被满足，用例会提前命中，测不到那个边界。
+#
+# 为什么时长边界从 t0=100ms 起算：`elapsed_ms` 从检测器 `t0`（摇杆推过
+# enter 的那一帧）起算，不是从夹具第一帧起算。所以 `596` 指的是 sweep 段
+# 自己的时长，不是 `end_ms`。
+BOUNDARY_CASES = (
+    # 1. 马赛回旋上限 - 4ms：596ms 走完 100°，终点正好落在 280°（0±80 的
+    #    下边界），elapsed 596 <= 600 → ok。若上限判定早一帧，会先报 too_slow。
+    {
+        "id": "det_roulette_max_minus_4",
+        "kind": "detector",
+        "skill": "马赛回旋 Roulette",
+        "config": "shipped",
+        "end_ms": 700,
+        "segments": (
+            ("hold", 0, 96, 0.0, 0.0),
+            ("sweep", 100, 596, 180.0, 280.0, 0.9),
+            ("hold", 700, 700, 0.0, 0.0),
+        ),
+    },
+    # 2. 马赛回旋上限 + 4ms：604ms 才走到 280°。第 600ms 那一帧终点仍是
+    #    279.3°（窗口外），下一帧 elapsed 604 > 600 → too_slow。
+    {
+        "id": "det_roulette_max_plus_4",
+        "kind": "detector",
+        "skill": "马赛回旋 Roulette",
+        "config": "shipped",
+        "end_ms": 708,
+        "segments": (
+            ("hold", 0, 96, 0.0, 0.0),
+            ("sweep", 100, 604, 180.0, 280.0, 0.9),
+            ("hold", 708, 708, 0.0, 0.0),
+        ),
+    },
+    # 3. 马赛回旋下限 - 4ms：248ms 就转满 100° 且终点到位 → too_fast。
+    #    必须让终点窗口只在最后一帧才满足，否则会提前触发。
+    {
+        "id": "det_roulette_min_minus_4",
+        "kind": "detector",
+        "skill": "马赛回旋 Roulette",
+        "config": "shipped",
+        "end_ms": 400,
+        "segments": (
+            ("hold", 0, 96, 0.0, 0.0),
+            ("sweep", 100, 248, 180.0, 280.0, 0.9),
+            ("hold", 352, 400, 0.0, 0.0),
+        ),
+    },
+    # 4. 马赛回旋下限 + 4ms：252ms 转满 100° 且终点到位 → ok。
+    {
+        "id": "det_roulette_min_plus_4",
+        "kind": "detector",
+        "skill": "马赛回旋 Roulette",
+        "config": "shipped",
+        "end_ms": 400,
+        "segments": (
+            ("hold", 0, 96, 0.0, 0.0),
+            ("sweep", 100, 252, 180.0, 280.0, 0.9),
+            ("hold", 356, 400, 0.0, 0.0),
+        ),
+    },
+    # 5. 终点容差 - 1°：终点相对 79°（目标 0±80）。前 99° 停在 81°（窗口外
+    #    1°），最后一帧跳到 79° → ok。若容差少 1°，这一帧会是 wrong_end。
+    {
+        "id": "det_roulette_end_tol_minus_1",
+        "kind": "detector",
+        "skill": "马赛回旋 Roulette",
+        "config": "shipped",
+        "end_ms": 560,
+        "segments": (
+            ("hold", 0, 96, 0.0, 0.0),
+            ("sweep", 100, 396, 180.0, 81.0, 0.9),
+            ("hold", 500, 504, 79.0, 0.9),
+            ("hold", 508, 560, 0.0, 0.0),
+        ),
+    },
+    # 6. 终点容差 + 1°：终点 81° 在窗口外 1°，全程没有成功，松手报 wrong_end。
+    {
+        "id": "det_roulette_end_tol_plus_1",
+        "kind": "detector",
+        "skill": "马赛回旋 Roulette",
+        "config": "shipped",
+        "end_ms": 600,
+        "segments": (
+            ("hold", 0, 96, 0.0, 0.0),
+            ("sweep", 100, 396, 180.0, 81.0, 0.9),
+            ("hold", 500, 600, 0.0, 0.0),
+        ),
+    },
+    # 7. 扫掠 23° < report_min_angle 24.5：整条静默（连 too_short 都不报）。
+    #    49 步（196ms）而不是 50 步：偶数步会在中点产生 11.5° 的取整刀口。
+    {
+        "id": "det_roulette_short_below_report_min",
+        "kind": "detector",
+        "skill": "马赛回旋 Roulette",
+        "config": "shipped",
+        "end_ms": 400,
+        "segments": (
+            ("hold", 0, 96, 0.0, 0.0),
+            ("sweep", 100, 196, 180.0, 157.0, 0.9),
+            ("hold", 300, 400, 0.0, 0.0),
+        ),
+    },
+    # 8. 扫掠 26° >= report_min_angle 24.5 且 < min_angle 70 → too_short。
+    {
+        "id": "det_roulette_short_at_report_min",
+        "kind": "detector",
+        "skill": "马赛回旋 Roulette",
+        "config": "shipped",
+        "end_ms": 400,
+        "segments": (
+            ("hold", 0, 96, 0.0, 0.0),
+            ("sweep", 100, 196, 180.0, 154.0, 0.9),
+            ("hold", 300, 400, 0.0, 0.0),
+        ),
+    },
+    # 9. 踩单车起手 54°（start_tolerance 55 内）：正常判定。90° 是合法终点，
+    #    swept 到 70 时终点 124 已落在 [90,270]±55 的窗口里 → 392ms 命中。
+    {
+        "id": "det_stepover_start_in_tol",
+        "kind": "detector",
+        "skill": "踩单车 Stepover",
+        "config": "shipped",
+        "end_ms": 700,
+        "segments": (
+            ("hold", 0, 96, 0.0, 0.0),
+            ("sweep", 100, 500, 54.0, 144.0, 0.9),
+            ("hold", 604, 700, 0.0, 0.0),
+        ),
+    },
+    # 10. 起手 56°：超出 55° 容差、仍在 55+20=75 的 claim 内 → wrong_start。
+    {
+        "id": "det_stepover_start_out_tol",
+        "kind": "detector",
+        "skill": "踩单车 Stepover",
+        "config": "shipped",
+        "end_ms": 600,
+        "segments": (
+            ("hold", 0, 96, 0.0, 0.0),
+            ("sweep", 100, 500, 56.0, 146.0, 0.9),
+            ("hold", 604, 600, 0.0, 0.0),
+        ),
+    },
+    # 11. 起手 74°：容差外、claim 边界内（74 <= 75）→ wrong_start。
+    {
+        "id": "det_stepover_start_at_claim_edge",
+        "kind": "detector",
+        "skill": "踩单车 Stepover",
+        "config": "shipped",
+        "end_ms": 600,
+        "segments": (
+            ("hold", 0, 96, 0.0, 0.0),
+            ("sweep", 100, 500, 74.0, 164.0, 0.9),
+            ("hold", 604, 600, 0.0, 0.0),
+        ),
+    },
+    # 12. 起手 76°：既超出容差也超出 claim（76 > 75）→ 静默 abort，零判定。
+    {
+        "id": "det_stepover_start_outside_claim",
+        "kind": "detector",
+        "skill": "踩单车 Stepover",
+        "config": "shipped",
+        "end_ms": 600,
+        "segments": (
+            ("hold", 0, 96, 0.0, 0.0),
+            ("sweep", 100, 500, 76.0, 166.0, 0.9),
+            ("hold", 604, 600, 0.0, 0.0),
+        ),
+    },
+    # 13. 重新武装 116ms：第一段 too_short 后回中 116ms 就推第二段。
+    #     release_hold_ms=120，116 < 120 → 第二段起不来，只有第一条判定。
+    {
+        "id": "det_arc_rearm_116",
+        "kind": "detector",
+        "skill": "马赛回旋 Roulette",
+        "config": "shipped",
+        "end_ms": 700,
+        "segments": (
+            ("hold", 0, 96, 0.0, 0.0),
+            ("sweep", 100, 200, 180.0, 150.0, 0.9),
+            ("hold", 304, 416, 0.0, 0.0),
+            ("hold", 420, 600, 180.0, 0.9),
+            ("hold", 604, 700, 0.0, 0.0),
+        ),
+    },
+    # 14. 重新武装 124ms：回中满 120ms 后第二段正常起手，两条 too_short。
+    {
+        "id": "det_arc_rearm_124",
+        "kind": "detector",
+        "skill": "马赛回旋 Roulette",
+        "config": "shipped",
+        "end_ms": 800,
+        "segments": (
+            ("hold", 0, 96, 0.0, 0.0),
+            ("sweep", 100, 200, 180.0, 150.0, 0.9),
+            ("hold", 304, 424, 0.0, 0.0),
+            ("hold", 428, 428, 180.0, 0.9),
+            ("sweep", 432, 200, 180.0, 150.0, 0.9),
+            ("hold", 636, 800, 0.0, 0.0),
+        ),
+    },
+    # 15. 保持 348ms（hold_ms 350 在 4ms 网格上的下邻点）→ hold_short。
+    #     第 448ms 那一帧 held=348 < 350；452ms 松开 LB 时 reset 报 348ms。
+    {
+        "id": "det_croqueta_hold_348",
+        "kind": "detector",
+        "skill": "油炸丸子 La Croqueta",
+        "config": "shipped",
+        "end_ms": 560,
+        "buttons": ((0, ()), (4, ("LB",)), (452, ())),
+        "segments": (
+            ("hold", 0, 96, 0.0, 0.0),
+            ("hold", 100, 448, 90.0, 0.9),
+            ("hold", 452, 560, 0.0, 0.0),
+        ),
+    },
+    # 16. 保持 352ms（上邻点）→ ok。第 452ms 那一帧 held=352 >= 350。
+    {
+        "id": "det_croqueta_hold_352",
+        "kind": "detector",
+        "skill": "油炸丸子 La Croqueta",
+        "config": "shipped",
+        "end_ms": 560,
+        "buttons": ((0, ()), (4, ("LB",)), (456, ())),
+        "segments": (
+            ("hold", 0, 96, 0.0, 0.0),
+            ("hold", 100, 452, 90.0, 0.9),
+            ("hold", 456, 560, 0.0, 0.0),
+        ),
+    },
+    # 17. 容差 - 1°：目标偏 9°（<= tolerance_deg 10）→ 匹配 → ok。
+    {
+        "id": "det_croqueta_tol_minus_1",
+        "kind": "detector",
+        "skill": "油炸丸子 La Croqueta",
+        "config": "shipped",
+        "end_ms": 560,
+        "buttons": ((0, ()), (4, ("LB",)), (456, ())),
+        "segments": (
+            ("hold", 0, 96, 0.0, 0.0),
+            ("hold", 100, 452, 99.0, 0.9),
+            ("hold", 456, 560, 0.0, 0.0),
+        ),
+    },
+    # 18. 容差 + 1°：目标偏 11°（> 10）→ 从不匹配，_best_hold_ms 恒 0，
+    #     超时分支也不会产 hold_short → 零判定。
+    {
+        "id": "det_croqueta_tol_plus_1",
+        "kind": "detector",
+        "skill": "油炸丸子 La Croqueta",
+        "config": "shipped",
+        "end_ms": 560,
+        "buttons": ((0, ()), (4, ("LB",)), (456, ())),
+        "segments": (
+            ("hold", 0, 96, 0.0, 0.0),
+            ("hold", 100, 452, 101.0, 0.9),
+            ("hold", 456, 560, 0.0, 0.0),
+        ),
+    },
+)
+
 
 class _NullSource(GamepadSource):
     """只用于构造引擎；生成器直接手工喂 `_tick`，`poll()` 永不被调用。"""
@@ -658,7 +921,7 @@ def build_payload(root: Path) -> dict:
     used: dict[str, object] = {}
     cases = []
     seen: set[str] = set()
-    for case in CASES:
+    for case in CASES + BOUNDARY_CASES:
         case_id = case["id"]
         if case_id in seen:
             raise SystemExit(f"✗ 夹具 id 重复：{case_id}")
