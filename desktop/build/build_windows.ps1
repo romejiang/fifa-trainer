@@ -18,6 +18,7 @@ uv run pyinstaller `
     --onefile --windowed --noupx `
     --name "FIFA-Skill-Trainer" `
     --hidden-import pygame._sdl2.controller `
+    --hidden-import pygame._sdl2.video `
     --hidden-import padskills.xinput_source `
     --exclude-module XInput `
     --add-data "padskills\assets;padskills\assets" `
