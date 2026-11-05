@@ -64,6 +64,22 @@ SOURCE_RELS = {
 # det_success_mid_450 / det_set_modifier_rt_success 用网格内最近的 448（t0=100,
 # 第二下 548）。id 保留计划里的名字以便追溯，语义仍是「窗口内部的成功」。
 CASES = (
+    # 1. 窗口下端包含：第二下正好 400ms。
+    {
+        "id": "det_success_min_400",
+        "modifier": "RB",
+        "button": "X",
+        "end_ms": 508,
+        "changes": (
+            (0, ()),
+            (4, ("RB",)),
+            (100, ("RB", "X")),
+            (104, ("RB",)),
+            (500, ("RB", "X")),
+            (504, ("RB",)),
+        ),
+    },
+    # 2. 窗口内部的成功（计划写 450，网格上取 448）。
     {
         "id": "det_success_mid_450",
         "modifier": "RB",
@@ -76,6 +92,154 @@ CASES = (
             (104, ("RB",)),
             (548, ("RB", "X")),
             (552, ("RB",)),
+        ),
+    },
+    # 3. 窗口上端包含：第二下正好 600ms。
+    {
+        "id": "det_success_max_600",
+        "modifier": "RB",
+        "button": "X",
+        "end_ms": 708,
+        "changes": (
+            (0, ()),
+            (4, ("RB",)),
+            (100, ("RB", "X")),
+            (104, ("RB",)),
+            (700, ("RB", "X")),
+            (704, ("RB",)),
+        ),
+    },
+    # 4. 比窗口下限快：too_fast。
+    {
+        "id": "det_too_fast_300",
+        "modifier": "RB",
+        "button": "X",
+        "end_ms": 408,
+        "changes": (
+            (0, ()),
+            (4, ("RB",)),
+            (100, ("RB", "X")),
+            (104, ("RB",)),
+            (400, ("RB", "X")),
+            (404, ("RB",)),
+        ),
+    },
+    # 5. 第二下存在但太慢：走 rising 的 too_slow 分支，不是超时分支。
+    {
+        "id": "det_too_slow_second_700",
+        "modifier": "RB",
+        "button": "X",
+        "end_ms": 808,
+        "changes": (
+            (0, ()),
+            (4, ("RB",)),
+            (100, ("RB", "X")),
+            (104, ("RB",)),
+            (800, ("RB", "X")),
+            (804, ("RB",)),
+        ),
+    },
+    # 6. 一直没有第二下：首个 interval > 750 的帧是 852（752ms）。
+    {
+        "id": "det_too_slow_no_second",
+        "modifier": "RB",
+        "button": "X",
+        "end_ms": 900,
+        "changes": (
+            (0, ()),
+            (4, ("RB",)),
+            (100, ("RB", "X")),
+            (104, ("RB",)),
+        ),
+    },
+    # 7. 超时边界：尾巴停在 interval=748（网格上取不到 750），不报任何失败。
+    {
+        "id": "det_too_slow_boundary_750",
+        "modifier": "RB",
+        "button": "X",
+        "end_ms": 848,
+        "changes": (
+            (0, ()),
+            (4, ("RB",)),
+            (100, ("RB", "X")),
+            (104, ("RB",)),
+        ),
+    },
+    # 8. 修饰键中途松开：hold_short 由 reset() 产出，elapsed 用上一帧的 _now。
+    {
+        "id": "det_hold_short_modifier_released",
+        "modifier": "RB",
+        "button": "X",
+        "end_ms": 308,
+        "changes": (
+            (0, ()),
+            (4, ("RB",)),
+            (100, ("RB", "X")),
+            (300, ("X",)),
+        ),
+    },
+    # 9. 第一下按 RB，随后换 RT 再按第二下：RB 撤离触发 hold_short，不产 Hit。
+    {
+        "id": "det_modifier_switch_rb_to_rt",
+        "modifier": "RB",
+        "button": "X",
+        "end_ms": 608,
+        "changes": (
+            (0, ()),
+            (4, ("RB",)),
+            (100, ("RB", "X")),
+            (300, ("X",)),
+            (304, ("RT", "X")),
+            (500, ("RT",)),
+            (604, ("RT", "X")),
+        ),
+    },
+    # 10. set_modifier("RT") 在首帧之前调用：证明换修饰键后判定跟着换。
+    {
+        "id": "det_set_modifier_rt_success",
+        "set_modifier": "RT",
+        "modifier": "RB",
+        "button": "X",
+        "end_ms": 560,
+        "changes": (
+            (0, ()),
+            (4, ("RT",)),
+            (100, ("RT", "X")),
+            (104, ("RT",)),
+            (548, ("RT", "X")),
+            (552, ("RT",)),
+        ),
+    },
+    # 11. 首帧 X 已按住，之后才按 RB：observe 守卫让「一直按着」不算 rising。
+    {
+        "id": "det_first_frame_held_x",
+        "modifier": "RB",
+        "button": "X",
+        "end_ms": 200,
+        "changes": (
+            (0, ("X",)),
+            (100, ("RB", "X")),
+        ),
+    },
+    # 12. 命中后 40ms 再按被 _armed 挡住；松开满 120ms 后重新起手，第二段再 Hit。
+    {
+        "id": "det_release_hold_gate",
+        "modifier": "RB",
+        "button": "X",
+        "end_ms": 1104,
+        "changes": (
+            (0, ()),
+            (4, ("RB",)),
+            (100, ("RB", "X")),
+            (104, ("RB",)),
+            (500, ("RB", "X")),
+            (504, ("RB",)),
+            (540, ("RB", "X")),
+            (544, ("RB",)),
+            (700, ("RB", "X")),
+            (704, ("RB",)),
+            (1100, ("RB", "X")),
+            (1104, ("RB",)),
         ),
     },
 )
@@ -143,8 +307,22 @@ def _normalize_elapsed_ms(value: float, case_id: str, what: str) -> float:
     return rounded
 
 
-def _drive(det: TapDetector, frames: list, case_id: str) -> tuple:
+def _drive(det: TapDetector, frames: list, case_id: str, set_modifier=None) -> tuple:
     """按引擎分支驱动参考实现，记录 Hit / Failure / 首下后的 status。"""
+    if set_modifier is not None:
+        value = set_modifier
+        try:
+            normalized = canonical_button(value)
+        except ValueError as exc:
+            raise SystemExit(f"✗ {case_id}: set_modifier 不是规范按键名：{exc}") from None
+        if normalized != value:
+            raise SystemExit(
+                f"✗ {case_id}: set_modifier 必须是规范名 {normalized!r}，收到 {value!r}"
+            )
+        # 必须在喂首帧之前调用：回放套件走同一入口、同一顺序，否则
+        # det_set_modifier_rt_success 会变成「Python 0 条、GDScript 1 条」的假分歧。
+        det.set_modifier(normalized)
+
     hits = []
     failures = []
     status_after_first_press = None
@@ -189,22 +367,10 @@ def _drive(det: TapDetector, frames: list, case_id: str) -> tuple:
 def _case_payload(case: dict, skill) -> dict:
     case_id = case["id"]
     det = TapDetector(skill)
-    if "set_modifier" in case:
-        value = case["set_modifier"]
-        try:
-            normalized = canonical_button(value)
-        except ValueError as exc:
-            raise SystemExit(f"✗ {case_id}: set_modifier 不是规范按键名：{exc}") from None
-        if normalized != value:
-            raise SystemExit(
-                f"✗ {case_id}: set_modifier 必须是规范名 {normalized!r}，收到 {value!r}"
-            )
-        # 必须在喂首帧之前调用：回放套件走同一入口、同一顺序，否则
-        # det_set_modifier_rt_success 会变成「Python 0 条、GDScript 1 条」的假分歧。
-        det.set_modifier(normalized)
-
     frames = _build_frames(case)
-    hits, failures, status_after_first_press = _drive(det, frames, case_id)
+    hits, failures, status_after_first_press = _drive(
+        det, frames, case_id, case.get("set_modifier")
+    )
     expect = {"hits": hits, "failures": failures}
     if status_after_first_press is not None:
         expect["status_after_first_press"] = status_after_first_press

@@ -21,6 +21,23 @@ const GOLDEN_PATH := "res://tests/fixtures/tap_golden.json"
 const CONFIG_PATH := "res://assets/config/skills_config.json"
 const TOL := 1e-6
 
+## 逐条点名的 detector 用例：少一条就红。删掉大半夹具时，逐用例循环会零次
+## 「通过」，所以规模与 id 下限必须先于任何回放执行。
+const REQUIRED_DETECTOR_IDS: Array[String] = [
+	"det_success_min_400",
+	"det_success_mid_450",
+	"det_success_max_600",
+	"det_too_fast_300",
+	"det_too_slow_second_700",
+	"det_too_slow_no_second",
+	"det_too_slow_boundary_750",
+	"det_hold_short_modifier_released",
+	"det_modifier_switch_rb_to_rt",
+	"det_set_modifier_rt_success",
+	"det_first_frame_held_x",
+	"det_release_hold_gate",
+]
+
 var _mismatches := 0
 
 
@@ -31,7 +48,7 @@ func run(r) -> void:
 		return
 	var cases := _detector_cases(data)
 	_check_meta(r, data)
-	r.check(cases.size() >= 1, "detector 用例规模下限：至少 1 条（实际 %d）" % cases.size())
+	_check_scale(r, cases, data)
 
 	var meta: Dictionary = data.get("meta", {})
 	var base_skill := _load_skill(r, str(meta.get("skill", "")))
@@ -40,6 +57,7 @@ func run(r) -> void:
 		return
 	for case in cases:
 		_check_case(r, case, base_skill)
+	_check_abandon_silent(r, base_skill)
 	print("TAP_GOLDEN_DETECTOR cases=%d mismatches=%d" % [cases.size(), _mismatches])
 	r.complete()
 
@@ -75,6 +93,46 @@ func _check_meta(r, data: Dictionary) -> void:
 	var meta: Dictionary = data.get("meta", {})
 	_eq_int(r, int(meta.get("hz", 0)), 250, "meta.hz 必须是 250")
 	_eq_int(r, int(meta.get("step_ms", 0)), 4, "meta.step_ms 必须是 4")
+
+
+## 规模与 id 下限：删空夹具、丢掉点名用例、复制 id 都必须变红。
+##
+## 只断言 kind == "detector" 的条数，不对总 cases.size() 下断言：04-02 会往同一份
+## 夹具加入 runtime 用例，总数会变成 18；两个计划合起来才能防「删掉一大半」。
+func _check_scale(r, cases: Array, data: Dictionary) -> void:
+	_eq_int(r, cases.size(), 12, "detector 用例必须正好 12 条")
+	var ids: Dictionary = {}
+	for case in cases:
+		ids[str(case.get("id", ""))] = true
+	_eq_int(r, ids.size(), cases.size(), "每条用例都必须有唯一 id")
+	for required_id in REQUIRED_DETECTOR_IDS:
+		var present: bool = ids.has(required_id)
+		r.check(present, "detector 用例必须包含点名 id %s" % required_id)
+		if not present:
+			_mismatches += 1
+	_check_frame_grid(r, data)
+
+
+## 所有帧必须落在 250 Hz / 4ms 网格上：时间轴换成别处采样率后，%.0f 才可能分叉；
+## 这条断言让「偷偷换采样率」当场变红，而不是等文案对不上才发现。
+func _check_frame_grid(r, data: Dictionary) -> void:
+	for case in data.get("cases", []):
+		if typeof(case) != TYPE_DICTIONARY or str(case.get("kind", "")) != "detector":
+			continue
+		var case_id := str(case.get("id", ""))
+		var frames: Array = case.get("frames", [])
+		r.check(not frames.is_empty(), "%s: frames 不能为空" % case_id)
+		if frames.is_empty():
+			_mismatches += 1
+		for entry in frames:
+			if typeof(entry) != TYPE_ARRAY or entry.size() != 2:
+				r.check(false, "%s: frames 的每一项必须是 [t_ms, 按键]" % case_id)
+				_mismatches += 1
+				continue
+			var t_ms := int(entry[0])
+			if t_ms % 4 != 0:
+				r.check(false, "%s: 帧时间 %d 必须是 4 的整数倍" % [case_id, t_ms])
+				_mismatches += 1
 
 
 ## 检测器的窗口 / 宽限 / 松开时长来自真实配置副本（test-core.sh 先证明它与唯一
@@ -122,6 +180,48 @@ func _check_case(r, case: Dictionary, base_skill: Skill) -> void:
 	if expect.has("status_after_first_press"):
 		_eq_str(r, str(actual["status_after_first_press"]),
 			str(expect["status_after_first_press"]), "%s: 首次按下后的 status" % case_id)
+
+
+## 不依赖夹具的结构断言：abandon() 必须静默、清槽，并按 _prev_pressed 重算 _armed。
+##
+## 如果 abandon() 被「顺手合并」成 reset()，第一条 pop_failure() 就会拿到 hold_short；
+## 如果只清了 _t0/_release_since 而漏掉最后一行 `_armed = not _prev_pressed`，两个方向
+## 的 _armed 断言会分别变红。仓库既有纪律：测试可以直接读带下划线的私有字段。
+func _check_abandon_silent(r, base_skill: Skill) -> void:
+	var synthetic := {"modifier": "RB", "button": "X"}
+	var detector := TapDetector.new(_build_skill(base_skill, synthetic))
+	detector.update(_make_frame(0, "RB"))
+	detector.update(_make_frame(100, "RB+X"))
+	_eq_bool(r, detector._have_t0, true, "abandon 前：_t0 已建立")
+
+	detector.observe(_make_frame(200, "RB+X"))
+	detector.abandon()
+	var silent: bool = detector.pop_failure() == null
+	r.check(silent, "abandon() 必须静默（不产 hold_short）")
+	if not silent:
+		_mismatches += 1
+	_eq_str(r, detector.status(), "待机", "abandon() 后 status 回到待机")
+	_eq_bool(r, detector._armed, false, "X 仍按住时 abandon() 后 _armed 必须是 false")
+
+	detector.observe(_make_frame(300, "RB"))
+	detector.abandon()
+	_eq_bool(r, detector._armed, true, "X 松开后 abandon() 必须重新武装（_armed == true）")
+
+	# 失败单槽也要被静默清掉：先造成一次 too_fast（不 pop），再 abandon。
+	var slot := TapDetector.new(_build_skill(base_skill, synthetic))
+	slot.update(_make_frame(0, "RB"))
+	slot.update(_make_frame(100, "RB+X"))
+	slot.update(_make_frame(200, "RB"))
+	slot.update(_make_frame(300, "RB+X"))
+	var pending_present: bool = slot._pending != null
+	r.check(pending_present, "构造 too_fast 后失败单槽必须非空")
+	if not pending_present:
+		_mismatches += 1
+	slot.abandon()
+	var cleared: bool = slot.pop_failure() == null
+	r.check(cleared, "abandon() 必须清掉尚未取走的失败单槽")
+	if not cleared:
+		_mismatches += 1
 
 
 ## 逐帧回放：修饰键满足才 update，否则 observe + reset（顺序不能反）；
@@ -209,5 +309,11 @@ func _eq_float(r, actual: float, expected: float, label: String) -> void:
 
 func _eq_int(r, actual: int, expected: int, label: String) -> void:
 	r.check(actual == expected, "%s（实际 %d，期望 %d）" % [label, actual, expected])
+	if actual != expected:
+		_mismatches += 1
+
+
+func _eq_bool(r, actual: bool, expected: bool, label: String) -> void:
+	r.check(actual == expected, "%s（实际 %s，期望 %s）" % [label, str(actual), str(expected)])
 	if actual != expected:
 		_mismatches += 1
