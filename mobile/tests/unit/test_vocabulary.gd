@@ -17,6 +17,7 @@ func run(r) -> void:
 	_check_table_sizes(r)
 	_check_buttons(r)
 	_check_directions(r)
+	_check_direction_names(r)
 	r.complete()
 
 
@@ -80,6 +81,47 @@ func _check_directions(r) -> void:
 	_expect_null(r, null, "null 不是方向")
 	_expect_null(r, {"angle": 90.0}, "字典不是方向")
 	_expect_null(r, [90.0], "数组不是方向")
+
+
+## 角度 -> 中文方向名的边界：八向、22.5° 等距平局、22.6° 落向斜向、
+## 超出 22.5° 回落成数字，以及 Step.label() 的多方向连接。
+## 这些都是 SequenceDetector 的 `_summary` / `status` 文案的来源，失真会直接
+## 表现为「手机上说的方向和电脑不一样」。
+func _check_direction_names(r) -> void:
+	_expect_name(r, 0.0, "前", "0° = 前")
+	_expect_name(r, 45.0, "前右", "45° = 前右")
+	_expect_name(r, 90.0, "右", "90° = 右")
+	_expect_name(r, 135.0, "后右", "135° = 后右")
+	_expect_name(r, 180.0, "后", "180° = 后")
+	_expect_name(r, 225.0, "后左", "225° = 后左")
+	_expect_name(r, 270.0, "左", "270° = 左")
+	_expect_name(r, 315.0, "前左", "315° = 前左")
+	_expect_name(r, 360.0, "前", "360 归一为 0°")
+	_expect_name(r, -45.0, "前左", "-45 归一为 315°")
+	_expect_name(r, 22.5, "前", "22.5° 与 前/前右 等距，取先遇到的「前」（与 Python min 一致）")
+	_expect_name(r, 22.6, "前右", "22.6° 更靠近 前右")
+	_expect_name(r, 337.5, "前", "337.5° 与 前/前左 等距，取「前」")
+	# 计划里写的「30 -> 30°」在参考实现里**不可达**：八个正/斜向间隔 45°，任何角度
+	# 到最近卡点的距离都 <= 22.5°，所以 `diff <= 22.5` 恒成立，数字回落是死分支。
+	# 这里按 Python 的真实行为钉死 30° = 前右（45° 方向，差 15°）；数字回落分支
+	# 仍保留，纯粹为了与 config.py:144-149 逐行对齐。
+	_expect_name(r, 30.0, "前右", "30° 距 前右 15°，仍落在 22.5° 内")
+	_expect_name(r, 67.5, "前右", "67.5° 与 前右/右 等距，取先遇到的「前右」")
+
+	var two: Array[float] = [90.0, 270.0]
+	_expect_label(r, Step.new(two), "右/左", "多方向步用 / 连接")
+	var one: Array[float] = [0.0]
+	_expect_label(r, Step.new(one), "前", "单方向步直接返回名字")
+
+
+func _expect_name(r, angle: float, expected: String, label: String) -> void:
+	var actual := DirectionTable.direction_name(angle)
+	r.check(actual == expected, "%s（实际 %s，期望 %s）" % [label, actual, expected])
+
+
+func _expect_label(r, step: Step, expected: String, label: String) -> void:
+	var actual := step.label()
+	r.check(actual == expected, "%s（实际 %s，期望 %s）" % [label, actual, expected])
 
 
 func _expect_button(r, value: Variant, expected: String, label: String) -> void:

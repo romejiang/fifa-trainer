@@ -24,6 +24,10 @@ const TOL := 1e-6
 ## 「通过」，所以规模与 id 下限必须先于任何回放执行。
 const REQUIRED_DETECTOR_IDS: Array[String] = [
 	"det_roulette_ok",
+	"det_stepover_ok",
+	"det_heel_to_heel_ok",
+	"det_croqueta_ok",
+	"det_green_finesse_ok",
 ]
 
 var _mismatches := 0
@@ -38,6 +42,16 @@ func run(r) -> void:
 	_check_meta(r, data)
 	_check_scale(r, cases)
 	_check_frame_grid(r, cases)
+
+	var shipped := _config_for(r, data, "shipped")
+	if shipped == null:
+		print("GESTURE_GOLDEN cases=%d mismatches=%d" % [cases.size(), _mismatches])
+		r.complete()
+		return
+	# 三条按 kind 分派的点名检查：硬编码 ArcDetector 或「按 id 选检测器」都会红。
+	_check_factory_arc(r, shipped)
+	_check_factory_sequence(r, shipped)
+	_check_factory_taps(r, shipped)
 
 	for case in cases:
 		_check_case(r, data, case)
@@ -85,8 +99,8 @@ func _check_meta(r, data: Dictionary) -> void:
 
 ## 规模与 id 下限：删空夹具、丢掉点名用例、复制 id 都必须变红。
 func _check_scale(r, cases: Array) -> void:
-	r.check(cases.size() >= 1, "detector 用例至少 1 条（实际 %d）" % cases.size())
-	if cases.size() < 1:
+	r.check(cases.size() >= 5, "detector 用例至少 5 条（实际 %d）" % cases.size())
+	if cases.size() < 5:
 		_mismatches += 1
 	var ids: Dictionary = {}
 	for case in cases:
@@ -97,6 +111,63 @@ func _check_scale(r, cases: Array) -> void:
 		r.check(present, "detector 用例必须包含点名 id %s" % required_id)
 		if not present:
 			_mismatches += 1
+
+
+## 从夹具的 `configs` 注册表构造 AppConfig：不读 res://assets/config/ 的出厂副本。
+func _config_for(r, data: Dictionary, key: String) -> AppConfig:
+	var configs: Dictionary = data.get("configs", {})
+	if not configs.has(key):
+		_fail(r, "config 键 %s 不在 configs 注册表里" % key)
+		return null
+	var result := ConfigValidator.validate(configs[key], "<gesture_golden:%s>" % key)
+	if not result.ok():
+		_fail(r, "configs[%s] 无法通过 ConfigValidator：%s" % [key, result.to_text()])
+		return null
+	return result.config
+
+
+## 2 个弧线动作：分派表若把 arc 指向 sequence/taps，这两条立刻红。
+func _check_factory_arc(r, config: AppConfig) -> void:
+	_expect_detector_class(r, config, "马赛回旋 Roulette", Skill.KIND_ARC, "ArcDetector")
+	_expect_detector_class(r, config, "踩单车 Stepover", Skill.KIND_ARC, "ArcDetector")
+
+
+## 2 个序列动作：这是「按 kind 而不是按名字」的核心证明。
+func _check_factory_sequence(r, config: AppConfig) -> void:
+	_expect_detector_class(r, config, "磕球过人 Heel-to-Heel", Skill.KIND_SEQUENCE, "SequenceDetector")
+	_expect_detector_class(r, config, "油炸丸子 La Croqueta", Skill.KIND_SEQUENCE, "SequenceDetector")
+
+
+## 1 个按键动作：三类各覆盖，缺一类就不是完整分派表。
+func _check_factory_taps(r, config: AppConfig) -> void:
+	_expect_detector_class(r, config, "绿色搓射 Green Finesse", Skill.KIND_TAPS, "TapDetector")
+
+
+func _expect_detector_class(r, config: AppConfig, skill_name: String,
+		expected_kind: StringName, expected_class: String) -> void:
+	var skill := _find_skill(config, skill_name)
+	if skill == null:
+		_fail(r, "工厂检查：配置里找不到 %s" % skill_name)
+		return
+	if skill.kind != expected_kind:
+		_fail(r, "工厂检查：%s 的 kind 是 %s，期望 %s"
+			% [skill_name, str(skill.kind), str(expected_kind)])
+		return
+	var detector := DetectorFactory.build(skill)
+	if detector == null:
+		_fail(r, "工厂检查：DetectorFactory.build(%s) 返回 null" % skill_name)
+		return
+	var actual := ""
+	if detector is ArcDetector:
+		actual = "ArcDetector"
+	elif detector is SequenceDetector:
+		actual = "SequenceDetector"
+	elif detector is TapDetector:
+		actual = "TapDetector"
+	r.check(actual == expected_class, "工厂检查：%s -> %s（期望 %s）"
+		% [skill_name, actual, expected_class])
+	if actual != expected_class:
+		_mismatches += 1
 
 
 ## 所有帧必须落在 250 Hz / 4ms 网格上，且五元组形状正确。
@@ -121,15 +192,10 @@ func _check_frame_grid(r, cases: Array) -> void:
 func _check_case(r, data: Dictionary, case: Dictionary) -> void:
 	var case_id := str(case.get("id", "<缺 id>"))
 	var config_key := str(case.get("config", "shipped"))
-	var configs: Dictionary = data.get("configs", {})
-	if not configs.has(config_key):
-		_fail(r, "%s: config 键 %s 不在 configs 注册表里" % [case_id, config_key])
+	var config := _config_for(r, data, config_key)
+	if config == null:
 		return
-	var result := ConfigValidator.validate(configs[config_key], "<gesture_golden:%s>" % config_key)
-	if not result.ok():
-		_fail(r, "%s: configs[%s] 无法通过 ConfigValidator：%s" % [case_id, config_key, result.to_text()])
-		return
-	var skill := _find_skill(result.config, str(case.get("skill", "")))
+	var skill := _find_skill(config, str(case.get("skill", "")))
 	if skill == null:
 		_fail(r, "%s: 配置里找不到动作 %s" % [case_id, str(case.get("skill", ""))])
 		return

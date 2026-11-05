@@ -12,8 +12,14 @@ extends RefCounted
 ## 失败值是 null，不是异常（同 Buttons.canonical）：core 不抛、不打印、不 push_error。
 ## 调用方拿 null 生成 direction_unknown 的 ConfigError。
 ##
-## 刻意不移植 direction_name()（角度 → 中文方向名）：Phase 3 的校验错误只需要
-## direction_unknown，反向名等真正需要时再加，并附黄金用例。
+## 刻意不移植**全部** direction_name() 的地方：Phase 3 的校验错误只需要
+## direction_unknown。Phase 5 的 SequenceDetector 需要「角度 → 中文方向名」来拼
+## `_describe` / `_summary` / `status`，所以现在补上，并与 config.py:144-149 逐字对齐。
+
+const CARDINAL_NAMES := {
+	0.0: "前", 45.0: "前右", 90.0: "右", 135.0: "后右",
+	180.0: "后", 225.0: "后左", 270.0: "左", 315.0: "前左",
+}
 
 const ALIASES := {
 	"up": 0.0, "forward": 0.0, "fwd": 0.0, "front": 0.0, "north": 0.0,
@@ -50,3 +56,23 @@ static func resolve(value: Variant) -> Variant:
 	if key.is_valid_float():
 		return fposmod(key.to_float(), 360.0)
 	return null
+
+
+## 角度 -> 便于阅读的中文方向名：逐字移植 config.py:144-149。
+##
+## 先归一进 [0, 360)，取最近的正/斜向；偏差 <= 22.5° 返回中文名，否则回落成
+## 「30°」这种数字写法。`min()` 的平局规则是「保留先遇到的键」，所以这里必须用
+## 严格小于比较 —— 22.5° 恰好等距时 Python 选 0.0（前），GDScript 也必须选它。
+static func direction_name(angle: float) -> String:
+	var normalized := fposmod(angle, 360.0)
+	var best := 0.0
+	var best_diff := 361.0
+	for key in CARDINAL_NAMES:
+		var candidate := float(key)
+		var diff := absf(fposmod(normalized - candidate + 180.0, 360.0) - 180.0)
+		if diff < best_diff:
+			best_diff = diff
+			best = candidate
+	if best_diff <= 22.5:
+		return CARDINAL_NAMES[best]
+	return "%.0f°" % normalized

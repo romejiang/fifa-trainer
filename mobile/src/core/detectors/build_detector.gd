@@ -23,6 +23,5 @@ static func build(skill: Skill) -> Detector:
 		Skill.KIND_TAPS:
 			return TapDetector.new(skill)
 		Skill.KIND_SEQUENCE:
-			# Task 2 补齐：本任务只落弧线成功路径。
-			return null
+			return SequenceDetector.new(skill)
 	return null
