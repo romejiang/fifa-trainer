@@ -2,18 +2,18 @@
 gsd_state_version: "1.0"
 current_phase: 5
 current_phase_name: 全动作判定对等性 — 三类检测器 + 引擎仲裁 + 抽稀矩阵
-current_plan: 5
+current_plan: 6
 status: executing
-stopped_at: Completed 05-04-PLAN.md
-last_updated: "2026-11-05T20:21:47.000Z"
+stopped_at: Completed 05-05-PLAN.md
+last_updated: "2026-11-05T21:53:29.647Z"
 last_activity: 2026-11-06
-last_activity_desc: Phase 5 plan 04 complete — measured{} 全链 + 12 组断言 + 三次变异验证
-state_head: 06b5a21c78f70a5e682a64dbdb86bd636acbce97
+last_activity_desc: Phase 5 plan 05 complete — DECIMATION 抽稀矩阵 + 34 条边界带白名单 + 三次变异验证
+state_head: 5fd872cca890ffc21e18f5f7c930fccd9b59c162
 progress:
   total_phases: 10
   completed_phases: 4
   total_plans: 34
-  completed_plans: 30
+  completed_plans: 31
   percent: 40
 ---
 
@@ -28,12 +28,12 @@ See: .planning/PROJECT.md (updated 2026-11-04)
 
 ## Current Position
 
-Current Plan: 5
+Current Plan: 6
 Total Plans in Phase: 7
 Phase: 5 (全动作判定对等性 — 三类检测器 + 引擎仲裁 + 抽稀矩阵) — EXECUTING
-Plan: 5 of 7
-Status: Executing Phase 5
-Last activity: 2026-11-06 — 05-04 完成：measured{} 全链（三检测器 + Outcome）+ 12 组断言 + 三次变异验证
+Plan: 6 of 7
+Status: Ready to execute
+Last activity: 2026-11-06 — 05-05 完成：DECIMATION 252/0、34 条边界带白名单、三次变异验证
 
 Progress: [████░░░░░░] 40%
 
@@ -93,6 +93,7 @@ Progress: [████░░░░░░] 40%
 | Phase 5 P02 | 13min | 3 tasks | 4 files |
 | Phase 5 P03 | 43min | 3 tasks | 12 files |
 | Phase 5 P04 | 39min | 3 tasks | 12 files |
+| Phase 5 P05 | 37min | 3 tasks | 8 files |
 
 ## Accumulated Context
 
@@ -296,6 +297,10 @@ Recent decisions affecting current work:
 - [Phase 5]: `distance_deg` 用圆周距离（`Geometry.angle_diff`，与 `_end_ok` 同尺）；测试选 50°/90° 让 `angle_diff` 与 `abs(end_rel - nearest)` 同为 40，组 6 仍按同源等式断言
 - [Phase 5]: 出厂弧线的终点窗覆盖扫掠中段，200° 成功与 wrong_end 不可达；组 1~6 改用同形状合成弧（只改终点目标/容差/上限），检测器代码零分叉
 - [Phase 5]: `_step_t` 存毫秒（`now * 1000.0`），字段名承诺 `t_done_ms`；它只出现在赋值与 measured 构造里，不进任何判定分支
+- [Phase 5]: 抽稀边界距离用精确有理数比较（|t_i*hz - k*1000|）：浮点 k*1000/hz 会把 450ms 算成 450.00000000000006，破坏「并列取更早」
+- [Phase 5]: 抽稀实测 34 条边界带漂移（不是计划预期的 1 条）；全部按 D-05 登记进双向白名单，不网格化、不加第四条选样规则、不改任何阈值
+- [Phase 5]: det_arc_rearm_124 的 250 Hz 实测是 [too_short@204, too_short@208]，不是计划文字的 [too_short, too_fast]；白名单理由按夹具实测书写
+- [Phase 5]: DECIMATION 共 252 条 = 3 × (55 + 29)；夹具放 mobile/tests/fixtures/，唯一消费者是 Godot；下限 240 在 grep 与套件里是同一个数字
 
 ### Pending Todos
 
@@ -334,6 +339,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-11-05T20:21:47.000Z
-Stopped at: Completed 05-04-PLAN.md
+Last session: 2026-11-05T21:53:29.472Z
+Stopped at: Completed 05-05-PLAN.md
 Resume file: None

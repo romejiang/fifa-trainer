@@ -15,7 +15,7 @@
 - [ ] **JUDGE-04**: 失败原因分类正确：太快 / 太慢 / 起点不对 / 终点不对 / 保持时间不足
 - [x] **JUDGE-05**: 每次判定返回结构化度量 `measured{}`（起止角、扫过角、每步耗时、保持时长），供反馈层直接消费
 - [x] **JUDGE-06**: 用手势锁、失败归属、冷却、修饰键互斥的仲裁语义与桌面版一致，一次动作最多产出一个判定
-- [ ] **JUDGE-07**: 用 250 Hz 录制轨迹抽稀到 60 / 90 / 120 Hz 的夹具，证明判定不漂移；若漂移，以证据调整阈值并记录理由
+- [x] **JUDGE-07**: 用 250 Hz 录制轨迹抽稀到 60 / 90 / 120 Hz 的夹具，证明判定不漂移；若漂移，以证据调整阈值并记录理由
 
 ### 输入与设备
 
@@ -132,7 +132,7 @@
 | JUDGE-04 | Phase 5 | Pending |
 | JUDGE-05 | Phase 5 | Complete |
 | JUDGE-06 | Phase 5 | Complete |
-| JUDGE-07 | Phase 5 | Pending |
+| JUDGE-07 | Phase 5 | Complete |
 | INPUT-01 | Phase 4 | Partial (Xbox verified; PlayStation untested) |
 | INPUT-02 | Phase 4 | Complete |
 | INPUT-03 | Phase 4 | Complete |

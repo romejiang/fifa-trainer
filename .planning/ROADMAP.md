@@ -189,7 +189,7 @@ Decimal phases appear between their surrounding integers in numeric order.
   4. 每次判定返回结构化 `measured{}`（起止角、扫过角、每步耗时、保持时长），反馈层可直接消费，无需二次计算
   5. 250 Hz → 60 / 90 / 120 Hz 抽稀重跑不漂移；若漂移，报告给出证据与阈值调整记录，且 `release_hold_ms` 与 `global_cooldown_ms` 有专门的边界夹具
 
-**Plans**: 7 plans, 7 waves
+**Plans**: 5/7 plans executed, 7 waves
 **Wave 1**
 - [x] 05-01-PLAN.md — 参考冻结 + 生成器骨架 + 10 条已知用例（tracer：Python 参考 → 夹具 → GDScript 回放 → `GESTURE_GOLDEN` 哨兵）
 
@@ -203,7 +203,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] 05-04-PLAN.md — `measured{}` 全链（三检测器 + `Outcome`）+ `test_measured`（`MEASURED`）
 
 **Wave 5** *(blocked on Wave 4 completion)*
-- [ ] 05-05-PLAN.md — 250→120/90/60 Hz 抽稀矩阵 + 漂移白名单 + 变异验证（`DECIMATION`）
+- [x] 05-05-PLAN.md — 250→120/90/60 Hz 抽稀矩阵 + 漂移白名单 + 变异验证（`DECIMATION`）
 
 **Wave 6** *(blocked on Wave 5 completion)*
 - [ ] 05-06-PLAN.md — 左摇杆轴对/符号/校准 + `snapshot_ls()` + schema v2 迁移门 + 设置页同一页补齐
@@ -311,7 +311,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 →
 | 2. 安卓工具链 + 真机冒烟 APK | 5/5 | Complete    | 2026-11-05 |
 | 3. 纯核心地基 | 6/6 | Complete    | 2026-11-05 |
 | 4. 设备输入层 + 绿色搓射竖切 | 11/11 | Complete    | 2026-11-06 |
-| 5. 全动作判定对等性 | 4/7 | In progress | - |
+| 5. 全动作判定对等性 | 5/7 | In Progress | - |
 | 6. 训练循环 | 0/0 | Not started | - |
 | 7. 反馈呈现 | 0/0 | Not started | - |
 | 8. 长期使用韧性 | 0/0 | Not started | - |
