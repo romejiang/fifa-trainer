@@ -294,6 +294,16 @@ func _check_profile_schema(r) -> void:
 
 	_expect_invalid(r, [base], "根是数组")
 
+	# 直接调用子对象的 from_dict 也必须整份返回 null，而不是「部分可用 + 错误」。
+	var axes_errors: Array[ConfigError] = []
+	var bad_axes := AxisMapping.from_dict({"rs_x": {"index": 8, "sign": 1}}, axes_errors)
+	r.check(bad_axes == null, "AxisMapping.from_dict 直接调用也返回 null")
+	var calibration_errors: Array[ConfigError] = []
+	var bad_calibration := Calibration.from_dict(
+		{"center_x": 0.0, "center_y": 0.0, "scale_x": 0.0, "scale_y": 1.0},
+		calibration_errors)
+	r.check(bad_calibration == null, "Calibration.from_dict 直接调用也返回 null")
+
 
 func _check_reuse_gate(r) -> void:
 	var profile := _legal_profile()

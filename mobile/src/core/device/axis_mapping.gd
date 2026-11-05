@@ -103,6 +103,7 @@ func to_dict() -> Dictionary:
 ## 缺省是 -1 = 未映射）。ls 允许 -1（跳过左摇杆探针的档案仍然合法），rs 必须落在
 ## 0..7 —— 没有右摇杆映射的档案不可用，必须整份丢弃重新探。
 static func from_dict(data: Variant, out_errors: Array[ConfigError]) -> AxisMapping:
+	var before := out_errors.size()
 	if typeof(data) != TYPE_DICTIONARY:
 		_error(out_errors, "$.axes", &"axes_not_object",
 			"axes 必须是对象，收到 %s" % JSON.stringify(data),
@@ -134,6 +135,8 @@ static func from_dict(data: Variant, out_errors: Array[ConfigError]) -> AxisMapp
 	var rt := _axis(root, "rt", true, out_errors)
 	mapping.rt_index = int(rt["index"])
 	mapping.rt_rest = float(rt["rest"])
+	if out_errors.size() > before:
+		return null
 	return mapping
 
 

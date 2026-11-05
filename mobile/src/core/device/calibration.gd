@@ -171,6 +171,7 @@ func to_dict() -> Dictionary:
 
 ## 四项必须是有限数值，且两个量程都大于 0；任一非法 → 记一条 ConfigError 并返回 null。
 static func from_dict(data: Variant, out_errors: Array[ConfigError]) -> Calibration:
+	var before := out_errors.size()
 	if typeof(data) != TYPE_DICTIONARY:
 		_error(out_errors, "$.calibration", &"calibration_not_object",
 			"calibration 必须是对象，收到 %s" % JSON.stringify(data),
@@ -182,6 +183,8 @@ static func from_dict(data: Variant, out_errors: Array[ConfigError]) -> Calibrat
 	calibration.center_y = _read_finite(root, "center_y", out_errors)
 	calibration.scale_x = _read_positive(root, "scale_x", out_errors)
 	calibration.scale_y = _read_positive(root, "scale_y", out_errors)
+	if out_errors.size() > before:
+		return null
 	return calibration
 
 
