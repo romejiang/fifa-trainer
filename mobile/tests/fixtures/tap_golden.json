@@ -15762,10 +15762,10 @@
     "detectors": "desktop/padskills/detectors.py",
     "engine": "desktop/padskills/engine.py",
     "sha256": {
-      "config": "b9fb9f39d8477ae20fc28de23280311b9ec18bb16eb88aa142bd9aa4c6bdc1c6",
+      "config": "244be196fba6a56f2139ca2ec338f841cbe46ab6e91cfc64feb6d7c2a90ec043",
       "detectors": "9fca631c91a5def337499bba3ffa8dfdc0cb9af7ebd01f4d7c0d1da46822e7ba",
-      "engine": "8f248180dffcb1d3394b3abfd9cd76289918b86c34844b98f6afb5671bfae69f",
-      "skills_config": "bccf123a06efc61c7f05bc430e488a0f596bdc1e5c7eade4c18a3660f9d0eee9"
+      "engine": "72651fa4bab0b7d7613331f306f1903e3c9a3aec24517d08f0cd9f5aa8fbca35",
+      "skills_config": "039b2d72309de6905c2cb87dcd40a3c58c9dd87eaf9121737cf7a4f0559e1f10"
     },
     "skills_config": "shared/skills_config.json"
   }
