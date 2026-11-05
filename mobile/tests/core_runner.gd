@@ -50,6 +50,7 @@ const SUITES := {
 	"device_profile": preload("res://tests/unit/test_device_profile.gd"),
 	"geometry": preload("res://tests/unit/test_geometry.gd"),
 	"green_slice": preload("res://tests/unit/test_green_slice.gd"),
+	"input_log": preload("res://tests/unit/test_input_log.gd"),
 	"input_setup": preload("res://tests/unit/test_input_setup.gd"),
 	"models": preload("res://tests/unit/test_models.gd"),
 	"onboarding_flow": preload("res://tests/unit/test_onboarding_flow.gd"),

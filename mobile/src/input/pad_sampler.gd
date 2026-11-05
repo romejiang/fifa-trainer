@@ -12,6 +12,9 @@ extends Node
 ## 只是时间戳晚到帧边界。真机上哪条通道在供数由 `events_motion` / `events_button`
 ## / `poll_edges` 三个计数器记录，不靠猜。
 ##
+## 每条事件在写入缓冲之后**同时**交给 `InputLog`：按键边沿全记，轴按 16 ms / 0.02
+## 节流。日志写入失败不会影响本函数 —— `InputLog` 自己吞掉全部 I/O 错误。
+##
 ## **必须用 `_input`，不能用 GUI 之后才到达的那条输入回调**：Control 会先吃事件，
 ## 判定输入不能被 UI 吃掉。也**不要**在 `_input` 里把事件标记为已处理 —— 那会挡掉
 ## 别的节点。节点必须在场景树里（`_input` 只在树内被调用）。
@@ -40,6 +43,10 @@ var buffer := PadStateBuffer.new()
 ## D6 的线程取证：`_input` 与 `_process` 各写一次，值不同就是跨线程。
 var input_thread_id: int = 0
 var process_thread_id: int = 0
+## 轴日志节流状态：键是 "<device>:<axis>"，值是 {"v": float, "t": int}。
+## 键里带设备号：换手柄后同号轴的值不能继承上一只手柄的基准。只记录**真的写进
+## 日志**的样本，被跳过的样本不刷新基准（见 `InputLog.axis_should_log`）。
+var _log_axes: Dictionary = {}
 
 
 func _ready() -> void:
@@ -80,21 +87,45 @@ func _input(event: InputEvent) -> void:
 	input_thread_id = OS.get_thread_caller_id()
 	# 只做形状转换，不判定、不吞事件。缓冲自己负责设备过滤与越界拒绝。
 	if event is InputEventJoypadMotion:
+		var motion_ms := _now_ms()
 		buffer.apply_event({
 			"device": event.device,
-			"t_ms": _now_ms(),
+			"t_ms": motion_ms,
 			"kind": "motion",
 			"axis": int(event.axis),
 			"value": event.axis_value,
 		})
+		# 日志在状态写入之后：即使缓冲拒收（设备不匹配 / 越界），原始事件仍值得记录。
+		_log_axis(int(motion_ms), event)
 	elif event is InputEventJoypadButton:
+		var button_ms := _now_ms()
 		buffer.apply_event({
 			"device": event.device,
-			"t_ms": _now_ms(),
+			"t_ms": button_ms,
 			"kind": "button",
 			"index": int(event.button_index),
 			"pressed": event.pressed,
 		})
+		# 按钮边沿永不节流：按下 / 松开各一条，测试者能逐条核对。
+		var index := int(event.button_index)
+		var canonical := JoyButtonMap.name_of(index)
+		if canonical.is_empty():
+			canonical = "-"
+		InputLog.button(int(button_ms), event.device, index, canonical, event.pressed)
+
+
+## 轴日志节流：同一设备同一根轴，|Δ| < 0.02 且距上次写入 < 16 ms 时跳过。
+## 跳过的样本不写日志、也不更新基准 —— 下一次比较仍以最后一条真的写进日志的值为准。
+func _log_axis(t_ms: int, event: InputEventJoypadMotion) -> void:
+	var axis := int(event.axis)
+	var key := "%d:%d" % [event.device, axis]
+	var value := event.axis_value
+	if _log_axes.has(key):
+		var last: Dictionary = _log_axes[key]
+		if not InputLog.axis_should_log(float(last["v"]), int(last["t"]), value, t_ms):
+			return
+	_log_axes[key] = {"v": value, "t": t_ms}
+	InputLog.axis(t_ms, event.device, axis, value)
 
 
 func _process(_delta: float) -> void:
