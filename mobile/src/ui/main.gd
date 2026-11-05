@@ -39,6 +39,8 @@ const DIAGNOSTICS_SCENE := preload("res://src/ui/diagnostics_overlay.tscn")
 ## 换轴对（输入设置屏对「两键同时按住」另有一道守卫，见 `handle_button`）。
 const DIAGNOSTICS_CHORD_SECONDS := 0.8
 const DIAGNOSTICS_CHORD_BUTTONS: Array[int] = [9, 10]
+## 练习屏按住 B 这么久就回设置页。B 不参与绿色搓射，不会和判定冲突。
+const BACK_HOLD_SECONDS := 1.0
 
 
 @onready var _config_error: Label = %ConfigError
@@ -57,6 +59,8 @@ var _diagnostics = null
 ## 组合键已经按住多久、本轮是否已经触发过（按住不放只开一次，不会来回抖）。
 var _chord_hold: float = 0.0
 var _chord_latched: bool = false
+## 练习屏按住 B 的累计秒数。
+var _back_hold: float = 0.0
 ## 打开覆盖层前的布局确认值；关闭时原样恢复。
 var _layout_was_confirmed: bool = false
 
@@ -127,6 +131,16 @@ func _process(delta: float) -> void:
 		_diagnostics.call("tick", delta)
 		return
 	_flush_button_edges()
+	# 练习屏返回：按住 B 一秒。读的是当前按住状态，不是边沿 —— 松开即清零。
+	if _in_practice:
+		if bool(_sampler.buffer.pressed_dict().has("B")):
+			_back_hold += delta
+			if _back_hold >= BACK_HOLD_SECONDS:
+				_back_hold = 0.0
+				_leave_practice()
+				return
+		else:
+			_back_hold = 0.0
 	_log_diagnostics(delta)
 	if not _in_practice:
 		# 输入设置页零 Outcome：连 `tick()` 都不调用。运行时的 `layout_confirmed`
@@ -320,6 +334,7 @@ func _leave_practice() -> void:
 	if _setup == null or _practice == null:
 		return
 	_in_practice = false
+	_back_hold = 0.0
 	_runtime.set_layout_confirmed(false)
 	_practice.visible = false
 	_practice_container.visible = false

@@ -24,9 +24,9 @@ extends Control
 
 ## 10 Hz：够读清实时毫秒，也不会让文本整形占满一帧。
 const LIVE_REFRESH_SECONDS := 0.1
-const HINT_PLAYSTATION := "按住 R1，连按两下 □"
-const HINT_XBOX := "按住 RB，连按两下 X"
-const HINT_NO_LAYOUT := "布局未确认，请返回引导重选"
+const HINT_PLAYSTATION := "按住 R1，连按两下 □\n按住 B 1 秒返回设置"
+const HINT_XBOX := "按住 RB，连按两下 X\n按住 B 1 秒返回设置"
+const HINT_NO_LAYOUT := "布局未确认，请返回引导重选\n按住 B 1 秒返回设置"
 ## 检测器在未起手时返回这个字面量；屏上不显示设备面板黑话，显示「等待第一下」。
 const IDLE_STATUS := "待机"
 const IDLE_DISPLAY := "等待第一下"

@@ -20,10 +20,10 @@
 ### 输入与设备
 
 - [ ] **INPUT-01**: 支持 Xbox 系与 PlayStation（DualSense / DualShock）手柄经蓝牙连接
-- [ ] **INPUT-02**: 启动时探测实际轴序号，不硬编码 `JOY_AXIS_*` 常量
-- [ ] **INPUT-03**: 摇杆校准：中点与满量程，单档案，数据结构预留 `profile_id`
-- [ ] **INPUT-04**: 提供 Xbox / PlayStation 布局选择与按键确认页；无法自动识别设备时由用户确认，绝不静默猜测
-- [ ] **INPUT-05**: 检测器输入来自事件捕获（`InputEventJoypadMotion`），不轮询 `get_joy_axis`，避免丢失帧内反转
+- [x] **INPUT-02**: 启动时探测实际轴序号，不硬编码 `JOY_AXIS_*` 常量
+- [x] **INPUT-03**: 摇杆校准：中点与满量程，单档案，数据结构预留 `profile_id`
+- [x] **INPUT-04**: 提供 Xbox / PlayStation 布局选择与按键确认页；无法自动识别设备时由用户确认，绝不静默猜测
+- [x] **INPUT-05**: 检测器输入来自事件捕获（`InputEventJoypadMotion`），不轮询 `get_joy_axis`，避免丢失帧内反转
 - [ ] **INPUT-06**: 手柄断连被检测并自动重连；掉线期间不计入尝试、不产生失败判定
 
 ### 会话循环
@@ -51,8 +51,8 @@
 
 ### 上手引导
 
-- [ ] **ONBOARD-01**: 手柄配对图文引导，支持按任意键唤醒
-- [ ] **ONBOARD-02**: 校准引导（中点 + 满量程），首次使用可完成
+- [x] **ONBOARD-01**: 手柄配对图文引导，支持按任意键唤醒
+- [x] **ONBOARD-02**: 校准引导（中点 + 满量程），首次使用可完成
 
 ### 韧性
 
@@ -133,11 +133,11 @@
 | JUDGE-05 | Phase 5 | Pending |
 | JUDGE-06 | Phase 5 | Pending |
 | JUDGE-07 | Phase 5 | Pending |
-| INPUT-01 | Phase 4 | Pending |
-| INPUT-02 | Phase 4 | Pending |
-| INPUT-03 | Phase 4 | Pending |
-| INPUT-04 | Phase 4 | Pending |
-| INPUT-05 | Phase 4 | Pending |
+| INPUT-01 | Phase 4 | Partial (Xbox verified; PlayStation untested) |
+| INPUT-02 | Phase 4 | Complete |
+| INPUT-03 | Phase 4 | Complete |
+| INPUT-04 | Phase 4 | Complete |
+| INPUT-05 | Phase 4 | Complete |
 | INPUT-06 | Phase 8 | Pending |
 | LOOP-01 | Phase 6 | Pending |
 | LOOP-02 | Phase 6 | Pending |
@@ -153,8 +153,8 @@
 | DATA-01 | Phase 8 | Pending |
 | DATA-02 | Phase 8 | Pending |
 | DATA-03 | Phase 3 | Complete |
-| ONBOARD-01 | Phase 4 | Pending |
-| ONBOARD-02 | Phase 4 | Pending |
+| ONBOARD-01 | Phase 4 | Complete |
+| ONBOARD-02 | Phase 4 | Complete |
 | RESIL-01 | Phase 8 | Pending |
 | RESIL-02 | Phase 3 | Complete |
 | RESIL-03 | Phase 3 | Complete |
