@@ -154,11 +154,12 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] 04-06-PLAN.md — 练习屏 + 结果横幅 + 无设备 60 Hz 集成竖切 + `ACCEPTANCE.md` 第 6 节 (completed 2026-11-05)
 
 **Wave 7** *(blocked on Wave 6 completion)*
-- [ ] 04-08-PLAN.md — 引导 UX 修复：探针实时读数 + 2 次软重试 + 纯语言文案 + 停止屏增量 + 屏上诊断覆盖层（D1/D2 的新证据通道），并重建 APK
+- [x] 04-08-PLAN.md — 引导 UX 修复：探针实时读数 + 2 次软重试 + 纯语言文案 + 停止屏增量 + 屏上诊断覆盖层（D1/D2 的新证据通道），并重建 APK (completed 2026-11-05)
 
 **Wave 8** *(blocked on Wave 7 completion)*
 - [ ] 04-07-PLAN.md — 签名 APK + 真机 D0–D6 清单（`checkpoint:human-verify`，无设备不得勾选）
       — **2026-11-05 真机结果：D0 失败**（探针三次拒绝 + 停止屏「没有收到摇杆事件（events_motion = 1931）」）；D1–D6 未执行（`run-as: package not debuggable`；只有一只 Xbox 手柄）。**用户最终决定保留四步探针、修 UX**（不做单屏检测）；修复与重建由 04-08 承担，本计划改为 Wave 8，必须等 04-08 的新 APK 出来后再走查；成功标准 2/3/4/5 仍未闭合
+      — **2026-11-05 04-08 已交付新包**：`mobile/build/fifa-trainer.apk`（27,046,027 字节，证书 `e1841a17…32e046` 不变，v2 验签通过，只含 arm64）。D1/D2 改走「LB+RB 打开诊断覆盖层 + `adb exec-out screencap`」，不再需要 `run-as`；D2 拒绝面因缺第二只手柄仍记为未执行。**重走 D0–D6 前必须先卸载重装这个新包**
 
 **UI hint**: yes
 

@@ -3,16 +3,16 @@ gsd_state_version: "1.0"
 current_phase: 4
 current_phase_name: 设备输入层 + 绿色搓射竖切
 status: executing
-stopped_at: 04-07 Task 2 blocked — 真机 D0 失败，D1–D6 未执行
-last_updated: "2026-11-05T12:42:28.000Z"
+stopped_at: 04-08 完成 — 引导 UX 修复 + 诊断覆盖层 + 新 APK；04-07（Wave 8）待重走真机 D0–D6
+last_updated: "2026-11-05T13:40:00.000Z"
 last_activity: 2026-11-05
-last_activity_desc: 04-07 真机走查：D0 失败（探针重试循环 + 停止屏 events_motion=1931），用户要求改单屏输入检测
-state_head: c350258bec1a544da5e4dee9345eceaa4b077965
+last_activity_desc: 04-08 执行完毕：探针实时读数与两次软重试、屏上诊断覆盖层（D1/D2 新出口）、重建签名 APK（27046027 B，证书不变）
+state_head: 58ee924
 progress:
   total_phases: 10
   completed_phases: 3
   total_plans: 23
-  completed_plans: 22
+  completed_plans: 23
   percent: 32
 ---
 
@@ -27,10 +27,10 @@ See: .planning/PROJECT.md (updated 2026-11-04)
 
 ## Current Position
 
-Phase: 4 (设备输入层 + 绿色搓射竖切) — BLOCKED
-Plan: 7 of 7（Task 1 完成；Task 2 真机 D0 失败，D1–D6 未执行，checkpoint:human-verify / blocking-human）
-Status: Blocked — 等待重新规划（用户要求把多步引导改成单屏输入检测）
-Last activity: 2026-11-05 20:42 — 04-07 真机走查：D0 在探针重试循环与「没有收到摇杆事件（events_motion = 1931）」停止屏处失败；`run-as: package not debuggable` 使 D1/D2 不可执行
+Phase: 4 (设备输入层 + 绿色搓射竖切) — 代码侧已收口，真机清单未闭合
+Plan: 8 of 8（04-01…04-06、04-08 完成；04-07 是 Wave 8 的真机走查，等新 APK 上机）
+Status: Executing — 04-08 已交付修复与新包；下一步是 04-07 重走 D0–D6
+Last activity: 2026-11-05 21:40 — 04-08 完成：探针屏看得见 + 两次软重试 + 纯语言拒绝 + 增量停止屏；新增诊断覆盖层（LB+RB 0.8 s）作为 D1/D2 的截图证据出口；`gate-b.sh` 重建 APK（27,046,027 B，证书 e1841a17…32e046 不变）
 
 Progress: [███░░░░░░░] 32%
 
@@ -80,6 +80,7 @@ Progress: [███░░░░░░░] 32%
 | Phase 4 P04 | 13min | 3 tasks | 18 files |
 | Phase 4 P05 | 15min | 3 tasks | 17 files |
 | Phase 4 P06 | 9min | 3 tasks | 16 files |
+| Phase 4 P08 | 34min | 5 tasks | 15 files |
 
 ## Accumulated Context
 
@@ -239,6 +240,13 @@ Recent decisions affecting current work:
 - [Phase 4]: 真机 D0 失败：探针连续拒绝（两轴同时动了 margin 0.001；上与右落在同一根轴 2/2；上下没有互为反号 上轴2符号-1/下轴3符号1），并在 20:15:50 出现停止屏「没有收到摇杆事件（events_motion = 1931）」；同一时段 `PAD_DIAG ev_m=2633`，停止屏文案与日志自相矛盾，是待修缺陷
 - [Phase 4]: release APK 不可调试：`adb shell run-as com.fifaskill.trainer ...` 返回 `run-as: package not debuggable`；D1/D2 的 `controllers.json` 读取与改写通道不存在，后续计划必须换证据出口或出 debuggable 构建
 - [Phase 4]: 用户否决多步引导，要求改成单屏输入检测：一屏显示所有按键与摇杆，无状态机、无第一步/第二步顺序依赖，按/推哪个就亮哪个，识别错了由用户指出；这是 Rule 4 架构变更，04-07 未实施，需重新规划与重建
+- [Phase 4]: 用户 2026-11-05 最终决定**保留四步探针、只修 UX**（否决单屏检测）；04-08 因此只改引导的可见性与容错，不动判定链
+- [Phase 4]: 软重试只对「这一下没推好」的三类原因生效（`ambiguous_axes` / `not_enough_samples` / `not_enough_travel`），上限 2 次，第 3 次硬失败；`_clear_failure()` 同时清失败文案与计数，是唯一的清空点
+- [Phase 4]: 交叉校验失败的软重试**不调** `_clear_failure()`：重测的那一步单独是成功的，清掉计数会让交叉失败变成无限重来
+- [Phase 4]: 探针屏 `%Hint` 第一行永远是「app 收到了什么」（`你推的是：轴 N 的正/负方向（±x.xx）`），10 Hz 节流；轴序号只能由探针给出，屏幕绝不写「右摇杆 X 轴」（INPUT-02）
+- [Phase 4]: 停止屏只报本步增量（`本步开始后新增 N 个摇杆事件（累计 M）`），三个停止判据一字未改；旧文案与 `PAD_DIAG ev_m=2633` 自相矛盾，已写进 ACCEPTANCE 说明替换原因
+- [Phase 4]: 诊断覆盖层是 D1/D2 的新证据出口：LB+RB（9+10）0.8 s、十字键左右（13/14）翻页、22 px、每行 ≤100 字符、1 Hz、只经 `screencap`；读原始字节而不调 `ProfileStore.load_all()`（后者会删坏档）
+- [Phase 4]: 覆盖层零 Outcome 的三层保证：组合键不含 X → 打开时 `set_layout_confirmed(false)` 静默 abandon → 可见期间组合根 `_process` 早退；`test_onboarding_ui` 有机械断言
 
 ### Pending Todos
 
@@ -246,9 +254,9 @@ None yet.
 
 ### Blockers/Concerns
 
-- **Phase 4 真机清单 D0 失败（04-07 Task 2，checkpoint:human-verify / blocking-human）**：手机 Motorola XT2175-2 / Android 12 已连上（`ZY22F5FXX9`），APK 已安装（证书 `e1841a17…32e046`，27012856 字节），但 D0 在探针重试循环失败：`两轴同时动了：margin 0.001 < 0.25`（20:15:38）/ `上与右落在同一根轴（2/2）`（20:15:46）/ `上下没有互为反号：上 (轴 2, 符号 -1)、下 (轴 3, 符号 1)`（20:18:22）；20:15:50 出现停止屏「没有收到摇杆事件（events_motion = 1931）」，与同一时段 `PAD_DIAG ev_m=2633` 矛盾。D1–D6 未执行；成功标准 2/3/4/5 均不得勾选
-- **D1/D2 的 `run-as` 通道不可用**：release APK 不可调试，`adb shell run-as com.fifaskill.trainer ...` 返回 `run-as: package not debuggable`；`controllers.json` 无法读取/改写。后续计划需出 debuggable 构建或换一个不依赖 `run-as` 的档案证据出口
-- **用户要求改架构（Rule 4，未实施）**：把多步引导（rest → 四步探针 → 中点/满量程校准 → 布局确认）改成单屏输入检测（所有按键 + 摇杆实时显示，无状态机、无第一步/第二步顺序依赖）；需新计划、重写 UI、重跑测试与重建 APK，之后重新做真机验收。用户原话：「一直显示重来重来重来」「不要弄成这种状态机的模式，就在一个屏里边把所有按键检测事解决了」
+- **Phase 4 真机清单 D0 失败（04-07 Task 2，checkpoint:human-verify / blocking-human）**：手机 Motorola XT2175-2 / Android 12 已连上（`ZY22F5FXX9`），APK 已安装（证书 `e1841a17…32e046`，27012856 字节），但 D0 在探针重试循环失败：`两轴同时动了：margin 0.001 < 0.25`（20:15:38）/ `上与右落在同一根轴（2/2）`（20:15:46）/ `上下没有互为反号：上 (轴 2, 符号 -1)、下 (轴 3, 符号 1)`（20:18:22）；20:15:50 出现停止屏「没有收到摇杆事件（events_motion = 1931）」，与同一时段 `PAD_DIAG ev_m=2633` 矛盾。D1–D6 未执行；成功标准 2/3/4/5 均不得勾选。**04-08 已修可见性与容错并重建 APK（27,046,027 字节），重走 D0 前必须先卸载重装新包**
+- **D1/D2 的 `run-as` 通道不可用（已绕过，不是已解决）**：release APK 不可调试，`adb shell run-as com.fifaskill.trainer …` 返回 `run-as: package not debuggable`。04-08 增加屏上诊断覆盖层，D1/D2 的证据改为「LB+RB 打开覆盖层 + `adb exec-out screencap`」；但覆盖层**只读**，D2 拒绝面所需的「改写外层 key」仍然做不到
+- **用户已决定保留四步探针（2026-11-05，本条关闭）**：用户否决单屏输入检测，改为「保留四步探针、只修 UX」；04-08 按此执行（实时读数 / 两次软重试 / 纯语言文案 / 增量停止屏）。原 blocker 与 04-07 的记录保留为历史
 - **D2 缺第二只手柄**：现场只有 Xbox Series X Controller（`getevent -pl` 仅列出 `Xbox Wireless Controller`）；拒绝面（DualSense 或另一只轴映射不同的手柄）未执行，成功标准 3 不得声称完整
 - Phase 2 / 4 之前需备齐 **2 台不同 OEM 手机 + Xbox 与 DualSense 手柄**；模拟器不能替代真机验证
 - **Phase 2 的人工验收全部未闭合，落点都在 `mobile/ACCEPTANCE.md`**：第 0 节四项前置条件、第 1 节两台 × 四项观察、第 4 节密钥库离线备份、第 5 节第二台干净机器重导出。`adb devices` 当前为空，`device-smoke.sh` 以 `DEVICE_SMOKE_FAIL` 退出（正确行为，不是缺陷）
@@ -273,6 +281,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-11-05T12:42:28.000Z
-Stopped at: 04-07 Task 2 blocked（checkpoint:human-verify / blocking-human）；D0 失败、D1–D6 未执行，`mobile/ACCEPTANCE.md` §6 已记录原文；下一步需重新规划单屏输入检测
+Last session: 2026-11-05T13:40:00.000Z
+Stopped at: 04-08 完成（5/5 task：4 个提交 + 1 个 gitignored 产物）；新 APK 在 `mobile/build/fifa-trainer.apk`；下一步 04-07（Wave 8）重走真机 D0–D6，先卸载重装新包
 Resume file: None
