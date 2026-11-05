@@ -17,14 +17,15 @@
 |---|------|------|------|
 | G1 | 桌面零回归 | `bash tools/check_desktop.sh` | 「302 项检查全部通过」；本阶段**禁止**改 `desktop/padskills/*.py`（`check_desktop.sh:2` 与 `:15` 的基线 SHA 会同时抓住改测试与改基线） |
 | G2 | 移动端套件只增不减 | `bash mobile/tools/test-core.sh` | `TESTS_DONE failures=0` 且 `TESTS_ASSERTIONS` **严格 > 1533** |
-| G3 | 四条新哨兵 | 见 §Shared Patterns / 哨兵 | `GESTURE_GOLDEN` / `GESTURE_RUNTIME` / `MEASURED` / `DECIMATION` 全部 `mismatches=0` 且 `cases` 达下限（84 / 29 / N / 252） |
+| G3 | 四条新哨兵 | 见 §Shared Patterns / 哨兵 | `GESTURE_GOLDEN` / `GESTURE_RUNTIME` / `MEASURED` / `DECIMATION` 全部 `mismatches=0` 且 `cases` 达下限（≥52 / 29 / ≥12 / ≥240，每条的 shell grep 下限与套件下限是**同一个数字**） |
 | G4 | core 纯度 | `python3 tools/lint_core_purity.py mobile/src/core` | `LINT_OK files=N`；14 条禁用 token 见 `tools/lint_core_purity.py:47-64` |
 | G5 | 真机证据 | D5-2 / D5-3 的 `OUTCOME` 日志行 + `adb exec-out screencap` | D5-8 未执行时**不得**声称 INPUT-01 完整 |
 
 补充口径：
 - JUDGE-03 的「230 项」是 Phase 1 的历史数字；当前基线是 **302**（205 + 97，RESEARCH E3）。计划里写「以 205 项检测器/引擎断言表达的 127 条可移植行为为移植口径」。
-- **夹具位置冲突裁决**：RESEARCH §B.3 写 `shared/golden_detector.json` / `shared/golden_engine.json`，05-VALIDATION 写 `mobile/tests/fixtures/gesture_golden.json`。采用 VALIDATION 的位置 + `shared/golden_decimated.json`，理由是有既有先例与书面理由：`tools/gen_geometry_golden.py:11-14` 明确写过「夹具不放 shared/，唯一消费者是 mobile/tests，放 shared 会逼出第二次同步」。检测器与引擎用例合成**一份** `gesture_golden.json`、用 `kind` 区分，正是 `tap_golden.json` 的现状（`tools/gen_tap_golden.py:602`、`mobile/tests/unit/test_tap_detector.gd:84-89`、`test_tap_runtime.gd:121-126`）。
-- 抽稀夹具留在 `shared/`：它是 `decimate_trace.py` 的输出、且被 Python 重放消费，两边都是消费者。
+- **夹具位置冲突裁决**：RESEARCH §B.3 写 `shared/golden_detector.json` / `shared/golden_engine.json`，05-VALIDATION 写 `mobile/tests/fixtures/gesture_golden.json`。采用 VALIDATION 的位置，理由是有既有先例与书面理由：`tools/gen_geometry_golden.py:11-14` 明确写过「夹具不放 shared/，唯一消费者是 mobile/tests，放 shared 会逼出第二次同步」。检测器与引擎用例合成**一份** `gesture_golden.json`、用 `kind` 区分，正是 `tap_golden.json` 的现状（`tools/gen_tap_golden.py:602`、`mobile/tests/unit/test_tap_detector.gd:84-89`、`test_tap_runtime.gd:121-126`）。
+- **抽稀夹具同样放 `mobile/tests/fixtures/golden_decimated.json`**（原 §0 写的「留在 `shared/`」已作废）：它的主要消费者是 GDScript 套件 `test_decimation.gd`，而 Godot 只能读 `res://`，`shared/` 在工程目录之外 —— 放 `shared/` 会让 240+ 条回放根本读不到夹具。`decimate_trace.py` 是它的**生产者**，不是消费者，不构成「两边都读」的理由。
+- **`configs` 注册表是夹具契约的一部分**：`gesture_golden.json` 与 `golden_decimated.json` 顶层都必须带 `configs{<key>: 完整配置对象}`；三处回放套件只走 `configs[case.config]` + `ConfigValidator.validate()`，**禁止**回落 `res://assets/config/`。只记 diff 不够 —— GDScript 读不懂 diff 的语义，变体会被静默按出厂阈值回放。
 
 ---
 
@@ -47,7 +48,7 @@
 | 13 | `mobile/src/core/tap_runtime.gd`（改：改为子类） | 3 | service | streaming | 自身 | exact |
 | 14 | `mobile/src/core/outcome.gd`（改：+`measured`） | 3 | model | event-driven | 自身 + `engine.py:62-76` | exact |
 | 15 | `tools/decimate_trace.py` | 4 | tool | batch / transform | `tools/gen_geometry_golden.py` + `tools/check_config_parity.py` | exact（骨架） |
-| 16 | `shared/golden_decimated.json` | 4 | fixture（生成物） | batch | `mobile/tests/fixtures/geometry_golden.json` | role-match |
+| 16 | `mobile/tests/fixtures/golden_decimated.json` | 4 | fixture（生成物） | batch | `mobile/tests/fixtures/geometry_golden.json` | role-match |
 | 17 | `shared/decimation_allowlist.json` | 4 | config | batch | 无（首个白名单）；格式参考 `config_corpus.json` 的 `divergence` 双向规则 | partial |
 | 18 | `mobile/src/core/device/calibration.gd`（改：+LS 四字段） | 5 | model | transform | 自身 | exact |
 | 19 | `mobile/src/core/device/axis_mapping.gd`（改：+`snapshot_ls()`） | 5 | model | transform | 自身 `snapshot_rs()` | exact |
@@ -1194,7 +1195,7 @@ func _check_scale(r, cases: Array, data: Dictionary) -> void:
 			_mismatches += 1
 ```
 
-Phase 5 把「正好 N 条」换成「`>= 50` / `>= 26`」（RESEARCH 允许语料增长），但**必须同时保留逐条点名 id**。
+Phase 5 把「正好 N 条」换成「`>= 52` / `>= 29`」（RESEARCH 允许语料增长），但**必须同时保留逐条点名 id**。两层下限（套件 `_check_scale` 与 `test-core.sh` 的 grep）必须是**同一个数字**。
 
 **逐帧回放**（`test_tap_detector.gd:229-260`）——修饰键不满足时 `observe` + `reset`，顺序不能反；每帧后 `pop_failure()`；用例结束不 `reset()`。
 
@@ -1243,7 +1244,7 @@ func _make_frame(t_ms: int, label: String) -> Frame:
 
 **Analog:** `test_tap_detector.gd`（回放）+ `test_geometry.gd`（黄金夹具读取）。
 
-断言：`rate_hz ∈ {120,90,60}`、`frames` 时间戳在源轨迹里原样存在（子集）、`codes_equal`、`drift` 双向白名单。哨兵：`DECIMATION rates=3 cases=252 mismatches=0`。
+断言：`rate_hz ∈ {120,90,60}`、`frames` 时间戳在源轨迹里原样存在（子集）、`codes_equal`、`drift` 双向白名单、`cases == 3 × 源用例数`。哨兵：`DECIMATION rates=3 cases=243 mismatches=0`（下限 240）。
 
 #### 15.4 `test_practice_wiring.gd`
 
@@ -1383,13 +1384,13 @@ if ! grep -qE '^TAP_GOLDEN_DETECTOR cases=[1-9][0-9]* mismatches=0$' "$tmp/tests
 新增四条必须**同一形状**（`cases=[1-9][0-9]*` 不可省；`mismatches` 只统计真实差异）：
 
 ```
-GESTURE_GOLDEN cases=84 mismatches=0
+GESTURE_GOLDEN cases=54 mismatches=0
 GESTURE_RUNTIME cases=29 mismatches=0
-MEASURED cases=N mismatches=0
-DECIMATION rates=3 cases=252 mismatches=0
+MEASURED cases=12 mismatches=0
+DECIMATION rates=3 cases=243 mismatches=0
 ```
 
-**生成器 vs 套件双下限**：套件先断言 `cases.size() >= 常量`，外壳再 grep 哨兵；两层都要。
+**生成器 vs 套件双下限**：套件先断言 `cases.size() >= 常量`，外壳再 grep 哨兵；两层**必须用同一个常量**（52 / 29 / 12 / 240），否则「删掉一半语料仍能绿」只要绕过其中一层就成立。
 
 ### S7. 中文文案 / 英文标识符 / 单文件单 `class_name`
 
