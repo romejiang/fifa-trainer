@@ -2,18 +2,18 @@
 gsd_state_version: "1.0"
 current_phase: 5
 current_phase_name: 全动作判定对等性 — 三类检测器 + 引擎仲裁 + 抽稀矩阵
-current_plan: Not started
+current_plan: 2
 status: executing
-stopped_at: Phase 4 complete, ready to plan Phase 5
-last_updated: "2026-11-05T17:41:42.037Z"
+stopped_at: Completed 05-01-PLAN.md
+last_updated: "2026-11-05T18:20:00.000Z"
 last_activity: 2026-11-06
-last_activity_desc: Phase 4 complete, transitioned to Phase 5
-state_head: 142ea2d73268575692200729f01ad0b88ee40b58
+last_activity_desc: Phase 5 plan 01 complete — 10 条手势黄金用例全绿
+state_head: 0153e0d04e6f4864ad00d1a452f215ddd06c129e
 progress:
   total_phases: 10
   completed_phases: 4
   total_plans: 34
-  completed_plans: 26
+  completed_plans: 27
   percent: 40
 ---
 
@@ -24,16 +24,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-11-04)
 
 **Core value:** 用真手柄、在任何地方都能练，判定准、反馈看得懂。
-**Current focus:** Phase 4 — 设备输入层 + 绿色搓射竖切
+**Current focus:** Phase 5 — 全动作判定对等性 — 三类检测器 + 引擎仲裁 + 抽稀矩阵
 
 ## Current Position
 
-Current Plan: Not started
+Current Plan: 2
 Total Plans in Phase: 7
-Phase: 5 (全动作判定对等性 — 三类检测器 + 引擎仲裁 + 抽稀矩阵) — READY TO EXECUTE
-Plan: 11 of 11（04-01…04-06、04-08…04-11 完成；04-07 是 Wave 8 的真机走查，两次尝试都失败）
-Status: Ready to execute
-Last activity: 2026-11-06 — Phase 4 complete, transitioned to Phase 5
+Phase: 5 (全动作判定对等性 — 三类检测器 + 引擎仲裁 + 抽稀矩阵) — EXECUTING
+Plan: 2 of 7
+Status: Executing Phase 5
+Last activity: 2026-11-06 — 05-01 完成：手势黄金回放 10 条用例全绿
 
 Progress: [████░░░░░░] 40%
 
@@ -42,7 +42,7 @@ Progress: [████░░░░░░] 40%
 **Velocity:**
 - Total plans completed: 27
 - Average duration: — min
-- Total execution time: 0.9 hours
+- Total execution time: 1.2 hours
 
 **By Phase:**
 
@@ -88,6 +88,7 @@ Progress: [████░░░░░░] 40%
 | Phase 4 P09 | 21min | 3 tasks | 14 files |
 | Phase 4 P10 | 13min | 2 tasks | 9 files |
 | Phase 4 P11 | 18min | 2 tasks | 16 files |
+| Phase 5 P01 | 14min | 3 tasks | 16 files |
 
 ## Accumulated Context
 
@@ -218,6 +219,12 @@ Recent decisions affecting current work:
 - [Phase 4]: 探针的 `rs_y` 只能来自「向下」步，禁止用「向上取反」推导；上下接线反了必须被 `validate_cross` 在探针阶段抓住
 - [Phase 4]: `evaluate_step` 返回有符号 `delta`；`validate_cross` 只消费 `axis/sign/separation`，不重算 —— 两边各写一份键名会在 `_check_evaluate_feeds_cross` 立刻变红
 - [Phase 4]: `low_separation`（separation < 3.0）是唯一且可达的 warning；`weak_step` 不可达，不写
+- [Phase 5]: 手势黄金夹具放 `mobile/tests/fixtures/gesture_golden.json` 而非 ROADMAP 写的 `shared/golden_vectors.json`：唯一消费者是 Godot，`shared/` 在 `res://` 之外读不到
+- [Phase 5]: 夹具的 `configs` 注册表存**完整**配置对象，每个用例只认 `configs[case.config]`；回放套件禁止回落到 `res://assets/config/` 的出厂副本，生成器用 `is` 身份比较确认
+- [Phase 5]: 检测器一律 `build_detector(skill)` / `DetectorFactory.build(skill)` 按 `skill.kind` 分派；生成器断言类名，套件用 2 arc / 2 sequence / 1 taps 三条点名检查兜底
+- [Phase 5]: `direction_name()` 的数字回落分支在参考实现里不可达（八向间隔 45°，最近卡点恒 ≤ 22.5°）；保留为死分支以维持逐行对等，`30°` 的真实结果是「前右」
+- [Phase 5]: `_assert_not_rounding_cliff` 在 `update()` 之前预演会被 `%.0f` 格式化的 `swept` / `end_rel`；踩单车语料因此选 0.72°/帧（500ms），避开 4.5° 刀口
+- [Phase 5]: 失败码只写数学可达的配置：油炸丸子不写 `too_fast`；`overshoot` / `wrong_direction` 出厂配置不可达，留给变体配置用例
 - [Phase 4]: 复用门只比较实测的四个 index+sign；`calibration.center/scale` 与探针 `rest` 不参与，同名不同映射必须 `can_reuse() == false`
 - [Phase 4]: `DeviceProfile.from_dict` 任一字段非法 → null + ConfigError，整份丢弃绝不部分恢复；`profile_id` 固定 "primary" 但字段与序列化必须存在
 - [Phase 4]: `suggest_layout` 认不出设备名返回空，调用方必须让用户二选一；绝不预选 Xbox
@@ -309,6 +316,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-11-05T15:52:00.000Z
-Stopped at: Phase 4 complete, ready to plan Phase 5
+Last session: 2026-11-05T18:20:00.000Z
+Stopped at: Completed 05-01-PLAN.md
 Resume file: None
