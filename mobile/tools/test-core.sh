@@ -195,4 +195,13 @@ if ! grep -qE '^GESTURE_GOLDEN cases=(5[2-9]|[6-9][0-9]|[1-9][0-9]{2,}) mismatch
 fi
 echo "✓ 手势回放：$(grep -E '^GESTURE_GOLDEN ' "$tmp/tests.log")"
 
+# 引擎回放的正向哨兵：与检测器回放分开，55 条检测器用例不能替 29 条引擎用例作证。
+# 阈值与套件 `_check_scale` 的下限是同一个数字（29）；mismatches 必须为 0。
+if ! grep -qE '^GESTURE_RUNTIME cases=(29|[3-9][0-9]|[1-9][0-9]{2,}) mismatches=0$' "$tmp/tests.log"; then
+    echo "✗ 没有 GESTURE_RUNTIME cases=N mismatches=0（引擎期望未回放或跨语言判定有差异）" >&2
+    grep -E '^GESTURE_RUNTIME ' "$tmp/tests.log" >&2 || true
+    exit 1
+fi
+echo "✓ 引擎回放：$(grep -E '^GESTURE_RUNTIME ' "$tmp/tests.log")"
+
 echo "✓ 核心闸门通过：配置一致、边界干净、黄金未漂移、tap 回放一致、运行时判定一致、核心套件全绿"
