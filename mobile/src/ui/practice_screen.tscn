@@ -1,0 +1,82 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://src/ui/practice_screen.gd" id="1_practice"]
+[ext_resource type="Script" path="res://src/ui/result_banner.gd" id="2_banner"]
+
+[node name="PracticeScreen" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+script = ExtResource("1_practice")
+
+[node name="ActionName" type="Label" parent="."]
+unique_name_in_owner = true
+layout_mode = 0
+offset_left = 48.0
+offset_top = 24.0
+offset_right = 1232.0
+offset_bottom = 104.0
+theme_override_font_sizes/font_size = 40
+
+[node name="Hint" type="Label" parent="."]
+unique_name_in_owner = true
+layout_mode = 0
+offset_left = 48.0
+offset_top = 112.0
+offset_right = 1232.0
+offset_bottom = 200.0
+autowrap_mode = 2
+theme_override_font_sizes/font_size = 32
+
+[node name="LiveMs" type="Label" parent="."]
+unique_name_in_owner = true
+layout_mode = 0
+offset_left = 48.0
+offset_top = 208.0
+offset_right = 1232.0
+offset_bottom = 248.0
+theme_override_font_sizes/font_size = 32
+
+[node name="SuccessCount" type="Label" parent="."]
+unique_name_in_owner = true
+layout_mode = 0
+offset_left = 48.0
+offset_top = 256.0
+offset_right = 1232.0
+offset_bottom = 296.0
+theme_override_font_sizes/font_size = 28
+
+[node name="ResultBanner" type="Control" parent="."]
+unique_name_in_owner = true
+layout_mode = 0
+offset_left = 48.0
+offset_top = 304.0
+offset_right = 1232.0
+offset_bottom = 584.0
+script = ExtResource("2_banner")
+
+[node name="Title" type="Label" parent="ResultBanner"]
+unique_name_in_owner = true
+layout_mode = 0
+offset_right = 1184.0
+offset_bottom = 128.0
+theme_override_font_sizes/font_size = 72
+
+[node name="Reason" type="Label" parent="ResultBanner"]
+unique_name_in_owner = true
+layout_mode = 0
+offset_top = 136.0
+offset_right = 1184.0
+offset_bottom = 280.0
+autowrap_mode = 2
+theme_override_font_sizes/font_size = 40
+
+[node name="DebugPanel" type="Label" parent="."]
+unique_name_in_owner = true
+layout_mode = 0
+offset_left = 48.0
+offset_top = 600.0
+offset_right = 1232.0
+offset_bottom = 680.0
+theme_override_font_sizes/font_size = 28

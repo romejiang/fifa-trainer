@@ -142,7 +142,10 @@ esac
 #      只读、不调用字体工具、毫秒级，是把这条边补上的唯一办法。
 #   2) 字形闸门比对「清单 vs 子集」——在关闭系统兜底的前提下逐字符断言。
 glyph_tool="tools/make_font_subset.py"
-echo "▸ 校验字形清单与源文件一致…"
+# 这一步同时覆盖闭世界的两条边：src/ui 下的新增文件（目录自动枚举）与会渲染的
+# core 文案（RENDER_SOURCES 点名）。任一缺登记，--check 直接失败 —— 闸门在真机
+# 豆腐时保持绿色是本仓库已经付过代价的假绿。
+echo "▸ 校验字形源闭世界（src/ui 自动枚举 + RENDER_SOURCES 点名）与清单一致…"
 if ! python3 "$repo_root/$glyph_tool" --check; then
     echo "✗ 字形清单与源文件不一致：运行 python3 $glyph_tool 重新生成" >&2
     exit 1

@@ -35,7 +35,13 @@ from typing import Dict, List, Optional
 #   desktop/padskills/gui.py       —— _ADVICE 里的失败建议文案
 #   desktop/padskills/detectors.py —— FAILURE_LABELS 的失败短标签
 #   mobile/src/smoke/*             —— 首屏验收面板本身（最长中文串 / 符号 / 轴读数）
-#   mobile/src/ui/*                —— 组合根与引导屏（练习屏在 04-06 加入）
+#   mobile/src/ui/*                —— 组合根、引导屏、练习屏（由下面的断言自动枚举）
+#   mobile/src/core/*              —— S8 / S99 等**会渲染到屏幕**的失败原因（见
+#                                     RENDER_SOURCES：这些没有目录级边界，必须点名）
+#
+# 为什么不登记 config_store.gd / profile_store.gd：它们的 `notice` 与档案提示在
+# Phase 4 从未被渲染（`main.gd` 只渲染 `ConfigResult.to_text()` 的 errors/warnings，
+# 档案失败只打印错误码）；把不点屏的文件收进来只会让清单无谓膨胀。
 CHAR_SOURCES = (
     Path("shared") / "skills_config.json",
     Path("desktop") / "padskills" / "gui.py",
@@ -46,6 +52,35 @@ CHAR_SOURCES = (
     Path("mobile") / "src" / "ui" / "main.tscn",
     Path("mobile") / "src" / "ui" / "onboarding_screen.gd",
     Path("mobile") / "src" / "ui" / "onboarding_screen.tscn",
+    Path("mobile") / "src" / "ui" / "practice_screen.gd",
+    Path("mobile") / "src" / "ui" / "practice_screen.tscn",
+    Path("mobile") / "src" / "ui" / "result_banner.gd",
+    Path("mobile") / "src" / "core" / "config" / "config_loader.gd",
+    Path("mobile") / "src" / "core" / "config" / "config_validator.gd",
+    Path("mobile") / "src" / "core" / "config" / "overlay_merge.gd",
+    Path("mobile") / "src" / "core" / "device" / "probe_evaluator.gd",
+    Path("mobile") / "src" / "core" / "device" / "calibration.gd",
+    Path("mobile") / "src" / "core" / "device" / "device_profile.gd",
+    Path("mobile") / "src" / "core" / "onboarding_flow.gd",
+)
+
+# 渲染源：这些文件的字符串**会直接出现在屏幕上** —— S99 配置错误正文
+# （config_loader / config_validator / overlay_merge）、S8 与校准失败原因
+# （probe_evaluator / calibration）、复用门与布局建议（device_profile /
+# onboarding_flow）。`mobile/src/ui/**` 有目录级的自动枚举，`src/core` 没有
+# （里面大量纯逻辑文件永远不渲染），所以这条边只能点名。
+#
+# 为什么 `--check` 也要查：只查「UI 目录有没有漏登记」时，core 里新加一句会渲染的
+# 文案仍然能悄悄漏进子集 —— 屏幕豆腐而闸门全绿。RENDER_SOURCES 让这条边也有牙齿，
+# 且只看「是否在 CHAR_SOURCES 里」，不重复扫描字符。
+RENDER_SOURCES = (
+    Path("mobile") / "src" / "core" / "config" / "config_loader.gd",
+    Path("mobile") / "src" / "core" / "config" / "config_validator.gd",
+    Path("mobile") / "src" / "core" / "config" / "overlay_merge.gd",
+    Path("mobile") / "src" / "core" / "device" / "probe_evaluator.gd",
+    Path("mobile") / "src" / "core" / "device" / "calibration.gd",
+    Path("mobile") / "src" / "core" / "device" / "device_profile.gd",
+    Path("mobile") / "src" / "core" / "onboarding_flow.gd",
 )
 
 # 成功标准 2 写死的五个符号。它们不必出现在源文件里，但必须进子集。
@@ -127,14 +162,39 @@ def assert_ui_sources_registered(root: Path) -> None:
     )
 
 
+def assert_render_sources_registered(root: Path) -> None:
+    """``RENDER_SOURCES`` 里的每个 core 文件都必须在 ``CHAR_SOURCES`` 里。
+
+    为什么需要第二条断言：``assert_ui_sources_registered()`` 只能枚举
+    ``mobile/src/ui``；``src/core`` 里没有可枚举的边界（大多数文件永不渲染），
+    于是「新增一条会渲染的失败原因却忘了登记」会继续假绿。两条断言一起构成
+    闭世界的两条边：目录自动枚举 + 渲染源点名。
+
+    与 UI 断言一样挂在 ``collect_chars()`` 的第一句，所以 ``sync`` 与 ``--check``
+    两条路径都必然执行。
+    """
+    registered = {rel.as_posix() for rel in CHAR_SOURCES}
+    missing = [rel.as_posix() for rel in RENDER_SOURCES if rel.as_posix() not in registered]
+    if not missing:
+        return
+    lines = "\n".join(f"  ✗ {rel}" for rel in missing)
+    raise SystemExit(
+        "✗ 有会渲染到屏幕的 core 文件未登记进 CHAR_SOURCES：\n"
+        f"{lines}\n"
+        "把这些文件追加进 CHAR_SOURCES（并加入 RENDER_SOURCES），再运行本脚本重生成；"
+        "否则屏幕上的失败原因会在真机上缺字，而字形闸门仍然报绿。"
+    )
+
+
 def collect_chars(root: Path) -> List[str]:
     """从全部字符来源里推导必需字符集（按码点排序、去重）。
 
     缺任何一个来源都直接报错：悄悄少扫一个文件，清单就会少字，而闸门对着
     少字的清单照样报绿 —— 那正是本脚本存在的原因。
     """
-    # 先证明闭世界没有缺口，再谈扫描：未登记的 UI 文件会让清单少字。
+    # 先证明闭世界没有缺口，再谈扫描：未登记的 UI 文件或渲染源会让清单少字。
     assert_ui_sources_registered(root)
+    assert_render_sources_registered(root)
     chars = set(EXTRA_SYMBOLS)
     chars.update(ASCII_PRINTABLE)
     for rel in CHAR_SOURCES:

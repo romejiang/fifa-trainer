@@ -16,6 +16,8 @@ extends Control
 ## `TapDetector` / `TapRuntime` 的 `* 1000.0` 换算一致。`PadSampler` 的
 ## `_now_ms()` 是**事件时间戳**，单位毫秒；两者不能混用，也不要在本文件里换算。
 
+const PRACTICE_SCENE := preload("res://src/ui/practice_screen.tscn")
+
 @onready var _config_error: Label = %ConfigError
 @onready var _onboarding: Control = %Onboarding
 @onready var _practice_container: Control = %Practice
@@ -24,9 +26,13 @@ var _flow: OnboardingFlow = null
 var _runtime: TapRuntime = null
 var _sampler: PadSampler = null
 var _profile_store: ProfileStore = null
+## 练习屏脚本没有 `class_name`，必须保持无类型引用才能在运行时调 `setup`。
+var _practice = null
 ## 已消费到第几条按钮边沿。边沿数组只追加，游标只前进。
 var _seen_edges: int = 0
 var _practice_entered: bool = false
+## 1 Hz 诊断日志的累加器（D5/D6 的抄录来源）。
+var _diag_accum: float = 0.0
 
 
 func _ready() -> void:
@@ -60,10 +66,11 @@ func _ready() -> void:
 	add_child(_sampler)
 	_on_device_list_changed(_sampler.connected_devices())
 	_onboarding.call("setup", _flow, _sampler)
+	_build_practice_screen()
 	_refresh_screens()
 
 
-func _process(_delta: float) -> void:
+func _process(delta: float) -> void:
 	# 配置错误屏上没有判定：不推进、不分派。
 	if _flow == null:
 		return
@@ -73,6 +80,47 @@ func _process(_delta: float) -> void:
 	frame.buttons = _sampler.buffer.pressed_dict()
 	_runtime.tick(frame)
 	_refresh_screens()
+	_log_diagnostics(delta)
+
+
+## 实例化练习屏进 `%Practice` 容器。**这里不调 `setup`**：`add_child` 会先跑练习屏
+## 的 `_ready`，但此刻 `flow` 可能还没到 layout_confirm，注入要等首次进入练习。
+## 04-05 的占位 Label 必须真正 `queue_free()`：它没有任何数据源，压在真屏下面
+## 只会让人误以为屏幕上那行字也是判定的一部分。
+func _build_practice_screen() -> void:
+	_practice = PRACTICE_SCENE.instantiate()
+	_practice_container.add_child(_practice)
+	_practice.visible = false
+	var placeholder := _practice_container.get_node_or_null("Placeholder")
+	if placeholder != null:
+		placeholder.queue_free()
+
+
+## 1 Hz 诊断日志：D5 / D6 的抄录来源（adb logcat -s godot:I）。
+##
+## 只在已绑定设备时打印 —— 无设备时 `buffer` 的 min/max 是哨兵值（INF / -INF），
+## 打出来只会误导。每根轴一行是必须的：扳机静止值与满量程都要能从日志里读回来。
+func _log_diagnostics(delta: float) -> void:
+	_diag_accum += delta
+	if _diag_accum < 1.0:
+		return
+	_diag_accum = 0.0
+	if _sampler == null or _sampler.buffer.device < 0:
+		return
+	var buffer := _sampler.buffer
+	var stats := buffer.delta_ms_percentiles()
+	print("PAD_DIAG ev_m=%d ev_b=%d poll=%d dt50=%.2f dt95=%.2f dtmax=%.2f in_tid=%d proc_tid=%d" % [
+		buffer.events_motion, buffer.events_button, buffer.poll_edges,
+		float(stats.get("p50", 0.0)), float(stats.get("p95", 0.0)),
+		float(stats.get("max", 0.0)),
+		_sampler.input_thread_id, _sampler.process_thread_id,
+	])
+	for axis in PadStateBuffer.MAX_AXIS:
+		var span := buffer.axis_range(axis)
+		print("PAD_AXIS i=%d v=%.3f min=%.3f max=%.3f" % [
+			axis, buffer.axis_value(axis), span.x, span.y,
+		])
+	print("PAD_DEV name=%s guid=%s" % [_sampler.device_name(), _sampler.device_guid()])
 
 
 ## 唯一的按钮边沿消费者。引导屏不读边沿数组，避免同一次按下被解释两次。
@@ -172,11 +220,23 @@ func _refresh_screens() -> void:
 		return
 	if _flow.can_enter_practice():
 		if not _practice_entered:
+			var layout := _flow.effective_layout()
+			if layout == &"":
+				# 空布局 = 组合根被绕过或布局未确认：留在引导屏，绝不把空值
+				# 当成「默认 Xbox」去 setup。屏上的错误态也只在 setup 收到空值时出现。
+				print("LAYOUT_ERROR 空布局不能进练习")
+				_practice_container.visible = false
+				_onboarding.visible = true
+				return
 			_practice_entered = true
 			# 成功标准 4 的机械落点：只有五条同时成立时才把运行时置为已确认。
 			_runtime.set_layout_confirmed(true)
+			_practice.setup(_runtime, layout, _sampler.buffer)
 			_onboarding.visible = false
 			_practice_container.visible = true
+			# 容器可见不够：练习屏 _process 开头的 `if not visible: return` 会把
+			# pop_outcomes() 的 drain、横幅与 %DebugPanel 一起挡在屏幕外。
+			_practice.visible = true
 			_commit_profile()
 		return
 	_practice_container.visible = false
