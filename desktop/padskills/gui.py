@@ -55,6 +55,7 @@ DETAIL_H = 212
 ATTEMPTS_Y = 360        # BODY_Y + DETAIL_H + GAP
 ATTEMPTS_H = 192
 FULL_H = 510            # H - MARGIN_Y - BODY_Y，无底栏页面的整块正文卡
+HERO_PHOTO_SHIFT = 26   # 背景照片整体下移的逻辑像素，遮住鞋/球上的品牌标志
 
 # ---- 配色（亮色，卡片白 + 高对比结果色） ----
 BG = (245, 245, 247)
@@ -2129,12 +2130,16 @@ class TrainerApp:
             photo = self._hero_photo()
             if photo is not None:
                 iw, ih = photo.get_size()
-                scale = max(hero_w / iw, h / ih)
+                # 照片整体下移：多留出上方余量，再向下裁切，避免露出品牌标
+                shift = max(0, int(round(HERO_PHOTO_SHIFT * s)))
+                target_h = h + 2 * shift
+                scale = max(hero_w / iw, target_h / ih)
                 sw = max(1, int(iw * scale + 0.5))
                 sh = max(1, int(ih * scale + 0.5))
                 scaled = self.pg.transform.smoothscale(photo, (sw, sh))
-                hero.blit(scaled, (-max(0, (sw - hero_w) // 2),
-                                   -max(0, (sh - h) // 2)))
+                crop_x = max(0, (sw - hero_w) // 2)
+                crop_y = max(0, (sh - h) // 2 - shift)
+                hero.blit(scaled, (-crop_x, -crop_y))
             else:
                 # 兜底：程序化青色渐变 + 柔和斜向光带（不画球）
                 for y in range(h):
@@ -2688,8 +2693,8 @@ class TrainerApp:
             if not on:
                 return
             rad = math.radians(angle)
-            # 指针伸到内圈边缘：球心 = r_in - 球半径，外缘正好贴住内圈
-            tip = self._stick_point(cx, cy, r_in - ball,
+            # 指针伸到最外圈：球心 = r_out - 球半径，外缘正好贴住外圈
+            tip = self._stick_point(cx, cy, r_out - ball,
                                     math.sin(rad), -math.cos(rad))
             pg.draw.line(self.screen, color, (cx, cy), tip, width)
             pg.draw.circle(self.screen, color,
