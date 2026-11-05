@@ -167,7 +167,7 @@
 |------|------------------------|----------|--------|-----------------|
 | 卸载确认（原文） | `adb uninstall com.fifaskill.trainer` 的整行输出 | | | |
 | 安装命令（原文） | `adb install -r mobile/build/fifa-trainer.apk` 的整行输出 | | | |
-| 本次 APK 的证书 SHA-256 | `apksigner verify --print-certs mobile/build/fifa-trainer.apk` 的证书摘要整行（04-07 Task 1 抄录；应与第 2 节、BUILD.md 第六节逐字相同） | | | |
+| 本次 APK 的证书 SHA-256 | `Signer #1 certificate SHA-256 digest: e1841a17bda43307cdfc8e9e757c672a6a91b7fd60ea86e715afd461ba32e046`（APK 构建时间 2026-11-05 19:22:57 CST，27012856 字节；与 BUILD.md 第六节、第 2 节逐字相同） | | | |
 | 探针第 1/4 步 | 屏幕原文 + 是否通过 + 进度条读数 | | | |
 | 探针第 2/4 步 | 屏幕原文 + 是否通过 + 进度条读数 | | | |
 | 探针第 3/4 步 | 屏幕原文 + 是否通过 + 进度条读数 | | | |
