@@ -243,7 +243,8 @@ func tick(frame: Frame) -> void:
 			active.group_hits = 0
 			active.groups_done += 1
 		_last_any_fire = frame.now
-		_record(active, true, &"ok", "", hit.elapsed_ms, frame.now, hit.summary)
+		_record(active, true, &"ok", "", hit.elapsed_ms, frame.now, hit.summary,
+			hit.measured)
 
 		# i) 一次物理动作只认一个动作；`break` 必须在置锁之后。
 		_gesture_locked = true
@@ -288,16 +289,16 @@ func _drain_failures(now: float) -> void:
 		var code := str(failure.code)
 		active.failures[code] = int(active.failures.get(code, 0)) + 1
 		_record(active, false, failure.code, failure.message, failure.elapsed_ms,
-			now, "")
+			now, "", failure.measured)
 	if owner != null:
 		_discard_other_claims(owner)
 
 
 ## 成功 / 失败都从这里进队列；`seq` 从 1 开始单调递增。
 ##
-## **全项目唯一的 `_record` 定义**，8 个参数。`measured` 由计划 04 从
-## `Hit.measured` / `Failure.measured` 透传进来；本阶段只定稿签名，不改它。
-@warning_ignore("unused_parameter")
+## **全项目唯一的 `_record` 定义**，8 个参数。`measured` 由命中路径从
+## `Hit.measured`、失败路径从 `Failure.measured` **原样**透传（同一个对象，
+## 不 `duplicate()`、不裁剪、不重算）—— Phase 7 只认这一份度量。
 func _record(active: ActiveSkill, ok: bool, code: StringName, message: String,
 		elapsed_ms: float, at: float, detail: String, measured: Dictionary = {}) -> void:
 	var outcome := Outcome.new()
@@ -308,6 +309,7 @@ func _record(active: ActiveSkill, ok: bool, code: StringName, message: String,
 	outcome.elapsed_ms = elapsed_ms
 	outcome.at = at
 	outcome.detail = detail
+	outcome.measured = measured
 	_seq += 1
 	outcome.seq = _seq
 	active.last_outcome = outcome
