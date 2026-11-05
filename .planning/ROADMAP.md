@@ -134,7 +134,7 @@ Decimal phases appear between their surrounding integers in numeric order.
   4. 布局建议（Xbox / PlayStation）自动给出，但必须用户按键确认后才进入练习，未确认不前进一步
   5. 在真机上做一次绿色搓射，屏幕产出且仅产出一次判定并显示成功或失败原因；快速连做两次得到两次独立判定（事件流保住了帧内反转）
 
-**Plans**: 9 plans, 9 waves
+**Plans**: 10 plans, 10 waves
 **Wave 1**
 - [x] 04-01-PLAN.md — tap 检测器逐行移植 + Python 生成黄金夹具 + `TAP_GOLDEN_DETECTOR` 哨兵（成功标准 1）(completed 2026-11-05)
 
@@ -161,10 +161,14 @@ Decimal phases appear between their surrounding integers in numeric order.
       — **2026-11-05 真机结果：D0 失败**（探针三次拒绝 + 停止屏「没有收到摇杆事件（events_motion = 1931）」）；D1–D6 未执行（`run-as: package not debuggable`；只有一只 Xbox 手柄）。**用户最终决定保留四步探针、修 UX**（不做单屏检测）；修复与重建由 04-08 承担，本计划改为 Wave 8，必须等 04-08 的新 APK 出来后再走查；成功标准 2/3/4/5 仍未闭合。
       — **2026-11-05 21:19–21:30 第二次走查（新包 27,046,027 B）：D0 仍然失败**，卡在探针第 1/4 步「上」：`PAD_AXIS i=4/i=5` 先报 0.000、首次上报后变 -1.000，静止基线按 0 记 → 57 行 `PROBE_REJECT ambiguous_axes key=up`、`margin 0.000`。用户要求「换一种检测方式或跳过」。D1–D6 未执行；成功标准 2/3/4/5 仍未闭合。修复方向：采静止基线前等所有轴上报过一次，或排除从未上报的轴；修完必须重建 APK 并重新走查
       — **2026-11-05 04-08 已交付新包**：`mobile/build/fifa-trainer.apk`（27,046,027 字节，证书 `e1841a17…32e046` 不变，v2 验签通过，只含 arm64）。D1/D2 改走「LB+RB 打开诊断覆盖层 + `adb exec-out screencap`」，不再需要 `run-as`；D2 拒绝面因缺第二只手柄仍记为未执行。**重走 D0–D6 前必须先卸载重装这个新包**
-      — **2026-11-05 04-09 已把首启路径换成单页输入设置**（`InputSetup` + `input_setup_screen`，组合根不再驱动 `OnboardingFlow`；`trigger_rest = min`）。新包 **27,067,065 B**（证书不变）。下一次走查先卸载重装这个包，D0 只有 8 步，见 `ACCEPTANCE.md` §6「本次待验收」
+      — **2026-11-05 04-09 已把首启路径换成单页输入设置**（`InputSetup` + `input_setup_screen`，组合根不再驱动 `OnboardingFlow`；`trigger_rest = min`）。新包 **27,067,065 B**（证书不变）。下一次走查先卸载重装这个包，D0 只有 8 步，见 `ACCEPTANCE.md` §6「D0 操作说明」
+      — **2026-11-05 04-10 已加输入事件日志**：按键边沿与轴变化写入 `/sdcard/Android/data/com.fifaskill.trainer/files/input_log.txt` 并镜像 logcat `INPUT_EVT`，`adb exec-out cat` 可直接回放；新包 **27,071,318 B**（证书不变）。D0 操作与 04-09 相同，下一次走查用这个包
 
 **Wave 9** *(blocked on Wave 8 completion)*
 - [x] 04-09-PLAN.md — 单页输入设置：`InputSetup` 纯逻辑（轴对 / 符号 / 中点 / 量程 / 扳机 rest=min）+ 一页式屏 + 组合根切换 + 第 17 套件 + 重建 APK (completed 2026-11-05)
+
+**Wave 10** *(blocked on Wave 9 completion)*
+- [x] 04-10-PLAN.md — `InputLog` 输入事件日志（按键边沿 + 轴节流，文件 2 MB 轮转 + logcat `INPUT_EVT`）+ `PadSampler` 接线 + 会话头 + 第 18 套件 + 重建 APK (completed 2026-11-05)
 
 **UI hint**: yes
 

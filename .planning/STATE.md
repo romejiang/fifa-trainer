@@ -3,11 +3,11 @@ gsd_state_version: "1.0"
 current_phase: 4
 current_phase_name: 设备输入层 + 绿色搓射竖切
 status: executing
-stopped_at: 04-09 单页输入设置已交付（新 APK 27,067,065 B）— 首启不再有四步探针；D0–D6 仍待 04-07 用新包重走
-last_updated: "2026-11-05T13:58:00.000Z"
+stopped_at: 04-10 输入事件日志已交付（新 APK 27,071,318 B）— 按键边沿与轴变化可被 adb 回放；D0–D6 仍待 04-07 用新包重走
+last_updated: "2026-11-05T14:59:43.000Z"
 last_activity: 2026-11-05
-last_activity_desc: 04-09 完成：InputSetup 纯逻辑 + 一页式 input_setup_screen + 组合根换首启路径 + 重建 APK；扳机静止值改为观测最小值
-state_head: 9cff008
+last_activity_desc: 04-10 完成：InputLog（文件 + logcat INPUT_EVT）+ PadSampler 接线 + 会话头 + 第 18 套件；新 APK 27,071,318 B
+state_head: c664ff1
 progress:
   total_phases: 10
   completed_phases: 3
@@ -28,9 +28,9 @@ See: .planning/PROJECT.md (updated 2026-11-04)
 ## Current Position
 
 Phase: 4 (设备输入层 + 绿色搓射竖切) — 代码侧已收口，真机清单未闭合
-Plan: 9 of 9（04-01…04-06、04-08、04-09 完成；04-07 是 Wave 9 的真机走查，两次尝试都失败）
-Status: Blocked — 04-09 已把首启路径换成单页输入设置并重建 APK；等 04-07 用新包重走 D0–D6
-Last activity: 2026-11-05 21:35–21:56 — 04-09：`InputSetup` 纯逻辑 + 一页式 `input_setup_screen` + 组合根换首启路径；扳机静止值改为观测到的最小值；新 APK 27,067,065 B（证书不变）
+Plan: 10 of 10（04-01…04-06、04-08、04-09、04-10 完成；04-07 是 Wave 8 的真机走查，两次尝试都失败）
+Status: Blocked — 04-10 已加输入事件日志并重建 APK；等 04-07 用新包重走 D0–D6，按键与轴事件可用 adb 直接回放
+Last activity: 2026-11-05 22:46–22:59 — 04-10：`InputLog` + `PadSampler` 接线 + 会话头 + 第 18 套件；新 APK 27,071,318 B（证书不变）
 
 Progress: [███░░░░░░░] 32%
 
@@ -82,6 +82,7 @@ Progress: [███░░░░░░░] 32%
 | Phase 4 P06 | 9min | 3 tasks | 16 files |
 | Phase 4 P08 | 34min | 5 tasks | 15 files |
 | Phase 4 P09 | 21min | 3 tasks | 14 files |
+| Phase 4 P10 | 13min | 2 tasks | 9 files |
 
 ## Accumulated Context
 
@@ -256,6 +257,9 @@ Recent decisions affecting current work:
 - [Phase 4]: 复用判据降级为「同 guid key + 结构可用（rs 齐全 + 校准存在 + 有布局）」：没有探针就没有本次观测的四项 index+sign，拿档案自己比自己等于假绿；四项比较仍留在 `DeviceProfile.can_reuse`，等重新引入「探一次」的界面再接回
 - [Phase 4]: 设置页写档案时 `scale = 0` 按 1.0 存（未校准直通），并用 `DeviceProfile.from_dict` 往返断言证明这份档案不会被 `load_all()` 整份丢弃；空设备名兜底为「未知手柄」
 - [Phase 4]: A 的两个前置（没有手柄 / 还没有轴对）只在 `%Help` 多一行提示，不切屏、不记失败、不清空已采数据 —— 那是「没有可保存的映射」，不是判定失败
+- [Phase 4]: 输入事件日志的唯一目的是「事后可回放」：每行都有毫秒时间戳，格式是纯函数（`format_button` / `format_axis`），套件逐字断言；不做实时面板、不做解析器
+- [Phase 4]: 日志写 `Android/data/<包名>/files/input_log.txt`（adb 可读，release 包不需要 `run-as`）并镜像 logcat `INPUT_EVT`；非 Android 平台退回 `user://`，避免桌面开发去 `/storage` 撞无关错误
+- [Phase 4]: 日志失败只记一次 `INPUT_LOG_ERROR` 并短路本会话写入：按钮边沿永不节流，轴按 `|Δ| < 0.02 且 < 16 ms` 节流；2 MB 轮转只丢最旧的一半
 
 ### Pending Todos
 
@@ -265,7 +269,8 @@ None yet.
 
 - **Phase 4 真机清单 D0 失败（04-07 Task 2，checkpoint:human-verify / blocking-human）— 尝试一（旧包 27,012,856 B）**：手机 Motorola XT2175-2 / Android 12（`ZY22F5FXX9`），D0 在探针重试循环失败：`两轴同时动了：margin 0.001 < 0.25`（20:15:38）/ `上与右落在同一根轴（2/2）`（20:15:46）/ `上下没有互为反号：上 (轴 2, 符号 -1)、下 (轴 3, 符号 1)`（20:18:22）；20:15:50 出现停止屏「没有收到摇杆事件（events_motion = 1931）」。D1–D6 未执行；成功标准 2/3/4/5 均不得勾选。
 - **Phase 4 真机清单 D0 仍然失败 — 尝试二（新包 27,046,027 B，04-08 重建）**：干净卸载后安装成功（`versionName=0.1.0`，`lastUpdateTime=2026-11-05 21:19:05`，证书 `e1841a17…32e046` 不变），D0 卡在探针第 1/4 步「上」：`PAD_AXIS i=4/i=5` 在 21:22:32.677 报 `v=0.000`，21:22:54.846 变成 `v=-1.000`（真实静止值）；静止基线按 0 记 → 每窗口 `margin 0.000 < 0.25` → 57 行 `PROBE_REJECT code=ambiguous_axes key=up soft=1`。用户按 B 重来、重新推右摇杆均无效，要求「换一种检测方式或跳过」。D1–D6 未执行；成功标准 2/3/4/5 仍未闭合。**04-09 已修**：整条探针链被单页输入设置替换，`trigger_rest = min`，扳机跳变不再参与轴对识别；新包 27,067,065 B（证书不变），待 04-07 用新包重走。
-- **04-09 交付后的待办（04-07）**：先 `adb uninstall com.fifaskill.trainer` → `adb install -r mobile/build/fifa-trainer.apk`（27,067,065 B）。新 D0 只有 8 步（ACCEPTANCE §6「本次待验收」）：看轴表 → 推圆点 → X/Y 翻符号 → 推到底 → A 保存 → 练习屏；证据多一条 `adb logcat -s godot:I | grep INPUT_SETUP`（每秒一行 axis pair / sign / span / rest）。成功标准 2/3/4/5 仍未勾选。
+- **04-10 交付后的待办（04-07，最新包）**：先 `adb uninstall com.fifaskill.trainer` → `adb install -r mobile/build/fifa-trainer.apk`（**27,071,318 B**，证书 `e1841a17…32e046` 不变）。D0 操作与 04-09 相同（8 步），但按键边沿与轴变化现在写入 `/sdcard/Android/data/com.fifaskill.trainer/files/input_log.txt`，`adb exec-out cat` 直接可读；logcat 用 `adb logcat -s godot:I | grep INPUT_EVT`。成功标准 2/3/4/5 仍未勾选。
+- **04-09 的验收待办（历史，包已被 04-10 取代）**：先 `adb uninstall com.fifaskill.trainer` → `adb install -r mobile/build/fifa-trainer.apk`（27,067,065 B）。新 D0 只有 8 步（ACCEPTANCE §6「D0 操作说明」）：看轴表 → 推圆点 → X/Y 翻符号 → 推到底 → A 保存 → 练习屏；证据多一条 `adb logcat -s godot:I | grep INPUT_SETUP`（每秒一行 axis pair / sign / span / rest）。
 - **D1/D2 的 `run-as` 通道不可用（已绕过，不是已解决）**：release APK 不可调试，`adb shell run-as com.fifaskill.trainer …` 返回 `run-as: package not debuggable`。04-08 增加屏上诊断覆盖层，D1/D2 的证据改为「LB+RB 打开覆盖层 + `adb exec-out screencap`」；但覆盖层**只读**，D2 拒绝面所需的「改写外层 key」仍然做不到
 - **用户已决定保留四步探针（2026-11-05，本条关闭）**：用户否决单屏输入检测，改为「保留四步探针、只修 UX」；04-08 按此执行（实时读数 / 两次软重试 / 纯语言文案 / 增量停止屏）。原 blocker 与 04-07 的记录保留为历史
 - **D2 缺第二只手柄**：现场只有 Xbox Series X Controller（`getevent -pl` 仅列出 `Xbox Wireless Controller`）；拒绝面（DualSense 或另一只轴映射不同的手柄）未执行，成功标准 3 不得声称完整
@@ -292,6 +297,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-11-05T13:58:00.000Z
-Stopped at: 04-09 完成 —— 首启路径换成一页式输入设置（`InputSetup` + `input_setup_screen`），组合根不再驱动 `OnboardingFlow`，扳机静止值改为观测最小值；新 APK 27,067,065 B（证书 `e1841a17…32e046` 不变）。D0–D6 待 04-07 用新包重走，成功标准 2/3/4/5 仍未闭合
+Last session: 2026-11-05T14:59:43.000Z
+Stopped at: 04-10 完成 —— 输入事件日志（`InputLog` + `PadSampler` 接线 + 会话头 + 第 18 套件）；按键边沿与轴变化写入 `/sdcard/Android/data/com.fifaskill.trainer/files/input_log.txt` 并镜像 logcat `INPUT_EVT`；新 APK 27,071,318 B（证书 `e1841a17…32e046` 不变）。D0–D6 待 04-07 用新包重走，成功标准 2/3/4/5 仍未闭合
 Resume file: None
