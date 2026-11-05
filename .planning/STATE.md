@@ -28,9 +28,9 @@ See: .planning/PROJECT.md (updated 2026-11-04)
 ## Current Position
 
 Phase: 4 (设备输入层 + 绿色搓射竖切) — EXECUTING
-Plan: 6 of 7
+Plan: 7 of 7（Task 2 等待真机，checkpoint:human-verify / blocking-human）
 Status: Executing Phase 4
-Last activity: 2026-11-05 — 04-06 练习屏 + 结果横幅 + 60 Hz 集成竖切 + 真机记录表完成
+Last activity: 2026-11-05 — 04-07 Task 1 导出签名 APK 并核对证书指纹；Task 2 因 `adb devices` 为空停在真机检查点
 
 Progress: [███░░░░░░░] 32%
 
@@ -243,6 +243,7 @@ None yet.
 
 ### Blockers/Concerns
 
+- **Phase 4 真机清单未执行（04-07 Task 2 停在 `checkpoint:human-verify`，gate=blocking-human）**：`adb devices` 为空。APK 已产出并通过独立验签/对齐/包内容核对（证书 `e1841a17…32e046`，27012856 字节，`a2617a4`），`mobile/ACCEPTANCE.md` 第 6 节 D0–D6 一格未填；成功标准 2/3/4/5 均不得勾选
 - Phase 2 / 4 之前需备齐 **2 台不同 OEM 手机 + Xbox 与 DualSense 手柄**；模拟器不能替代真机验证
 - **Phase 2 的人工验收全部未闭合，落点都在 `mobile/ACCEPTANCE.md`**：第 0 节四项前置条件、第 1 节两台 × 四项观察、第 4 节密钥库离线备份、第 5 节第二台干净机器重导出。`adb devices` 当前为空，`device-smoke.sh` 以 `DEVICE_SMOKE_FAIL` 退出（正确行为，不是缺陷）
 - 60 Hz 抽稀是否保住 `release_hold_ms = 120` 与 `global_cooldown_ms = 60` 尚未实测，由 Phase 5 的抽稀矩阵回答；在此之前不动任何阈值
@@ -266,6 +267,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-11-05T11:18:26.000Z
-Stopped at: Completed 04-06-PLAN.md
+Last session: 2026-11-05T11:24:00.000Z
+Stopped at: 04-07 Task 2 真机检查点（checkpoint:human-verify / blocking-human）；APK 已产出，D0–D6 未填
 Resume file: None
