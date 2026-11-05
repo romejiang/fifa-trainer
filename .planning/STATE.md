@@ -2,18 +2,18 @@
 gsd_state_version: "1.0"
 current_phase: 5
 current_phase_name: 全动作判定对等性 — 三类检测器 + 引擎仲裁 + 抽稀矩阵
-current_plan: 6
+current_plan: 7
 status: executing
-stopped_at: Completed 05-05-PLAN.md
-last_updated: "2026-11-05T21:53:29.647Z"
+stopped_at: Completed 05-06-PLAN.md
+last_updated: "2026-11-05T22:58:20.113Z"
 last_activity: 2026-11-06
-last_activity_desc: Phase 5 plan 05 complete — DECIMATION 抽稀矩阵 + 34 条边界带白名单 + 三次变异验证
-state_head: 5fd872cca890ffc21e18f5f7c930fccd9b59c162
+last_activity_desc: Phase 5 plan 06 complete — 左摇杆三件套 + RS 冻结 + schema v2/ls_ready 迁移门
+state_head: 47fbbaa344dee8440b7250f0da830a29afc18d7b
 progress:
   total_phases: 10
   completed_phases: 4
   total_plans: 34
-  completed_plans: 31
+  completed_plans: 32
   percent: 40
 ---
 
@@ -28,19 +28,19 @@ See: .planning/PROJECT.md (updated 2026-11-04)
 
 ## Current Position
 
-Current Plan: 6
+Current Plan: 7
 Total Plans in Phase: 7
 Phase: 5 (全动作判定对等性 — 三类检测器 + 引擎仲裁 + 抽稀矩阵) — EXECUTING
-Plan: 6 of 7
+Plan: 7 of 7
 Status: Ready to execute
-Last activity: 2026-11-06 — 05-05 完成：DECIMATION 252/0、34 条边界带白名单、三次变异验证
+Last activity: 2026-11-06 — 05-06 完成：LS 三件套、D5-1 冻结、schema v2 + ls_ready（44,867 断言 / 0 失败）
 
 Progress: [████░░░░░░] 40%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 30
+- Total plans completed: 32
 - Average duration: — min
 - Total execution time: 2.8 hours
 
@@ -94,6 +94,7 @@ Progress: [████░░░░░░] 40%
 | Phase 5 P03 | 43min | 3 tasks | 12 files |
 | Phase 5 P04 | 39min | 3 tasks | 12 files |
 | Phase 5 P05 | 37min | 3 tasks | 8 files |
+| Phase 5 P6 | 26min | 3 tasks | 12 files |
 
 ## Accumulated Context
 
@@ -301,6 +302,7 @@ Recent decisions affecting current work:
 - [Phase 5]: 抽稀实测 34 条边界带漂移（不是计划预期的 1 条）；全部按 D-05 登记进双向白名单，不网格化、不加第四条选样规则、不改任何阈值
 - [Phase 5]: det_arc_rearm_124 的 250 Hz 实测是 [too_short@204, too_short@208]，不是计划文字的 [too_short, too_fast]；白名单理由按夹具实测书写
 - [Phase 5]: DECIMATION 共 252 条 = 3 × (55 + 29)；夹具放 mobile/tests/fixtures/，唯一消费者是 Godot；下限 240 在 grep 与套件里是同一个数字
+- [Phase 5]: 05-06：RS 轴对在第一次推满量程时冻结，ls_pair() 排除冻结对；左右摇杆各自的符号只由已知方向的位移确认，横向位移返回 sideways；schema v2 + ls_ready 让 v1 档案整份失效
 
 ### Pending Todos
 
@@ -339,6 +341,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-11-05T21:53:29.472Z
-Stopped at: Completed 05-05-PLAN.md
+Last session: 2026-11-05T22:58:19.936Z
+Stopped at: Completed 05-06-PLAN.md
 Resume file: None
