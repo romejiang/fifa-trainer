@@ -172,7 +172,9 @@ static func _axis(root: Dictionary, key: String, allow_unmapped: bool,
 		return result
 	var entry: Dictionary = raw
 	result["index"] = _index(entry, path, allow_unmapped, out)
-	result["sign"] = _sign(entry, path, out)
+	# 扳机条目没有符号：符号只对摇杆轴有意义，缺 sign 不是错误。
+	if key != "lt" and key != "rt":
+		result["sign"] = _sign(entry, path, out)
 	result["rest"] = _rest(entry, path, out)
 	return result
 

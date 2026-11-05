@@ -143,7 +143,7 @@ static func evaluate_step(samples: Array[PackedFloat32Array],
 ## 失败时不清空任何已测结果 —— 本函数是纯函数，不持有状态；是否保留进度由调用方决定。
 static func validate_cross(up: Dictionary, right: Dictionary, down: Dictionary,
 		left: Dictionary) -> Dictionary:
-	if up["axis"] != right["axis"]:
+	if up["axis"] == right["axis"]:
 		return _cross_fail(&"same_axis_up_right",
 			"上与右落在同一根轴（%d / %d），请只推右摇杆" % [up["axis"], right["axis"]])
 	if down["axis"] != up["axis"] or down["sign"] != -int(up["sign"]):

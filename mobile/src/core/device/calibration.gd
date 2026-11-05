@@ -24,6 +24,12 @@ const MIN_RANGE := 0.6
 ## 任一轴量程低于它 → 该轴不可用（推到头的距离太短）。
 const MIN_SCALE := 0.5
 
+## 每轴独立的中点与量程：摇杆是两个独立的模拟轴，磨损与偏移不会两轴同步。
+var center_x: float = 0.0
+var center_y: float = 0.0
+var scale_x: float = 1.0
+var scale_y: float = 1.0
+
 
 ## raw → 归一化。三步顺序写死：先减中点、再除量程、最后乘符号。
 ##
