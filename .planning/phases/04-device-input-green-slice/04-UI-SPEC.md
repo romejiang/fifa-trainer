@@ -54,10 +54,11 @@ created: "2026-11-05"
 
 ## 1. Node Contract（节点词汇表）
 
-Enumerated by `ls mobile/src/ui/*.gd mobile/src/ui/*.tscn | grep -v '\.uid$'` — **4 个文件**
-（波次 6 后为 7 个：新增 `practice_screen.gd` / `practice_screen.tscn` / `result_banner.gd`）—
+Enumerated by `ls mobile/src/ui/*.gd mobile/src/ui/*.tscn | grep -v '\.uid$'` — **9 个文件**
+（波次 7 把 04-06 的 7 个再加 `diagnostics_overlay.gd` / `diagnostics_overlay.tscn`；此前为 4 个）—
 `godot@4.7.2-stable` — 2026-11-05.
-场景内 `unique_name_in_owner` 计数：`main.tscn` = 3，`onboarding_screen.tscn` = 8，
+场景内 `unique_name_in_owner` 计数（实测）：`main.tscn` = 3，`onboarding_screen.tscn` = 8，
+`practice_screen.tscn` = 8，`diagnostics_overlay.tscn` = 1，
 `grep -c 'type="Button"' mobile/src/ui/*.tscn` = **0**。
 
 | 节点 | 类型 | 字号 | 归属 | 内容来源 | 备注 |
@@ -82,6 +83,7 @@ Enumerated by `ls mobile/src/ui/*.gd mobile/src/ui/*.tscn | grep -v '\.uid$'` �
 | `%ResultBanner` | `Control` + `result_banner.gd` | — | `practice_screen.tscn`（待实现） | 无背景、无边框，纯布局容器 | 占据屏幕中部 |
 | `%Title`（横幅） | `Label` | **72** | `%ResultBanner` 下 | `"✓ 做对了"` / `"✗ 没做对"` | **必须** `parent="ResultBanner"` |
 | `%Reason` | `Label` | **40** | `%ResultBanner` 下 | `outcome.detail`（成功）/ `outcome.message`（失败） | **必须** `parent="ResultBanner"`；`autowrap_mode = 2` |
+| `%Panel` | `Label` | 22 | `diagnostics_overlay.tscn` / `diagnostics_overlay.gd` | `page_text()` 的两页诊断文本 | 调试面；零交互；只读；`autowrap_mode = 0`（超宽即被裁，见 §5.1） |
 
 **节点命名冲突说明**：引导屏与练习屏各有一个 `%Title`。它们分属两个场景，
 `unique_name_in_owner` 的作用域是各自场景，互不影响；`result_banner.gd` 里的
@@ -272,6 +274,11 @@ Exceptions:
 `theme_override_font_sizes/font_size`。（`src/smoke/` 里另有 22 px，那是输入体检调试屏，
 不属本契约，也不得被任何正式屏引用。）
 
+**显式例外：`diagnostics_overlay.tscn` 的 `%Panel` 用 22 px**
+（字面量 `theme_override_font_sizes/font_size = 22`）。理由：它和 `src/smoke/` 同性质 ——
+一次性证据面，不是给人「用」的界面，只要求 1280×720 内放得下 26 行诊断文本。
+**正式屏（`onboarding_screen` / `practice_screen` / `main` / `result_banner`）不得引用 22 px。**
+
 | Role | Size | Weight | Line Height |
 |------|------|--------|-------------|
 | Body | 28px | **100 Thin（当前渲染值，实测）** | 1.2（字体固有：Noto Sans SC 子集 `hhea` = 1000 / −200 / 0，行框 ≈33.6px） |
@@ -445,6 +452,26 @@ ev_m=%d ev_b=%d poll=%d dt95=%.1f g=%d/%d
 **禁则**：`%DebugPanel` 不得显示中文、不得显示设备名（设备名走 `%Footer` 与
 `PAD_DEV` 日志）、不得因 `device < 0` 而抛错（无设备时不进入练习屏）。
 
+### 5.1 诊断覆盖层契约（`diagnostics_overlay`）
+
+D1 / D2 的唯一证据出口。release APK 不可调试、`run-as` 被拒，屏上覆盖层 + `screencap`
+是本 artifact 上唯一既能取证又不需要第二只手柄的通道。
+
+| 项 | 契约 |
+|----|------|
+| 打开 / 关闭 | 手柄 **LB + RB**（索引 **9 + 10**）同时按住 **0.8 秒**；再按一次关闭。任一个松开即重新计时 |
+| 翻页 | **十字键左 / 右**（索引 **13 / 14**）；在 2 页之间回绕；其余索引一律丢弃 |
+| 零触摸 | 不响应触摸、不响应鼠标；`type="Button"` 计数为 0 |
+| 零 Outcome | 打开时 `runtime.set_layout_confirmed(false)`（静默 `abandon()` + 清空未取走的结果）；可见期间组合根 `_process` 早退，不 tick 运行时、不分派引导按键；关闭时恢复打开前的 confirmed 值 |
+| 第 1 页（档案） | 抬头「档案页（第 1/2 页）」；每份档案 8 行：`外层key=` + `schema=` + `profile_id=` / `name=` + `guid=` / `axes rs_x=(i,s) rs_y=(i,s) ls_x=(i,s) ls_y=(i,s)` / `axes lt=(i,rest=) rt=(i,rest=)` / `cal center=(,) scale=(,)` / `layout=` + `confirmed=` + `btn_idx_ok=` / `probed=` / `q up= right= down= left=`。空文件 → 「尚未生成」；坏文件 → 「解析失败」+ 原始字节前 160 字符（**不删档**） |
+| 第 2 页（事件） | 抬头「事件页（第 2/2 页）」；`ev_m` / `ev_b` / `poll`、`dt50` / `dt95` / `dtmax`（+ 样本数）、`in_tid` / `proc_tid`、扳机行（LT/RT 的轴号 + `v` + `rest`）、逐轴 `v` / `min` / `max` 共 8 行 |
+| 行宽 | `MAX_LINE_CHARS = 100`；`autowrap_mode = 0` 下超宽会被裁，`test_onboarding_ui` 逐行断言 |
+| 行数 | 每页 ≤ 26 行（720 px / 22 px 行框约 27 行，留一行余量） |
+| 刷新 | 1 Hz（`REFRESH_SECONDS = 1.0`），只在可见时刷新 |
+| 字号 | 22 px —— §Typography 的显式例外 |
+| 取证 | 只经 `adb exec-out screencap -p`；**不依赖** `run-as` 或 debuggable 构建 |
+| 数据来源 | 档案 = `ProfileStore.PROFILES_PATH` 的**原始字节**（绝不调 `load_all()`，那会删坏档）；事件 = `PadStateBuffer` 的计数器与 `axis_range`，逐字不翻译 |
+
 ---
 
 ## 6. 字体与字形闸门（Font Contract）
@@ -546,6 +573,7 @@ ev_m=%d ev_b=%d poll=%d dt95=%.1f g=%d/%d
 | G9 | 练习屏 `%LiveMs` 的 10 Hz 与状态检测 | 计划要求 `%LiveMs.text = runtime.status()`；S12/S13 的区分也依赖同一字符串 | 若改成"每帧读状态再分支"，会把节流块复杂度抬高 | 契约：**S12/S13 不新增节点、不新增状态机**，只由 `%LiveMs` 的文本体现；所有高频赋值收在同一个 `_accum < 0.1` 块内 |
 | G10 | 无返回/退出路径 | 安卓返回键不处理；练习屏没有"退出练习" | 本阶段可接受（单动作竖切） | Phase 8 的热插拔 UX 再补；现在不新增按钮（零触摸） |
 | G11 | 实际渲染字重是 100（Thin），不是 400 | `AppFont.tres` 只有 `base_font` + `fallbacks`，无 `variation_opentype`；`NotoSansSC-Subset.ttf` 的 `fvar` 默认实例 `wght = 100`、`OS/2.usWeightClass = 100` | 28 px 正文在 1 m 外笔画偏细，契约的"不眯眼读出 `%Reason`"可能不达标；32/40 px 同样受影响 | **未解决**。一行修复：`AppFont.tres` 加 `variation_opentype = { &"wght": 400 }`——不动字体文件、不重生成子集、不影响 `GLYPH_OK`（按码点断言）、不影响任何 `.gd` grep。D0 判读通过则可维持 Thin 基线；判读失败先改这一行，**不要**先加字号 |
+| G12 | 诊断覆盖层是调试面，不在「零触摸 / 无动画」的豁免之外 | 它是一个全屏 `Control` + 一个 `Label`，没有 Button、没有 Tween、没有音频；但它需要更密的行距与 22 px 字号，明显不同于正式屏 | 若按正式屏的字号契约衡量，它会「违规」 | **显式豁免**：允许 22 px 与 ≤26 行/页，条件与理由见 §5.1 与 §Typography 的例外段；正式屏仍不得引用 22 px |
 
 ---
 
@@ -571,7 +599,14 @@ ev_m=%d ev_b=%d poll=%d dt95=%.1f g=%d/%d
 | 1 m 可读性 | D0 / D4 真机截图：不眯眼读出 `%Reason`；失败原因不压 `%DebugPanel` |
 | 判定只出现一次 | `test_green_slice`：`_check_single_shot_success` 恰好 1 条 + 二次 drain 为空；`_check_two_shots` 恰好 2 条且 `seq` 严格递增 |
 | 未确认布局零判定 | `test_green_slice._check_layout_gate`（`pop_outcomes()` 为空、`hits == 0`）+ `test_onboarding_flow._check_layout_never_preconfirmed` |
-| D0 停止条件可达 | `grep -c '没有收到摇杆事件' mobile/src/ui/onboarding_screen.gd` ≥ 1，同文件含 `events_motion`；真机 D0 复现时抄录原句即判失败 |
+| D0 停止条件可达 | `grep -c '本步开始后新增' mobile/src/ui/onboarding_screen.gd` → 1（增量文案的唯一落点 `stop_message()`）；真机 D0 复现时抄录整句：`本步开始后新增 N 个摇杆事件（累计 M）` 即判失败 |
+| 诊断覆盖层唯一节点 | `grep -c 'unique_name_in_owner = true' mobile/src/ui/diagnostics_overlay.tscn` → `1` |
+| 诊断覆盖层字号例外 | `grep -c 'theme_override_font_sizes/font_size = 22' mobile/src/ui/diagnostics_overlay.tscn` → `1` |
+| 组合键常量 | `grep -c 'DIAGNOSTICS_CHORD_BUTTONS' mobile/src/ui/main.gd` ≥ `2`；`grep -c 'Array\[int\] = \[9, 10\]'` → `1` |
+| 布局硬门总共有几处 | `grep -c 'set_layout_confirmed(false)' mobile/src/ui/main.gd` ≥ `4`（断连 / 换手柄 / 回引导三处 + 打开覆盖层一处） |
+| 覆盖层关闭后恢复 | `grep -c '_runtime.set_layout_confirmed(_layout_was_confirmed)' mobile/src/ui/main.gd` → `1` |
+| 覆盖层零 Outcome | `test_onboarding_ui._check_overlay_produces_no_outcome`：`set_layout_confirmed(false)` 后 `pop_outcomes()` 为空 |
+| 诊断两页可无头断言 | `test_onboarding_ui._check_diagnostics_profiles` / `_check_diagnostics_events` / `_check_diagnostics_line_width`（每行 ≤ `MAX_LINE_CHARS`、每页 ≤ 26 行） |
 
 ---
 
