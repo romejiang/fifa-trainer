@@ -145,7 +145,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] 04-03-PLAN.md — 轴探针 / 校准 / `DeviceProfile` / 复用门（纯逻辑，含 raw → 0/90/180/270 接缝断言）(completed 2026-11-05)
 
 **Wave 4** *(blocked on Wave 3 completion)*
-- [ ] 04-04-PLAN.md — `PadStateBuffer` + `PadSampler`（事件优先 + 每帧对账）+ `ProfileStore` 原子写 + lint 扩到 `src/input/`
+- [x] 04-04-PLAN.md — `PadStateBuffer` + `PadSampler`（事件优先 + 每帧对账）+ `ProfileStore` 原子写 + lint 扩到 `src/input/` (completed 2026-11-05)
 
 **Wave 5** *(blocked on Wave 4 completion)*
 - [ ] 04-05-PLAN.md — `OnboardingFlow` 纯状态机 + 组合根 + 引导屏 S1–S11 + 字形闭世界断言
