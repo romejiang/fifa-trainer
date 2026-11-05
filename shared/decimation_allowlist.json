@@ -19,17 +19,17 @@
     {
       "id": "det_croqueta_hold_352",
       "rate_hz": 60,
-      "reason": "hold 352ms 只比 350ms 阈值高 2ms；60 Hz 抽稀后 448ms 样本只保持 348ms，356ms 的回中样本先触发 reset 的 hold_short，成功判定晚到 356ms，条数与码都漂移。4ms 级边界带。 实测：250 Hz [ok@352ms] → 60 Hz [hold_short@356ms, ok@356ms]。"
+      "reason": "hold 352ms 只比 350ms 阈值高 2ms；60 Hz 抽稀后 448ms 样本只保持 348ms，回中时 elapsed=356ms 先判 hold_short；LB 随即重按，第二段在 elapsed=356ms 处补判 ok，条数 1→2。4ms 级边界带。 实测：250 Hz [ok@352ms] → 60 Hz [hold_short@356ms, ok@356ms]。"
     },
     {
       "id": "det_croqueta_hold_352",
       "rate_hz": 90,
-      "reason": "hold 352ms 只比 350ms 阈值高 2ms；90 Hz 抽稀后 444ms 样本只保持 344ms，356ms 的回中样本先触发 reset 的 hold_short，成功判定晚到 352ms，条数与码都漂移。4ms 级边界带。 实测：250 Hz [ok@352ms] → 90 Hz [hold_short@356ms, ok@352ms]。"
+      "reason": "hold 352ms 只比 350ms 阈值高 2ms；90 Hz 抽稀后 444ms 样本只保持 344ms，回中时 elapsed=356ms 先判 hold_short；LB 随即重按，第二段在 elapsed=352ms 处补判 ok，条数 1→2。4ms 级边界带。 实测：250 Hz [ok@352ms] → 90 Hz [hold_short@356ms, ok@352ms]。"
     },
     {
       "id": "det_croqueta_hold_352",
       "rate_hz": 120,
-      "reason": "hold 352ms 只比 350ms 阈值高 2ms；120 Hz 抽稀后 448ms 样本只保持 348ms，356ms 的回中样本先触发 reset 的 hold_short，成功判定晚到 356ms，条数与码都漂移。4ms 级边界带。 实测：250 Hz [ok@352ms] → 120 Hz [hold_short@356ms, ok@356ms]。"
+      "reason": "hold 352ms 只比 350ms 阈值高 2ms；120 Hz 抽稀后 448ms 样本只保持 348ms，回中时 elapsed=356ms 先判 hold_short；LB 随即重按，第二段在 elapsed=356ms 处补判 ok，条数 1→2。4ms 级边界带。 实测：250 Hz [ok@352ms] → 120 Hz [hold_short@356ms, ok@356ms]。"
     },
     {
       "id": "det_croqueta_ok",
@@ -49,17 +49,17 @@
     {
       "id": "det_croqueta_tol_minus_1",
       "rate_hz": 60,
-      "reason": "目标偏 9° 仍在 10° 容差内，但 hold 352ms 只比 350ms 阈值高 2ms；60 Hz 抽稀后 348ms 样本未达标，356ms 的回中样本先判 hold_short。4ms 级边界带。 实测：250 Hz [ok@352ms] → 60 Hz [hold_short@356ms]。"
+      "reason": "目标偏 9° 仍在 10° 容差内，但 hold 352ms 只比 350ms 阈值高 2ms；60 Hz 抽稀后 348ms 样本未达标，回中时 elapsed=356ms 先判 hold_short。4ms 级边界带。 实测：250 Hz [ok@352ms] → 60 Hz [hold_short@356ms]。"
     },
     {
       "id": "det_croqueta_tol_minus_1",
       "rate_hz": 90,
-      "reason": "目标偏 9° 仍在 10° 容差内，但 hold 352ms 只比 350ms 阈值高 2ms；90 Hz 抽稀后 344ms 样本未达标，356ms 的回中样本先判 hold_short。4ms 级边界带。 实测：250 Hz [ok@352ms] → 90 Hz [hold_short@356ms]。"
+      "reason": "目标偏 9° 仍在 10° 容差内，但 hold 352ms 只比 350ms 阈值高 2ms；90 Hz 抽稀后 344ms 样本未达标，回中时 elapsed=356ms 先判 hold_short。4ms 级边界带。 实测：250 Hz [ok@352ms] → 90 Hz [hold_short@356ms]。"
     },
     {
       "id": "det_croqueta_tol_minus_1",
       "rate_hz": 120,
-      "reason": "目标偏 9° 仍在 10° 容差内，但 hold 352ms 只比 350ms 阈值高 2ms；120 Hz 抽稀后 348ms 样本未达标，356ms 的回中样本先判 hold_short。4ms 级边界带。 实测：250 Hz [ok@352ms] → 120 Hz [hold_short@356ms]。"
+      "reason": "目标偏 9° 仍在 10° 容差内，但 hold 352ms 只比 350ms 阈值高 2ms；120 Hz 抽稀后 348ms 样本未达标，回中时 elapsed=356ms 先判 hold_short。4ms 级边界带。 实测：250 Hz [ok@352ms] → 120 Hz [hold_short@356ms]。"
     },
     {
       "id": "det_heel_to_heel_ok",
@@ -69,57 +69,57 @@
     {
       "id": "det_roulette_max_minus_4",
       "rate_hz": 60,
-      "reason": "250 Hz 在 596ms（上限 600 的 −4ms）刚好同时满足扫掠区间与终点窗 → ok。60 Hz 抽稀后 596ms 的决定性帧不被选中，最近的 600ms 样本只看到 278°（终点窗 280°±80° 之外）→ 松手 wrong_end。4ms 级边界带。 实测：250 Hz [ok@596ms] → 60 Hz [wrong_end@600ms]。"
+      "reason": "250 Hz 在 596ms（上限 600 的 −4ms）刚好同时满足扫掠区间与终点窗 → ok。60 Hz 抽稀后 596ms 的决定性帧不被选中，最后一个活跃样本只到 278.0°（终点窗 280°±80° 的外侧），随后回中 → wrong_end。4ms 级边界带。 实测：250 Hz [ok@596ms] → 60 Hz [wrong_end@600ms]。"
     },
     {
       "id": "det_roulette_max_minus_4",
       "rate_hz": 90,
-      "reason": "250 Hz 在 596ms（上限 600 的 −4ms）刚好同时满足扫掠区间与终点窗 → ok。90 Hz 抽稀后 596ms 的决定性帧不被选中，最近的 600ms 样本只看到 278°（终点窗 280°±80° 之外）→ 松手 wrong_end。4ms 级边界带。 实测：250 Hz [ok@596ms] → 90 Hz [wrong_end@600ms]。"
+      "reason": "250 Hz 在 596ms（上限 600 的 −4ms）刚好同时满足扫掠区间与终点窗 → ok。90 Hz 抽稀后 596ms 的决定性帧不被选中，最后一个活跃样本只到 278.7°（终点窗 280°±80° 的外侧），随后回中 → wrong_end。4ms 级边界带。 实测：250 Hz [ok@596ms] → 90 Hz [wrong_end@600ms]。"
     },
     {
       "id": "det_roulette_max_minus_4",
       "rate_hz": 120,
-      "reason": "250 Hz 在 596ms（上限 600 的 −4ms）刚好同时满足扫掠区间与终点窗 → ok。120 Hz 抽稀后 596ms 的决定性帧不被选中，最近的 600ms 样本只看到 278°（终点窗 280°±80° 之外）→ 松手 wrong_end。4ms 级边界带。 实测：250 Hz [ok@596ms] → 120 Hz [wrong_end@600ms]。"
+      "reason": "250 Hz 在 596ms（上限 600 的 −4ms）刚好同时满足扫掠区间与终点窗 → ok。120 Hz 抽稀后 596ms 的决定性帧不被选中，最后一个活跃样本只到 279.3°（终点窗 280°±80° 的外侧），随后回中 → wrong_end。4ms 级边界带。 实测：250 Hz [ok@596ms] → 120 Hz [wrong_end@600ms]。"
     },
     {
       "id": "det_roulette_max_plus_4",
       "rate_hz": 60,
-      "reason": "250 Hz 在 604ms 越过上限 600 → too_slow。60 Hz 抽稀后 604ms 这一帧不被选中，下一帧是 616ms 之后的回中帧，检测器按释放分支结束、不再产出 too_slow。4ms 级边界带。 实测：250 Hz [too_slow@604ms] → 60 Hz []。"
+      "reason": "250 Hz 在 604ms 越过上限 600 → too_slow。60 Hz 抽稀后边界只到 700ms（最后一个样本 279.3°，未越过上限），604 与 708ms 这两个关键帧都不在采样点上，检测器没有机会产出 too_slow。4ms 级边界带。 实测：250 Hz [too_slow@604ms] → 60 Hz []。"
     },
     {
       "id": "det_roulette_max_plus_4",
       "rate_hz": 90,
-      "reason": "250 Hz 在 604ms 越过上限 600 → too_slow。90 Hz 抽稀后 604ms 这一帧不被选中，下一帧是 612ms 之后的回中帧，检测器按释放分支结束、不再产出 too_slow。4ms 级边界带。 实测：250 Hz [too_slow@604ms] → 90 Hz []。"
+      "reason": "250 Hz 在 604ms 越过上限 600 → too_slow。90 Hz 抽稀后边界只到 700ms（最后一个样本 279.3°，未越过上限），604 与 708ms 这两个关键帧都不在采样点上，检测器没有机会产出 too_slow。4ms 级边界带。 实测：250 Hz [too_slow@604ms] → 90 Hz []。"
     },
     {
       "id": "det_roulette_max_plus_4",
       "rate_hz": 120,
-      "reason": "250 Hz 在 604ms 越过上限 600 → too_slow。120 Hz 抽稀后 604ms 这一帧不被选中，下一帧是 608ms 之后的回中帧，检测器按释放分支结束、不再产出 too_slow。4ms 级边界带。 实测：250 Hz [too_slow@604ms] → 120 Hz []。"
+      "reason": "250 Hz 在 604ms 越过上限 600 → too_slow。120 Hz 抽稀后边界只到 700ms（最后一个样本 279.3°，未越过上限），604 与 708ms 这两个关键帧都不在采样点上，检测器没有机会产出 too_slow。4ms 级边界带。 实测：250 Hz [too_slow@604ms] → 120 Hz []。"
     },
     {
       "id": "det_roulette_min_minus_4",
       "rate_hz": 90,
-      "reason": "250 Hz 在 248ms（下限 250 的 −4ms）判 too_fast。90 Hz 的边界落在 248 与 256ms 之间，最近样本是 256ms 的回中帧，先按 wrong_end 结束。4ms 级边界带。 实测：250 Hz [too_fast@248ms] → 90 Hz [wrong_end@256ms]。"
+      "reason": "250 Hz 在 248ms（下限 250 的 −4ms）判 too_fast。90 Hz 抽稀后 248ms 的决定性帧（348ms 样本）不被选中，下一次采样已是回中帧，按释放分支判 wrong_end（elapsed 256ms）。4ms 级边界带。 实测：250 Hz [too_fast@248ms] → 90 Hz [wrong_end@256ms]。"
     },
     {
       "id": "det_roulette_min_plus_4",
       "rate_hz": 60,
-      "reason": "250 Hz 在 252ms（下限 250 的 +4ms）判 ok。60 Hz 抽稀后 252ms 的决定性帧落在两帧之间，最近的是 268ms 的回中帧 → wrong_end。4ms 级边界带。 实测：250 Hz [ok@252ms] → 60 Hz [wrong_end@268ms]。"
+      "reason": "250 Hz 在 252ms（下限 250 的 +4ms）判 ok。60 Hz 抽稀后 252ms 的决定性帧不被选中，回中帧先到 → wrong_end（elapsed 268ms）。4ms 级边界带。 实测：250 Hz [ok@252ms] → 60 Hz [wrong_end@268ms]。"
     },
     {
       "id": "det_roulette_min_plus_4",
       "rate_hz": 90,
-      "reason": "250 Hz 在 252ms（下限 250 的 +4ms）判 ok。90 Hz 抽稀后 252ms 的决定性帧落在两帧之间，最近的是 256ms 的回中帧 → wrong_end。4ms 级边界带。 实测：250 Hz [ok@252ms] → 90 Hz [wrong_end@256ms]。"
+      "reason": "250 Hz 在 252ms（下限 250 的 +4ms）判 ok。90 Hz 抽稀后 252ms 的决定性帧不被选中，回中帧先到 → wrong_end（elapsed 256ms）。4ms 级边界带。 实测：250 Hz [ok@252ms] → 90 Hz [wrong_end@256ms]。"
     },
     {
       "id": "det_roulette_min_plus_4",
       "rate_hz": 120,
-      "reason": "250 Hz 在 252ms（下限 250 的 +4ms）判 ok。120 Hz 抽稀后 252ms 的决定性帧落在两帧之间，最近的是 260ms 的回中帧 → wrong_end。4ms 级边界带。 实测：250 Hz [ok@252ms] → 120 Hz [wrong_end@260ms]。"
+      "reason": "250 Hz 在 252ms（下限 250 的 +4ms）判 ok。120 Hz 抽稀后 252ms 的决定性帧不被选中，回中帧先到 → wrong_end（elapsed 260ms）。4ms 级边界带。 实测：250 Hz [ok@252ms] → 120 Hz [wrong_end@260ms]。"
     },
     {
       "id": "det_roulette_short_at_report_min",
       "rate_hz": 60,
-      "reason": "250 Hz 在 300ms 采样到 26° 扫掠 → too_short（report_min_angle=24.5）。60 Hz 的 16.7ms 周期把 300ms 与随后的回中帧合并到同一个最近样本，扫掠只到 23° 以下，整条静默。边界带量化。 实测：250 Hz [too_short@200ms] → 60 Hz []。"
+      "reason": "250 Hz 在 296ms 采样到 26° 扫掠 → too_short（report_min_angle=24.5°）。60 Hz 的 16.7ms 周期只取到 284ms 的 24.4° 与随后的回中帧；24.4° 低于报告下限，整条静默。边界带量化。 实测：250 Hz [too_short@200ms] → 60 Hz []。"
     },
     {
       "id": "rt_croqueta_ok",
@@ -139,17 +139,17 @@
     {
       "id": "rt_failure_owner_config_order",
       "rate_hz": 60,
-      "reason": "250 Hz 在 700–704ms 的 4ms 推杆（100°，无按键沿可保底）触发马赛回旋 wrong_start，并丢弃磕球同帧的 pending。60 Hz 抽稀后 704ms 这一帧不被选中，马赛回旋从未起手，只剩磕球在 616ms 的 too_slow。4ms 级边界带。 实测：250 Hz [wrong_start@4ms] → 60 Hz [too_slow@616ms]。"
+      "reason": "250 Hz 在 700–704ms 的 4ms 推杆（100°，无按键沿可保底）触发马赛回旋 wrong_start，并丢弃磕球同帧的 pending。60 Hz 抽稀后 704ms 这一帧不被采样，马赛回旋从未起手，只剩磕球的 too_slow（elapsed 616ms）。4ms 级边界带。 实测：250 Hz [wrong_start@4ms] → 60 Hz [too_slow@616ms]。"
     },
     {
       "id": "rt_failure_owner_config_order",
       "rate_hz": 90,
-      "reason": "250 Hz 在 700–704ms 的 4ms 推杆（100°，无按键沿可保底）触发马赛回旋 wrong_start，并丢弃磕球同帧的 pending。90 Hz 抽稀后 704ms 这一帧不被选中，马赛回旋从未起手，只剩磕球在 612ms 的 too_slow。4ms 级边界带。 实测：250 Hz [wrong_start@4ms] → 90 Hz [too_slow@612ms]。"
+      "reason": "250 Hz 在 700–704ms 的 4ms 推杆（100°，无按键沿可保底）触发马赛回旋 wrong_start，并丢弃磕球同帧的 pending。90 Hz 抽稀后 704ms 这一帧不被采样，马赛回旋从未起手，只剩磕球的 too_slow（elapsed 612ms）。4ms 级边界带。 实测：250 Hz [wrong_start@4ms] → 90 Hz [too_slow@612ms]。"
     },
     {
       "id": "rt_failure_owner_config_order",
       "rate_hz": 120,
-      "reason": "250 Hz 在 700–704ms 的 4ms 推杆（100°，无按键沿可保底）触发马赛回旋 wrong_start，并丢弃磕球同帧的 pending。120 Hz 抽稀后 704ms 这一帧不被选中，马赛回旋从未起手，只剩磕球在 608ms 的 too_slow。4ms 级边界带。 实测：250 Hz [wrong_start@4ms] → 120 Hz [too_slow@608ms]。"
+      "reason": "250 Hz 在 700–704ms 的 4ms 推杆（100°，无按键沿可保底）触发马赛回旋 wrong_start，并丢弃磕球同帧的 pending。120 Hz 抽稀后 704ms 这一帧不被采样，马赛回旋从未起手，只剩磕球的 too_slow（elapsed 608ms）。4ms 级边界带。 实测：250 Hz [wrong_start@4ms] → 120 Hz [too_slow@608ms]。"
     },
     {
       "id": "rt_heel_ok",
