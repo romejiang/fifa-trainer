@@ -17,6 +17,7 @@ func run(r) -> void:
 	_check_probe_rejections(r)
 	_check_evaluate_feeds_cross(r)
 	_check_calibration(r)
+	_check_calibration_ls(r)
 	_check_normalize_order(r)
 	_check_deadzone(r)
 	_check_profile_schema(r)
@@ -202,6 +203,92 @@ func _check_calibration(r) -> void:
 	r.eq_float(wild_scale.y, 1.0, 1e-9, "Y 量程夹到 1.0")
 	var wild_warnings: Array = wild_result["warnings"]
 	r.eq_float(float(wild_warnings.size()), 2.0, 1e-12, "两个轴各一条 clamp warning")
+
+
+## 左摇杆校准与右摇杆同构（D-06）。
+##
+## 三件事必须机械成立：四个 LS 字段能逐位往返、缺任一字段必须整份拒绝（绝不落
+## 默认值 —— 那正是 04-11 修掉的「默认校准看起来像真校准」）、`snapshot_ls()` 与
+## `snapshot_rs()` 在同一组 raw/center/scale/sign 下给出同一个向量与同一个角度。
+func _check_calibration_ls(r) -> void:
+	var calibration := Calibration.new()
+	calibration.center_x = 0.02
+	calibration.center_y = -0.03
+	calibration.scale_x = 0.98
+	calibration.scale_y = 0.96
+	calibration.ls_center_x = 0.02
+	calibration.ls_center_y = -0.03
+	calibration.ls_scale_x = 0.98
+	calibration.ls_scale_y = 0.96
+
+	var data := calibration.to_dict()
+	for key in ["ls_center_x", "ls_center_y", "ls_scale_x", "ls_scale_y"]:
+		r.check(data.has(key), "Calibration.to_dict 必须含 %s" % key)
+
+	var errors: Array[ConfigError] = []
+	var loaded := Calibration.from_dict(data, errors)
+	r.check(loaded != null and errors.is_empty(), "带 LS 字段的校准必须能往返")
+	if loaded != null:
+		r.eq_float(loaded.ls_center_x, 0.02, 0.0, "ls_center_x 逐位往返")
+		r.eq_float(loaded.ls_center_y, -0.03, 0.0, "ls_center_y 逐位往返")
+		r.eq_float(loaded.ls_scale_x, 0.98, 0.0, "ls_scale_x 逐位往返")
+		r.eq_float(loaded.ls_scale_y, 0.96, 0.0, "ls_scale_y 逐位往返")
+
+	var missing: Dictionary = data.duplicate(true)
+	missing.erase("ls_scale_x")
+	var missing_errors: Array[ConfigError] = []
+	r.check(Calibration.from_dict(missing, missing_errors) == null,
+		"缺 ls_scale_x 的校准必须返回 null（LS 字段不给默认值兜底）")
+
+	var raw := PackedFloat32Array()
+	raw.resize(AXIS_COUNT)
+	raw[0] = 0.62
+	raw[1] = -0.48
+	raw[2] = 0.62
+	raw[3] = -0.48
+	var mapping := AxisMapping.new()
+	mapping.rs_x_index = 2
+	mapping.rs_y_index = 3
+	mapping.rs_x_sign = 1
+	mapping.rs_y_sign = 1
+	mapping.ls_x_index = 0
+	mapping.ls_y_index = 1
+	mapping.ls_x_sign = 1
+	mapping.ls_y_sign = 1
+	var rs := AxisMapping.snapshot_rs(raw, mapping, calibration, 0.08)
+	var ls := AxisMapping.snapshot_ls(raw, mapping, calibration, 0.08)
+	r.check(ls.distance_to(rs) < 1e-9,
+		"snapshot_ls 与 snapshot_rs 必须给出同一个向量（差 %.12f）" % ls.distance_to(rs))
+	r.eq_float(Geometry.angle_diff(Geometry.angle_of(ls.x, ls.y),
+		Geometry.angle_of(rs.x, rs.y)), 0.0, 1e-9,
+		"snapshot_ls 与 snapshot_rs 的角度差必须 < 1e-9")
+
+	var flipped := AxisMapping.new()
+	flipped.rs_x_index = 2
+	flipped.rs_y_index = 3
+	flipped.rs_x_sign = -1
+	flipped.rs_y_sign = 1
+	flipped.ls_x_index = 0
+	flipped.ls_y_index = 1
+	flipped.ls_x_sign = -1
+	flipped.ls_y_sign = 1
+	var rs_flipped := AxisMapping.snapshot_rs(raw, flipped, calibration, 0.08)
+	var ls_flipped := AxisMapping.snapshot_ls(raw, flipped, calibration, 0.08)
+	r.eq_float(Geometry.angle_diff(Geometry.angle_of(ls_flipped.x, ls_flipped.y),
+		Geometry.angle_of(rs_flipped.x, rs_flipped.y)), 0.0, 1e-9,
+		"符号不同时两侧仍保持同构")
+
+	var unmapped := AxisMapping.new()
+	unmapped.rs_x_index = 2
+	unmapped.rs_y_index = 3
+	r.check(AxisMapping.snapshot_ls(raw, unmapped, calibration, 0.08) == Vector2.ZERO,
+		"没有 LS 映射时 snapshot_ls 返回 ZERO")
+
+	var out_of_range := AxisMapping.new()
+	out_of_range.ls_x_index = 99
+	out_of_range.ls_y_index = 1
+	r.check(AxisMapping.snapshot_ls(raw, out_of_range, calibration, 0.08) == Vector2.ZERO,
+		"LS 索引越界时 snapshot_ls 返回 ZERO")
 
 
 func _check_normalize_order(r) -> void:
@@ -493,7 +580,15 @@ func _legal_profile() -> DeviceProfile:
 	profile.calibration.center_y = -0.003
 	profile.calibration.scale_x = 0.98
 	profile.calibration.scale_y = 0.97
-	profile.quality = {"range_ready": true, "up": {"samples": 31, "margin": 0.72, "separation": 6.1}}
+	profile.calibration.ls_center_x = 0.002
+	profile.calibration.ls_center_y = -0.001
+	profile.calibration.ls_scale_x = 0.99
+	profile.calibration.ls_scale_y = 0.95
+	profile.quality = {
+		"range_ready": true,
+		"ls_ready": true,
+		"up": {"samples": 31, "margin": 0.72, "separation": 6.1},
+	}
 	profile.layout = DeviceProfile.LAYOUT_XBOX
 	profile.layout_confirmed = true
 	profile.button_index_ok = true

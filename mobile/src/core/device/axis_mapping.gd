@@ -77,12 +77,36 @@ static func snapshot_rs(raw: PackedFloat32Array, mapping: AxisMapping,
 		calibration: Calibration, deadzone: float) -> Vector2:
 	if mapping == null or calibration == null or not mapping.has_rs():
 		return Vector2.ZERO
-	if mapping.rs_x_index >= raw.size() or mapping.rs_y_index >= raw.size():
+	return _snapshot(raw, mapping.rs_x_index, mapping.rs_y_index,
+		calibration.center_x, calibration.center_y,
+		calibration.scale_x, calibration.scale_y,
+		mapping.rs_x_sign, mapping.rs_y_sign, deadzone)
+
+
+## 左摇杆的归一化入口：与 `snapshot_rs()` **完全同构** —— 同一份 `_snapshot`，
+## 只有索引、校准字段与符号不同（D-06）。
+##
+## 为什么要抽公共实现而不是复制一份：四个 `relative_to_ls` 技能的判定对等性
+## 依赖「左右摇杆用同一套变换」。两份复制体会在某次修 bug 时只改一边，而那种
+## 分叉不会让任何现有测试变红 —— 只会让左摇杆的手感悄悄偏离桌面版。
+static func snapshot_ls(raw: PackedFloat32Array, mapping: AxisMapping,
+		calibration: Calibration, deadzone: float) -> Vector2:
+	if mapping == null or calibration == null or not mapping.has_ls():
 		return Vector2.ZERO
-	var x := Calibration.normalize(raw[mapping.rs_x_index], calibration.center_x,
-		calibration.scale_x, mapping.rs_x_sign)
-	var y := Calibration.normalize(raw[mapping.rs_y_index], calibration.center_y,
-		calibration.scale_y, mapping.rs_y_sign)
+	return _snapshot(raw, mapping.ls_x_index, mapping.ls_y_index,
+		calibration.ls_center_x, calibration.ls_center_y,
+		calibration.ls_scale_x, calibration.ls_scale_y,
+		mapping.ls_x_sign, mapping.ls_y_sign, deadzone)
+
+
+## 两根摇杆共用的唯一变换：索引越界 / 未映射一律返回 ZERO，绝不部分归一化。
+static func _snapshot(raw: PackedFloat32Array, x_index: int, y_index: int,
+		center_x: float, center_y: float, scale_x: float, scale_y: float,
+		sign_x: int, sign_y: int, deadzone: float) -> Vector2:
+	if x_index < 0 or y_index < 0 or x_index >= raw.size() or y_index >= raw.size():
+		return Vector2.ZERO
+	var x := Calibration.normalize(raw[x_index], center_x, scale_x, sign_x)
+	var y := Calibration.normalize(raw[y_index], center_y, scale_y, sign_y)
 	return Calibration.deadzone(x, y, deadzone)
 
 
@@ -100,8 +124,9 @@ func to_dict() -> Dictionary:
 ## 从 JSON 字典还原映射。任一非法项 → 记一条 ConfigError 并返回 null。
 ##
 ## rs_x / rs_y / ls_x / ls_y 四项必须存在；lt / rt 可省略（本阶段的绿色搓射不读扳机，
-## 缺省是 -1 = 未映射）。ls 允许 -1（跳过左摇杆探针的档案仍然合法），rs 必须落在
-## 0..7 —— 没有右摇杆映射的档案不可用，必须整份丢弃重新探。
+## 缺省是 -1 = 未映射）。ls 允许 -1，所以「缺左摇杆探针」的旧档案仍能被**解析**；
+## 但它进不了练习 —— DeviceProfile 的 schema v2 门用 `has_ls()` 把整份档案拒绝
+## （D-06）。解析层不替使用层做政策判断，两层各守一条边。
 static func from_dict(data: Variant, out_errors: Array[ConfigError]) -> AxisMapping:
 	var before := out_errors.size()
 	if typeof(data) != TYPE_DICTIONARY:
