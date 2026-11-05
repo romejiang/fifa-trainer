@@ -189,7 +189,27 @@ Decimal phases appear between their surrounding integers in numeric order.
   4. 每次判定返回结构化 `measured{}`（起止角、扫过角、每步耗时、保持时长），反馈层可直接消费，无需二次计算
   5. 250 Hz → 60 / 90 / 120 Hz 抽稀重跑不漂移；若漂移，报告给出证据与阈值调整记录，且 `release_hold_ms` 与 `global_cooldown_ms` 有专门的边界夹具
 
-**Plans**: TBD
+**Plans**: 7 plans, 7 waves
+**Wave 1**
+- [ ] 05-01-PLAN.md — 参考冻结 + 生成器骨架 + 10 条已知用例（tracer：Python 参考 → 夹具 → GDScript 回放 → `GESTURE_GOLDEN` 哨兵）
+
+**Wave 2** *(blocked on Wave 1 completion)*
+- [ ] 05-02-PLAN.md — 检测器语料扩到 50 条：六类边界 + 变体配置 + 反向对照 + 变异验证
+
+**Wave 3** *(blocked on Wave 2 completion)*
+- [ ] 05-03-PLAN.md — `GestureEngine` + `ActiveSkill` + `TapRuntime` 子类 + 29 条引擎语料（`GESTURE_RUNTIME`）
+
+**Wave 4** *(blocked on Wave 3 completion)*
+- [ ] 05-04-PLAN.md — `measured{}` 全链（三检测器 + `Outcome`）+ `test_measured`（`MEASURED`）
+
+**Wave 5** *(blocked on Wave 4 completion)*
+- [ ] 05-05-PLAN.md — 250→120/90/60 Hz 抽稀矩阵 + 漂移白名单 + 变异验证（`DECIMATION`）
+
+**Wave 6** *(blocked on Wave 5 completion)*
+- [ ] 05-06-PLAN.md — 左摇杆轴对/符号/校准 + `snapshot_ls()` + schema v2 迁移门 + 设置页同一页补齐
+
+**Wave 7** *(blocked on Wave 6 completion)*
+- [ ] 05-07-PLAN.md — 组合根接全技能引擎 + `OUTCOME` 日志 + `analyze_input_log.py` + 真机 D5-0…D5-8
 
 ### Phase 6: 训练循环 — 10 次一组、免触摸推进、暂停恢复
 
