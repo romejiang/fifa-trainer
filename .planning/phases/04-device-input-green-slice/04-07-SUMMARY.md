@@ -2,7 +2,7 @@
 phase: 04-device-input-green-slice
 plan: 07
 subsystem: android-release-artifact-and-device-acceptance
-tags: [android, apk, apksigner, adb, real-device, acceptance, blocked, ux, single-screen-diagnostic]
+tags: [android, apk, apksigner, adb, real-device, acceptance, blocked, ux, trigger-baseline]
 
 requires:
   - phase: 04-device-input-green-slice
@@ -15,9 +15,9 @@ requires:
     provides: gate-b.sh 导出链路、release keystore、apksigner 36.1.0、adb 36.0.2
 
 provides:
-  - "mobile/build/fifa-trainer.apk：Phase 2 同一把钥匙签名的 arm64 release APK（27,012,856 B；v2+v3；证书 e1841a17…32e046）"
-  - "mobile/ACCEPTANCE.md §6：D0 失败的可核对原文（探针三次拒绝 + 停止屏 events_motion=1931）、D1–D6 未执行原因、用户要求单屏输入检测的记录"
-  - "阻塞事实：release APK 不可调试，adb run-as 被拒，D1/D2 的 controllers.json 读取/改写通道不可用"
+  - "mobile/build/fifa-trainer.apk：Phase 2 同一把钥匙签名的 arm64 release APK（尝试一 27,012,856 B；尝试二 27,046,027 B；证书 e1841a17…32e046）"
+  - "mobile/ACCEPTANCE.md §6：两次尝试的可核对原文（尝试一 探针三次拒绝 + 旧停止屏；尝试二 扳机轴静止基线 → 第 1/4 步 57 次 rejected），D1–D6 未执行原因"
+  - "阻塞事实：release APK 不可调试（run-as 被拒）；D2 缺第二只手柄；新包在「扳机轴首次上报前采样静止基线」这条路径上仍无法完成 D0"
 
 affects: [phase-5-detectors, phase-9-release, next-plan-single-screen-input-diagnostic]
 
@@ -28,6 +28,19 @@ actuals:
 
 plan_head_before: 71a968fdc575a2d69246ec71ca1e4eba87d139fa
 plan_head_after: c350258bec1a544da5e4dee9345eceaa4b077965
+
+attempt_2:
+  apk_bytes: 27046027
+  apk_built: "2026-11-05 21:14 CST"
+  started_utc: "2026-11-05T13:18:58Z"
+  duration: "13min"
+  tokens: 12300
+  tasks: 1
+  commits: 1
+  plan_head_before: acd4590ac1e121752acfa6cf2b6decbe77c8396a
+  plan_head_after: 6b9dc4514eaa1461e505823b98e50741c21a33e5
+  status: blocked
+  root_cause: "probe rest baseline sampled while trigger axes still reported 0.000; they later jumped to real rest -1.000, so every 300 ms window reads two axes moved by 1.0 -> margin 0.000 -> ambiguous_axes"
 
 tech-stack:
   added: []
@@ -98,21 +111,88 @@ coverage:
     human_judgment: true
     failure: "未执行：D0 失败，从未到达布局确认屏与练习屏"
 
-duration: 28min（本次 continuation；Task 1 于前一会话完成，APK 构建 19:22）
+coverage_attempt_2:
+  - id: D0
+    description: "全新手机首次启动（新 APK 27,046,027 B）：卸载 → 安装 → 只用手柄走完配对唤醒 / 四步探针 / 校准 / 布局确认"
+    verification:
+      - kind: manual
+        ref: "mobile/ACCEPTANCE.md §6 尝试二 D0（2026-11-05 21:19–21:30）"
+        status: fail
+    human_judgment: true
+    failure: "卡在探针第 1/4 步「上」：PAD_AXIS i=4/i=5 先报 0.000，首次上报后变 -1.000；静止基线按 0 记 → margin 0.000 → 57 行 PROBE_REJECT 全部 ambiguous_axes key=up。用户按 B 重来无效，要求换检测方式或跳过。"
+  - id: D1–D6
+    description: "轴落盘 / 换手柄重探 / 布局确认 / 一次搓射 / 两发独立 / 输入体检"
+    verification:
+      - kind: manual
+        ref: "mobile/ACCEPTANCE.md §6 尝试二 D1–D6"
+        status: fail
+    human_judgment: true
+    failure: "未执行：D0 未走完，从未进入校准 / 布局确认 / 练习屏；D2 拒绝面仍缺第二只手柄。"
+
+duration: 28min（尝试一 continuation；Task 1 于前一会话完成，APK 构建 19:22）
 completed: 2026-11-05
 status: blocked
 ---
 
 # Phase 4 Plan 07: 签名 APK + 真机 D0–D6 走查 Summary
 
-**签名 APK 与证书指纹核对完成；真机 D0 在探针重试循环与「没有收到摇杆事件（events_motion = 1931）」停止屏处失败，D1–D6 未执行；用户否决多步状态机，要求改成单屏输入检测 —— 本计划没有改一行源码，把失败原文与需求一起交回规划**
+**两次真机尝试都没有走完 D0：尝试一（旧包 27,012,856 B）在探针重试循环与「没有收到摇杆事件（events_motion = 1931）」停止屏处失败；尝试二（新包 27,046,027 B）在探针第 1/4 步被扳机轴静止基线卡死（`i=4/i=5` 先报 0.000、后变 -1.000，57 次 `ambiguous_axes key=up`）。D1–D6 未执行；成功标准 2/3/4/5 仍未闭合。本计划零源码改动，把两次失败原文与用户原话一起交回规划**
+
+## 第二次尝试（2026-11-05 21:19–21:30，APK 27,046,027 B，`e1841a17…32e046`）
+
+### 结论
+
+- **D0 失败，卡在第 1/4 步「上」**。干净卸载后安装 04-08 的新包
+  （`27046027` 字节，`versionName=0.1.0`，`firstInstallTime=lastUpdateTime=2026-11-05 21:19:05`），
+  全程未点屏幕；手柄连上后 `%Hint` 出现实时读数，证明 04-08 的可见性修复生效。
+- **根因是静止基线取值时机，不是用户操作**：手柄刚连上时扳机轴尚未上报，`PAD_AXIS i=4/i=5`
+  都是 `v=0.000`（21:22:32.677）；首次上报后真实静止值是 `-1.000`（21:22:54.846）。
+  静止基线按 `0.000` 记下，之后每个 300 ms 窗口都看到两根扳机轴「各移动 1.0」，
+  `margin = 0.000 < 0.25` → `ambiguous_axes`。
+- **57 行 `PROBE_REJECT` 全部是 `code=ambiguous_axes key=up soft=1`**（21:22:54.445–21:29:50.625）；
+  第 1/4 步从未通过。用户按 B 重来、重新推右摇杆都无效。
+- **D1–D6 未执行**：从未进入校准 / 布局确认 / 练习屏；D2 拒绝面还缺第二只手柄。
+- **用户决策（2026-11-05 21:30）**：原话「我按着你屏幕要求做了，但是还是失败了。我觉得你检测方式就有问题，
+  没有任何容错。我按了 B，也把右摇杆向上推了，没有用」「你要不换一种开发另外一种检测方式，
+  要不就跳过，不要在这卡着了，在这卡了好久了」。按用户要求停止走查，不再在同一包上反复重试。
+
+### 证据（可核对）
+
+| 证据 | 原文 |
+|------|------|
+| 安装 | `Success` / `Install command complete in 714 ms`；`versionName=0.1.0`，`lastUpdateTime=2026-11-05 21:19:05` |
+| 扳机轴首次上报前 | `11-05 21:22:32.677 … PAD_AXIS i=4 v=0.000 min=0.000 max=0.000`（`i=5` 同） |
+| 扳机轴首次上报后 | `11-05 21:22:54.846 … PAD_AXIS i=4 v=-1.000 min=-1.000 max=1.000`（`i=5` 同） |
+| 首条拒绝 | `PROBE_REJECT code=ambiguous_axes key=up soft=1 msg=两轴同时动了：margin 0.216 < 0.25，请只推一个方向` |
+| 末条拒绝 | `PROBE_REJECT code=ambiguous_axes key=up soft=1 msg=两轴同时动了：margin 0.000 < 0.25，请只推一个方向`（21:29:50.625） |
+| 屏幕 | 「这一步没通过 / 按 B 重来这一步 / 重来 / 你推的是：轴 4 的负方向（-1.00） / 只推「上」这一个方向：别的方向先松开（已经试了 2 次仍不对） / 两轴同时动了：margin 0.000 < 0.25，请只推一个方向」 |
+| `PAD_DIAG` | `11-05 21:30:01.304 … PAD_DIAG ev_m=1417 ev_b=170 poll=0 dt50=8.11 dt95=100.74 dtmax=247970.42 in_tid=1 proc_tid=1` |
+| `PAD_DEV` | `11-05 21:30:01.304 … PAD_DEV name=Xbox Series X Controller guid=58626f7820576972656c65737320436f` |
+
+证据文件（gitignored）：`mobile/build/phase4-second/D0-install.txt`、
+`D0-evidence.txt`、`logcat-godot.txt`、`D0-01-first-screen.png`、`D0-03-probe-reject-now.png`、
+`D0-04-final-212939.png`。
+
+### 与尝试一的差异
+
+| 维度 | 尝试一（27,012,856 B） | 尝试二（27,046,027 B） |
+|------|------------------------|------------------------|
+| 失败位置 | 第 2–4 步之间反复；出现过旧停止屏 | 第 1/4 步「上」，从未进入第 2 步 |
+| 屏幕可见性 | 只有技术文案（`margin 0.001`） | `%Hint` 第一行有实时读数「你推的是：轴 4 的负方向（-1.00）」 |
+| 软重试 | 不存在 | 有（屏幕显示「已经试了 2 次仍不对」），但对恒定幻影位移无效 |
+| 停止屏 | 出现「没有收到摇杆事件（events_motion = 1931）」 | **未出现**；失败是扳机基线，不是轴事件缺失 |
+| 用户结论 | 「一直显示重来重来重来」「我都看不明白」 | 「检测方式就有问题，没有任何容错」「要不就跳过」 |
+
+**04-08 的修复确实生效了一半**：屏幕能看见 app 收到了什么，也有软重试；但静止基线在扳机轴
+首次上报前取值这条缺陷，让第 1/4 步永远过不去。修法必须回到代码计划：要么等所有轴都上报过
+一次再采静止基线，要么把「从未上报过的轴」排除在探针之外。本计划零源码改动，不在此修。
 
 ## Performance
 
-- **Duration:** 本次 continuation 20:14–20:42（约 28 min）；Task 1 于前一会话完成（APK 构建时间 2026-11-05 19:22:57 CST）
-- **Tasks:** 1 / 2 完成（Task 1 完成；Task 2 是 `checkpoint:human-verify`，D0 失败后按停止条件终止）
-- **Files modified:** 1（`mobile/ACCEPTANCE.md`）；STATE / ROADMAP 在收尾 docs 提交中更新
-- **Commits:** 3（`a2617a4` Task 1、`0b97276` 等待设备的阻塞记录、`c350258` D0 失败记录）
+- **Duration:** 尝试一 20:14–20:42（约 28 min）；尝试二 21:18:58–21:31Z（约 13 min，UTC 计时）。Task 1 于前一会话完成（首次 APK 构建 19:22:57 CST；第二次 APK 构建 21:14 CST）。
+- **Tasks:** 1 / 2 完成（Task 1 完成；Task 2 是 `checkpoint:human-verify`，两次 D0 都失败后终止）
+- **Files modified:** 1（`mobile/ACCEPTANCE.md`，两次尝试都只改这一份文档）；STATE / ROADMAP 在收尾 docs 提交中更新
+- **Commits:** 尝试一 3（`a2617a4` Task 1、`0b97276` 等待设备的阻塞记录、`c350258` D0 失败记录）；尝试二 1（`6b9dc45` 新 APK 的 D0 失败记录）
 
 ## Accomplishments
 
@@ -123,6 +203,7 @@ status: blocked
 - **日志旁证**：同一时段 `PAD_DIAG ev_m=2633 ev_b=70 poll=0 dt50=7.87 dt95=94.54 dtmax=3173.86 in_tid=1 proc_tid=1`，`PAD_DEV name=Xbox Series X Controller guid=58626f7820576972656c65737320436f`；轴事件确实到达，停止屏的「没有送上任何摇杆事件」与计数自相矛盾。
 - **D1/D2 的硬阻塞**：`adb shell run-as com.fifaskill.trainer ls -l files/profiles` 返回 `run-as: package not debuggable: com.fifaskill.trainer`；release APK 不可调试，`controllers.json` 的读取与改写通道不存在。
 - **用户需求入库**：用户（Stephen）在真机操作后明确表示「一直显示重来重来重来」「我都看不明白」，要求把多步引导改成单屏输入检测；原话与要求已写进 `ACCEPTANCE.md` §6 与 `STATE.md` Blockers。
+- **尝试二（2026-11-05 21:19–21:30，新包 27,046,027 B）**：干净卸载后安装成功（`Success` / 714 ms；`versionName=0.1.0`；`lastUpdateTime=21:19:05`），`apksigner` 证书与 BUILD.md 第六节逐字一致；`%Hint` 实时读数出现，04-08 的可见性修复生效。但 D0 卡在第 1/4 步：`PAD_AXIS i=4/i=5` 在 21:22:32 是 `0.000`，21:22:54 变成 `-1.000`，静止基线按 0 记 → 57 行 `PROBE_REJECT` 全部 `ambiguous_axes key=up`、`margin 0.000`。D1–D6 未执行；用户要求「换一种检测方式或跳过」。
 
 ## Task Commits
 
@@ -130,15 +211,16 @@ Each task was committed atomically:
 
 1. **Task 1: 导出签名 APK 并核对证书指纹（不碰源码）** — `a2617a4` (docs)
 2. **Task 2 阻塞记录: 记录真机清单阻塞（Task 2 等待设备）** — `0b97276` (docs)
-3. **Task 2: 真机 D0 走查并记录失败与未执行项** — `c350258` (docs)
+3. **Task 2: 真机 D0 走查并记录失败与未执行项（尝试一，旧包）** — `c350258` (docs)
+4. **Task 2（尝试二）: 新 APK D0 仍失败于扳机轴静止基线** — `6b9dc45` (docs)
 
 **Plan metadata:** 见本次最终 docs 提交（SUMMARY / STATE / ROADMAP）
 
 ## Files Created/Modified
 
-- `mobile/ACCEPTANCE.md`（+76 / −64）— §6 D0–D6：本次结论、用户要求、D0 的 12 行实测原文、D1–D6 的逐行「未执行 + 原因」
-- `.planning/STATE.md`（收尾提交）— 当前计划状态改为 blocked、Blockers 增加 D0 失败 / run-as 不可用 / 用户要求单屏检测、Session Continuity 更新
-- `.planning/ROADMAP.md`（收尾提交）— 04-07 保持未勾选，追加本次真机结果与待重新规划的说明
+- `mobile/ACCEPTANCE.md`（尝试一 +76 / −64；尝试二 +122 / −2）— §6 按 APK 字节数分成尝试一 / 尝试二：尝试一的结论、用户要求、D0 12 行实测原文、D1–D6 逐行「未执行 + 原因」原样保留；尝试二新增 D0 的扳机轴基线证据、57 行 `PROBE_REJECT`、用户原话、D1–D6 的未执行原因
+- `.planning/STATE.md`（收尾提交）— 当前计划状态保持 blocked、Blockers 增加「尝试二：扳机轴静止基线」、Session Continuity 更新
+- `.planning/ROADMAP.md`（收尾提交）— 04-07 保持未勾选，追加尝试二结果与修复方向
 
 ## Decisions Made
 
@@ -147,6 +229,8 @@ Each task was committed atomically:
 - **release APK 不可调试是计划缺陷**：D1/D2 的 `run-as` 命令把 release 包当成可调试包；后续计划要么出 debuggable 构建，要么换一个不改源码的档案出口（例如导出前把档案通过 `user://` 以外的路径暴露），不能拿源码静态检查冒充真机证据。
 - **D2 拒绝面没有第二只手柄**：现场只有 Xbox Series X Controller；`getevent -pl` 只列出 `Xbox Wireless Controller`。按 orchestrator 约束 8，拒绝面明确标为「未执行」，不声称成功标准 3 完整。
 - **用户要求单屏输入检测是 Rule 4 架构变更**：多步状态机（rest → 四步探针 → 中点/满量程校准 → 布局确认）被用户否决；新形态是一屏显示所有按键与摇杆、无状态切换、按/推哪个亮哪个。04-07 的 `files_modified` 只有 `ACCEPTANCE.md`，且计划明令零源码改动，因此未实施；需要新计划、新测试、重新构建与重新验收。
+- **尝试二判 D0 失败，且不再重试同一包**：失败根因是静止基线在扳机轴首次上报前取值（0.000 → -1.000），不是用户推错方向。继续按 B 重来只会重复同一判定；用户已明确要求「换一种检测方式或跳过」，因此停止 D1–D6。
+- **尝试二不覆盖尝试一**：`ACCEPTANCE.md` §6 用「尝试一 / 尝试二 + 时间 + APK 字节数」并列保存两次原文；旧包的失败证据、旧停止屏原文与用户当时的要求都保留，避免「用新版本文档抹掉旧失败」。
 
 ## Deviations from Plan
 
@@ -186,6 +270,18 @@ Each task was committed atomically:
 - **Action:** 表中写「未捕获到第 1/4 步的单独截图；第 2/4 步的显示证明第 1 步已通过」，不伪造截图。
 - **Impact:** 第 1 步的证据是间接的；不影响 D0 的失败结论。
 
+**6. [Rule 1 - 候选缺陷] 探针静止基线在扳机轴首次上报前取值，导致 D0 永远卡在第 1 步（尝试二）**
+- **Found during:** 尝试二 D0（2026-11-05 21:22:54–21:29:50）
+- **Issue:** 手柄刚连上时 `PAD_AXIS i=4/i=5` 报 `v=0.000`（21:22:32.677）；扳机轴首次上报后真实静止值是 `-1.000`（21:22:54.846）。`OnboardingFlow.submit_rest_baseline()` 在 21:22:32–21:22:53 之间完成采样，`ProbeEvaluator.rest_from_samples()` 把两根扳机轴记为 `0.0`；之后每个 300 ms 窗口的 `delta` 都是 `-1.0`，两根轴并列 → `margin = 0.000 < 0.25` → `ambiguous_axes`。57 行 `PROBE_REJECT` 全部 `key=up`，第 1/4 步从未通过。
+- **Action:** 只记录，不改代码（本计划零源码改动）；`ACCEPTANCE.md` §6 尝试二已写入完整证据链。用户原话「检测方式就有问题，没有任何容错」「要不就跳过」。
+- **Impact:** 新包（27,046,027 B）仍然无法完成 D0；成功标准 2 无法闭合。修复方向：采静止基线前等所有轴都上报过一次，或把从未上报过的轴排除在探针之外。
+
+**7. [Rule 4 - 用户决策] 用户要求停止走查：换检测方式或跳过**
+- **Found during:** 尝试二 D0 重试循环（2026-11-05 21:30）
+- **Issue:** 用户按 B 重来、重新推右摇杆均无效后明确表示「你要不换一种开发另外一种检测方式，要不就跳过，不要在这卡着了，在这卡了好久了」。
+- **Action:** 按用户要求停止 D1–D6，不注入触摸、不改源码、不重建 APK；把原话写进 `ACCEPTANCE.md` §6 与 `STATE.md` Blockers，交回 orchestrator 决定是改检测方式还是暂时跳过。
+- **Impact:** D1–D6 未执行；成功标准 2/3/4/5 均未闭合，Phase 4 不得宣布完成。
+
 ### 环境差异（不是计划分歧）
 
 - 本环境没有 `gsd_run` 命令：Step 0 的 protected-branch 查询、`state.*`、`roadmap.update-plan-progress`、`windows append` 均无法执行。按 orchestrator 的 `<sequential_execution>`（在 main 工作树上顺序执行）与 `.planning/config.json` 的 `git.branching_strategy: none`，在 `main` 上用普通提交（带 hooks，未用 `--no-verify`）。STATE / ROADMAP 用手工编辑更新；未做任何 `git update-ref` 之类的自愈操作。
@@ -193,8 +289,8 @@ Each task was committed atomically:
 
 ---
 
-**Total deviations:** 5 个计划级阻塞（1 个用户架构变更、1 个 run-as 计划缺陷、1 个候选缺陷、1 个手柄缺口、1 个截图缺口）+ 1 条环境说明。
-**Impact on plan:** 没有任何断言被放宽；D0 的失败原文、停止屏、用户原话与 `run-as` 错误都进了验收表。成功标准 2/3/4/5 全部保持未勾选。
+**Total deviations:** 5 个尝试一计划级阻塞（1 个用户架构变更、1 个 run-as 计划缺陷、1 个候选缺陷、1 个手柄缺口、1 个截图缺口）+ 2 个尝试二阻塞（1 个 Rule 1 候选缺陷：扳机轴静止基线；1 个 Rule 4 用户决策：换检测方式或跳过）+ 2 条环境说明。
+**Impact on plan:** 没有任何断言被放宽；两次 D0 的失败原文、停止屏/拒绝行、用户原话与 `run-as` 错误都进了验收表。成功标准 2/3/4/5 全部保持未勾选。
 
 ## Known Stubs
 
@@ -206,6 +302,9 @@ None — 本计划没有新增源码；被验收的 APK 是 Task 1 的产物，�
 - **停止屏**：`输入事件缺失 / 本机在当前阶段没有送上任何摇杆事件。 / 停止 / 没有收到摇杆事件（events_motion = 1931）…`（20:15:50）。
 - **手柄断连**：20:18–20:29 之间出现 `手柄断开，等待重连 / 重新连接后会重新走探针与校准。`；重连后用户再次尝试，仍被 `两轴同时动了：margin 0.004 < 0.25` 拒绝（20:38:20）。
 - **用户反馈原话**：「一直显示重来重来重来」「我都看不明白」「不要弄成这种状态机的模式，就在一个屏里边把所有按键检测事解决了」。
+- **尝试二探针第 1/4 步死循环**：57 行 `PROBE_REJECT code=ambiguous_axes key=up soft=1 msg=两轴同时动了：margin 0.000 < 0.25，请只推一个方向`；屏幕「你推的是：轴 4 的负方向（-1.00）」「已经试了 2 次仍不对」。
+- **尝试二扳机轴基线**：`PAD_AXIS i=4/i=5 v=0.000`（21:22:32.677）→ `v=-1.000`（21:22:54.846）；静止基线按 0 记，扳机真实静止值是 -1。
+- **尝试二用户反馈**：「我按着你屏幕要求做了，但是还是失败了。我觉得你检测方式就有问题，没有任何容错。我按了 B，也把右摇杆向上推了，没有用」「你要不换一种开发另外一种检测方式，要不就跳过，不要在这卡着了，在这卡了好久了」。
 
 ## User Setup Required
 
@@ -213,11 +312,14 @@ None — 本计划未安装任何依赖；手机与手柄由用户提供，`adb`
 
 ## Next Phase Readiness
 
-- **必须重新规划**：把多步引导改成单屏输入检测（按钮 + 摇杆实时显示，无状态机、无顺序依赖）。这需要新的计划、新的 UI 测试、重新构建 APK，并重新走真机验收。
-- **D1/D2 的通道要先解决**：release APK 不可调试；新计划要么产出 debuggable 构建（仅用于验收），要么设计一个不依赖 `run-as` 的档案证据出口，并在计划里写清「源码静态检查不算真机证据」。
+- **先修静止基线再谈验收**：新包（27,046,027 B）的 D0 卡在第 1/4 步，根因是 `PAD_AXIS i=4/i=5` 在首次上报前返回 `0.000`、之后才是真实静止值 `-1.000`。修复方向二选一：① 采样静止基线前等待所有轴都上报过一次；② 把「从未上报过的轴」排除在探针之外。修完必须重新构建、重新真机走查，不能拿本次的包继续验收。
+- **用户要求「换检测方式或跳过」**：这是 Rule 4 的用户决策，未在本计划实施（零源码改动）；orchestrator 需要决定是重写检测方式、还是暂时跳过 Phase 4 的真机部分。用户的完整原话已写进 `ACCEPTANCE.md` §6 与 `STATE.md` Blockers。
+- **D1/D2 的通道要先解决**：release APK 不可调试；新计划要么产出 debuggable 构建（仅用于验收），要么继续用 04-08 的屏上诊断覆盖层，并在计划里写清「源码静态检查不算真机证据」。D2 的拒绝面还需要第二只轴映射不同的手柄。
 - **D2 需要第二只手柄**：Xbox + DualSense（或任意两只轴映射不同的手柄）；只有一只时不得声称成功标准 3 完整。
 - **成功标准 2/3/4/5 仍未闭合**：`REQUIREMENTS.md` 与 `ROADMAP.md` 不得勾选；Phase 4 不得宣布完成。
-- **已可复用的证据**：`mobile/build/phase4-d0-seq/d0-logcat.txt`（1 Hz `PAD_DIAG` / `PAD_AXIS` / `PAD_DEV` 整行）、`mobile/build/phase4-D0-*.png`（首屏、第 2/4 步、第 3/4 步、三次拒绝、停止屏、断连屏）、`mobile/build/phase4-D0-install-and-runas.txt`（uninstall / install / run-as 原文）。
+- **已可复用的证据**：
+  - 尝试一：`mobile/build/phase4-d0-seq/d0-logcat.txt`、`mobile/build/phase4-D0-*.png`、`mobile/build/phase4-D0-install-and-runas.txt`。
+  - 尝试二：`mobile/build/phase4-second/D0-install.txt`（uninstall / install / dumpsys）、`D0-evidence.txt`（PAD_AXIS 基线切换 + 首末 PROBE_REJECT）、`logcat-godot.txt`（完整 1 Hz 日志）、`D0-01-first-screen.png` / `D0-03-probe-reject-now.png` / `D0-04-final-212939.png`。
 
 ---
 
@@ -227,9 +329,10 @@ None — 本计划未安装任何依赖；手机与手柄由用户提供，`adb`
 
 ## Self-Check: PASSED
 
-- `mobile/ACCEPTANCE.md` §6 D0–D6 无空单元格（空单元格计数 0；未执行项写的是「未执行 + 原因」）
-- `c350258` 是 HEAD 祖先；`git diff 71a968f..c350258` 只含 `mobile/ACCEPTANCE.md` 与 `.planning/STATE.md`
+- `mobile/ACCEPTANCE.md` §6 两次尝试的 D0–D6 均无空单元格（未执行项写的是「未执行 + 原因」）
+- `c350258` 与 `6b9dc45` 都是 HEAD 的祖先；尝试二的 `git diff acd4590..6b9dc45` 只含 `mobile/ACCEPTANCE.md`
 - `git status --porcelain mobile/src mobile/tools tools shared` 为空（0 行）
 - §6 内没有 `- [x]`（计数 0）；`ROADMAP.md` 的 `04-07-PLAN.md` 仍为 `- [ ]`
-- 4 张关键截图与 install/run-as 文本、d0-logcat.txt 均存在于 `mobile/build/`（gitignored）并在表中点名
+- 尝试一的 4 张截图 + install/run-as 文本 + `d0-logcat.txt`、尝试二的 `D0-install.txt` + `D0-evidence.txt` + `logcat-godot.txt` + 3 张截屏均存在于 `mobile/build/`（gitignored）并在表中点名
+- 新 APK 的 `apksigner` 输出 `certificate SHA-256 digest: e1841a17…32e046` 与 `BUILD.md` 第六节逐字一致；`stat -f %z` = `27046027`
 - 成功标准 2/3/4/5 未被勾选：`REQUIREMENTS.md` 与 `ROADMAP.md` 未做任何完成标记

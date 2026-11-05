@@ -3,10 +3,10 @@ gsd_state_version: "1.0"
 current_phase: 4
 current_phase_name: 设备输入层 + 绿色搓射竖切
 status: executing
-stopped_at: 04-08 完成 — 引导 UX 修复 + 诊断覆盖层 + 新 APK；04-07（Wave 8）待重走真机 D0–D6
-last_updated: "2026-11-05T13:40:00.000Z"
+stopped_at: 04-07 第二次真机走查仍失败 — 新 APK 卡在探针第 1/4 步（扳机轴静止基线）；D1–D6 未执行，成功标准 2/3/4/5 未闭合
+last_updated: "2026-11-05T13:33:00.000Z"
 last_activity: 2026-11-05
-last_activity_desc: 04-08 执行完毕：探针实时读数与两次软重试、屏上诊断覆盖层（D1/D2 新出口）、重建签名 APK（27046027 B，证书不变）
+last_activity_desc: 04-07 第二次真机走查：干净卸载后安装新 APK（27046027 B，证书不变），D0 卡在第 1/4 步，57 行 PROBE_REJECT 全部 ambiguous_axes key=up；用户要求换检测方式或跳过
 state_head: 58ee924
 progress:
   total_phases: 10
@@ -28,9 +28,9 @@ See: .planning/PROJECT.md (updated 2026-11-04)
 ## Current Position
 
 Phase: 4 (设备输入层 + 绿色搓射竖切) — 代码侧已收口，真机清单未闭合
-Plan: 8 of 8（04-01…04-06、04-08 完成；04-07 是 Wave 8 的真机走查，等新 APK 上机）
-Status: Executing — 04-08 已交付修复与新包；下一步是 04-07 重走 D0–D6
-Last activity: 2026-11-05 21:40 — 04-08 完成：探针屏看得见 + 两次软重试 + 纯语言拒绝 + 增量停止屏；新增诊断覆盖层（LB+RB 0.8 s）作为 D1/D2 的截图证据出口；`gate-b.sh` 重建 APK（27,046,027 B，证书 e1841a17…32e046 不变）
+Plan: 8 of 8（04-01…04-06、04-08 完成；04-07 是 Wave 8 的真机走查，两次尝试都失败）
+Status: Blocked — 04-07 第二次 D0 仍失败（扳机轴静止基线）；等 orchestrator 决定修复方向或跳过
+Last activity: 2026-11-05 21:19–21:30 — 04-07 第二次真机走查：新 APK（27,046,027 B）干净安装，D0 卡在探针第 1/4 步；`PAD_AXIS i=4/i=5` 先从 0.000 变到 -1.000，静止基线按 0 记 → 57 行 `PROBE_REJECT ambiguous_axes key=up`；用户要求换检测方式或跳过
 
 Progress: [███░░░░░░░] 32%
 
@@ -247,6 +247,8 @@ Recent decisions affecting current work:
 - [Phase 4]: 停止屏只报本步增量（`本步开始后新增 N 个摇杆事件（累计 M）`），三个停止判据一字未改；旧文案与 `PAD_DIAG ev_m=2633` 自相矛盾，已写进 ACCEPTANCE 说明替换原因
 - [Phase 4]: 诊断覆盖层是 D1/D2 的新证据出口：LB+RB（9+10）0.8 s、十字键左右（13/14）翻页、22 px、每行 ≤100 字符、1 Hz、只经 `screencap`；读原始字节而不调 `ProfileStore.load_all()`（后者会删坏档）
 - [Phase 4]: 覆盖层零 Outcome 的三层保证：组合键不含 X → 打开时 `set_layout_confirmed(false)` 静默 abandon → 可见期间组合根 `_process` 早退；`test_onboarding_ui` 有机械断言
+- [Phase 4]: 04-07 第二次真机走查（新包 27,046,027 B）D0 仍失败：探针静止基线在扳机轴首次上报前取值（`i=4/i=5` 0.000 → -1.000），57 行 `PROBE_REJECT ambiguous_axes key=up`；用户要求换检测方式或跳过，D1–D6 未执行
+- [Phase 4]: **不是用户操作问题**：`PAD_AXIS` 证明两根扳机轴在 21:22:32 都是 0.000、21:22:54 变成 -1.000；静止基线按 0 记后，任何推杆都会被两根「各移动 1.0」的扳机轴淹没。修复方向：等所有轴上报过一次再采基线，或排除从未上报的轴
 
 ### Pending Todos
 
@@ -254,7 +256,8 @@ None yet.
 
 ### Blockers/Concerns
 
-- **Phase 4 真机清单 D0 失败（04-07 Task 2，checkpoint:human-verify / blocking-human）**：手机 Motorola XT2175-2 / Android 12 已连上（`ZY22F5FXX9`），APK 已安装（证书 `e1841a17…32e046`，27012856 字节），但 D0 在探针重试循环失败：`两轴同时动了：margin 0.001 < 0.25`（20:15:38）/ `上与右落在同一根轴（2/2）`（20:15:46）/ `上下没有互为反号：上 (轴 2, 符号 -1)、下 (轴 3, 符号 1)`（20:18:22）；20:15:50 出现停止屏「没有收到摇杆事件（events_motion = 1931）」，与同一时段 `PAD_DIAG ev_m=2633` 矛盾。D1–D6 未执行；成功标准 2/3/4/5 均不得勾选。**04-08 已修可见性与容错并重建 APK（27,046,027 字节），重走 D0 前必须先卸载重装新包**
+- **Phase 4 真机清单 D0 失败（04-07 Task 2，checkpoint:human-verify / blocking-human）— 尝试一（旧包 27,012,856 B）**：手机 Motorola XT2175-2 / Android 12（`ZY22F5FXX9`），D0 在探针重试循环失败：`两轴同时动了：margin 0.001 < 0.25`（20:15:38）/ `上与右落在同一根轴（2/2）`（20:15:46）/ `上下没有互为反号：上 (轴 2, 符号 -1)、下 (轴 3, 符号 1)`（20:18:22）；20:15:50 出现停止屏「没有收到摇杆事件（events_motion = 1931）」。D1–D6 未执行；成功标准 2/3/4/5 均不得勾选。
+- **Phase 4 真机清单 D0 仍然失败 — 尝试二（新包 27,046,027 B，04-08 重建）**：干净卸载后安装成功（`versionName=0.1.0`，`lastUpdateTime=2026-11-05 21:19:05`，证书 `e1841a17…32e046` 不变），D0 卡在探针第 1/4 步「上」：`PAD_AXIS i=4/i=5` 在 21:22:32.677 报 `v=0.000`，21:22:54.846 变成 `v=-1.000`（真实静止值）；静止基线按 0 记 → 每窗口 `margin 0.000 < 0.25` → 57 行 `PROBE_REJECT code=ambiguous_axes key=up soft=1`。用户按 B 重来、重新推右摇杆均无效，要求「换一种检测方式或跳过」。D1–D6 未执行；成功标准 2/3/4/5 仍未闭合。**修复方向**：采静止基线前等所有轴都上报过一次，或把从未上报过的轴排除在探针之外；修完必须重建 APK 并重新走查。
 - **D1/D2 的 `run-as` 通道不可用（已绕过，不是已解决）**：release APK 不可调试，`adb shell run-as com.fifaskill.trainer …` 返回 `run-as: package not debuggable`。04-08 增加屏上诊断覆盖层，D1/D2 的证据改为「LB+RB 打开覆盖层 + `adb exec-out screencap`」；但覆盖层**只读**，D2 拒绝面所需的「改写外层 key」仍然做不到
 - **用户已决定保留四步探针（2026-11-05，本条关闭）**：用户否决单屏输入检测，改为「保留四步探针、只修 UX」；04-08 按此执行（实时读数 / 两次软重试 / 纯语言文案 / 增量停止屏）。原 blocker 与 04-07 的记录保留为历史
 - **D2 缺第二只手柄**：现场只有 Xbox Series X Controller（`getevent -pl` 仅列出 `Xbox Wireless Controller`）；拒绝面（DualSense 或另一只轴映射不同的手柄）未执行，成功标准 3 不得声称完整
@@ -281,6 +284,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-11-05T13:40:00.000Z
-Stopped at: 04-08 完成（5/5 task：4 个提交 + 1 个 gitignored 产物）；新 APK 在 `mobile/build/fifa-trainer.apk`；下一步 04-07（Wave 8）重走真机 D0–D6，先卸载重装新包
+Last session: 2026-11-05T13:33:00.000Z
+Stopped at: 04-07 第二次真机走查失败（新 APK 27,046,027 B，卡在探针第 1/4 步：扳机轴静止基线）；D1–D6 未执行；用户要求换检测方式或跳过。证据在 `mobile/ACCEPTANCE.md` §6 尝试二 与 `mobile/build/phase4-second/`
 Resume file: None
