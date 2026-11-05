@@ -161,6 +161,84 @@ CASES = (
             ("hold", 0, 560, 0.0, 0.0),
         ),
     },
+    # 6. 马赛回旋太快：3.2°/帧（248ms 扫 198.4°）。end_ok 在 end_rel >= 280 时成立，
+    #    即 swept >= 100；3.2°/帧的 100° 落在第 32 帧（swept 102.4，距终点边界
+    #    还有 2.4° 余量），elapsed 128ms < 250 → too_fast。
+    #    刻意不用「每帧整 1°」：那会让第一个达标帧正好压在 ±80° 的边界上，
+    #    Python/GDScript 的 1 ulp 差异就可能把 abort 推后一帧。
+    {
+        "id": "det_roulette_too_fast",
+        "kind": "detector",
+        "skill": "马赛回旋 Roulette",
+        "config": "shipped",
+        "end_ms": 500,
+        "segments": (
+            ("hold", 0, 96, 0.0, 0.0),
+            ("sweep", 100, 248, 180.0, 378.4, 0.9),
+            ("hold", 348, 500, 0.0, 0.0),
+        ),
+    },
+    # 7. 马赛回旋太慢：0.6°/帧持续旋转 1400ms。每 4 帧走 2.4° > motion_delta 2.0，
+    #    所以「在动」计时器一直刷新，不会先撞 idle 250ms；第 151 帧（604ms）刚
+    #    超过上限 600ms 就报 too_slow。
+    {
+        "id": "det_roulette_too_slow",
+        "kind": "detector",
+        "skill": "马赛回旋 Roulette",
+        "config": "shipped",
+        "end_ms": 1600,
+        "segments": (
+            ("hold", 0, 96, 0.0, 0.0),
+            ("sweep", 100, 1400, 180.0, 390.0, 0.9),
+            ("hold", 1504, 1600, 0.0, 0.0),
+        ),
+    },
+    # 8. 踩单车起点不对：从相对 60° 起手。start_tolerance 55 已经超出，但仍在
+    #    55 + claim_margin 20 = 75 之内，所以这次手势「是冲我来的」——会报错，
+    #    而不是静默。起手帧本身不判，下一帧（4ms）立刻报 wrong_start。
+    {
+        "id": "det_stepover_wrong_start",
+        "kind": "detector",
+        "skill": "踩单车 Stepover",
+        "config": "shipped",
+        "end_ms": 700,
+        "segments": (
+            ("hold", 0, 96, 0.0, 0.0),
+            ("sweep", 100, 500, 60.0, 150.0, 0.9),
+            ("hold", 604, 700, 0.0, 0.0),
+        ),
+    },
+    # 9. 马赛回旋终点不对：扫掠 84° 后回中。swept 84 >= min_angle 70，所以不是
+    #    too_short；终点 180 + 84 = 264°，距 0° 目标 96° > 80°，松手时报 wrong_end。
+    #    整段都没进过终点窗口（end_rel 最大 264 < 280），不会先命中成功。
+    {
+        "id": "det_roulette_wrong_end",
+        "kind": "detector",
+        "skill": "马赛回旋 Roulette",
+        "config": "shipped",
+        "end_ms": 700,
+        "segments": (
+            ("hold", 0, 96, 0.0, 0.0),
+            ("sweep", 100, 500, 180.0, 264.0, 0.9),
+            ("hold", 604, 700, 0.0, 0.0),
+        ),
+    },
+    # 10. 油炸丸子保持不够：按住 LB 向右推 196ms 后松开 LB、但摇杆仍推着。
+    #     引擎前置分支走 observe() + reset()，reset 里的 _abandon_failure 报
+    #     hold_short（已保持 196ms，需要 350ms）。elapsed 用上一帧的 _now（200ms）。
+    {
+        "id": "det_croqueta_hold_short",
+        "kind": "detector",
+        "skill": "油炸丸子 La Croqueta",
+        "config": "shipped",
+        "end_ms": 500,
+        "buttons": ((0, ()), (4, ("LB",)), (300, ())),
+        "segments": (
+            ("hold", 0, 96, 0.0, 0.0),
+            ("hold", 100, 396, 90.0, 0.9),
+            ("hold", 400, 500, 0.0, 0.0),
+        ),
+    },
 )
 
 

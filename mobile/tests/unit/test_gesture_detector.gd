@@ -28,6 +28,11 @@ const REQUIRED_DETECTOR_IDS: Array[String] = [
 	"det_heel_to_heel_ok",
 	"det_croqueta_ok",
 	"det_green_finesse_ok",
+	"det_roulette_too_fast",
+	"det_roulette_too_slow",
+	"det_stepover_wrong_start",
+	"det_roulette_wrong_end",
+	"det_croqueta_hold_short",
 ]
 
 var _mismatches := 0
@@ -99,8 +104,8 @@ func _check_meta(r, data: Dictionary) -> void:
 
 ## 规模与 id 下限：删空夹具、丢掉点名用例、复制 id 都必须变红。
 func _check_scale(r, cases: Array) -> void:
-	r.check(cases.size() >= 5, "detector 用例至少 5 条（实际 %d）" % cases.size())
-	if cases.size() < 5:
+	r.check(cases.size() >= 10, "detector 用例至少 10 条（实际 %d）" % cases.size())
+	if cases.size() < 10:
 		_mismatches += 1
 	var ids: Dictionary = {}
 	for case in cases:

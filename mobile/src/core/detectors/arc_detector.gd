@@ -20,9 +20,10 @@ extends Detector
 ## 起点约束是区分动作的关键：从前往侧转 90° 是踩单车，从后往前转 180° 才是
 ## 马赛回旋，所以 `start_target` 为 null 以外的情况都要把起点纳入判定。
 ##
-## 本轮只移植「回中收尾 / 起手 / 累计 / 终点与区间 / 成功」这条真实路径
-## （detectors.py:246-321、:383-412）。六个 abort 分支与两种松手失败码由后续任务
-## 补齐；`_release_failure()` 现在返回 null，缺口在方法文档里写明。
+## 六个 abort 分支的顺序是语义的一部分（detectors.py:323-404）：
+## `wrong_start → wrong_direction → overshoot → stalled → too_slow → too_fast`。
+## 它们都会 abort，所以顺序只影响报告哪条原因，不影响是否触发 —— 但「报哪条」
+## 正是用户看到的反馈，不能重排。
 
 ## 推过这个幅度才算起手。
 var enter: float = 0.80
@@ -163,14 +164,28 @@ func _abort() -> void:
 	_turn_sign = 0
 
 
-## 松手了但没成功：说清楚差在哪儿。
+## 松手了但没成功：说清楚差在哪儿（detectors.py:220-238）。
 ##
-## 参考实现在这里产出两种码 —— `swept < min_angle` → `too_short`，
-## `end_targets` 非空且终点不对 → `wrong_end`（detectors.py:220-238）。
-## 本任务只移植成功路径，两种码与文案由后续任务补齐；现在恒返回 null，
-## 所以松手时不会凭空多出一条失败裁定。
+## 只可能产出两种码，且**扫掠小于 `report_min_angle` 时调用方整条静默**
+## （detectors.py:258）—— 太小的抖动不值得报「转得不够」。
 func _release_failure(
-		_swept: float, _elapsed_ms: float, _end_rel_value: float, _end_ok: bool) -> Failure:
+		swept: float, elapsed_ms: float, end_rel_value: float, end_ok: bool) -> Failure:
+	if swept < min_angle:
+		return Failure.new(
+			&"too_short",
+			"转得不够：只转了 %.0f°（需要 %.0f°~%.0f°）" % [swept, min_angle, max_angle],
+			elapsed_ms,
+		)
+	if not end_targets.is_empty() and not end_ok:
+		var parts := PackedStringArray()
+		for target in end_targets:
+			parts.append("%.0f°" % target)
+		return Failure.new(
+			&"wrong_end",
+			"终点不对：停在相对 %.0f°（应该回到 %s±%.0f°）"
+				% [end_rel_value, "/".join(parts), end_tolerance],
+			elapsed_ms,
+		)
 	return null
 
 
@@ -273,7 +288,70 @@ func update(frame: Frame) -> Hit:
 		_last_path_t = now
 
 	var swept := absf(acc)
-	_capture_measured(swept, elapsed_ms, Geometry.norm_deg(frame.rs_angle - base))
+
+	# 检查顺序按「最能说明问题」排：起点 -> 方向 -> 转多了 -> 停住 -> 太慢 -> 太快。
+	# 这些分支都会 abort，所以顺序只影响报告哪条原因，不影响是否触发
+	# （detectors.py:323-404）。顺序是语义的一部分，不许重排。
+	if _have_start_target and Geometry.angle_diff(start_rel, start_target) > start_tolerance:
+		if _claimed:
+			_emit(Failure.new(
+				&"wrong_start",
+				"起点不对：从相对 %.0f° 起手（%s要求 %.0f°±%.0f°）"
+					% [start_rel, _name, start_target, start_tolerance],
+				elapsed_ms,
+			))
+		_capture_measured(swept, elapsed_ms, Geometry.norm_deg(frame.rs_angle - base))
+		_abort()
+		return null
+
+	# 转向符号要等真的转起来再锁定：刚推出去那一帧 acc 还是 0，
+	# 直接比较会把它误判成「转向反了」。
+	if direction != 0 and swept >= 5.0:
+		if _turn_sign == 0:
+			_turn_sign = 1 if acc > 0.0 else -1
+		if _turn_sign != direction:
+			if _claimed:
+				_emit(Failure.new(
+					&"wrong_direction",
+					"转向反了：应该%s" % direction_label,
+					elapsed_ms,
+				))
+			_capture_measured(swept, elapsed_ms, Geometry.norm_deg(frame.rs_angle - base))
+			_abort()
+			return null
+
+	if swept > max_angle:
+		if _claimed:
+			_emit(Failure.new(
+				&"overshoot",
+				"转多了：累计 %.0f°（上限 %.0f°）" % [swept, max_angle],
+				elapsed_ms,
+			))
+		_capture_measured(swept, elapsed_ms, Geometry.norm_deg(frame.rs_angle - base))
+		_abort()
+		return null
+
+	if (now - _last_motion) * 1000.0 > idle_ms:
+		if _claimed and swept >= 5.0:
+			_emit(Failure.new(
+				&"stalled",
+				"中途停住了：超过 %.0fms 没转动" % idle_ms,
+				elapsed_ms,
+			))
+		_capture_measured(swept, elapsed_ms, Geometry.norm_deg(frame.rs_angle - base))
+		_abort()
+		return null
+
+	if elapsed_ms > max_ms:
+		if _claimed:
+			_emit(Failure.new(
+				&"too_slow",
+				"太慢了：用了 %.0fms（上限 %.0fms）" % [elapsed_ms, max_ms],
+				elapsed_ms,
+			))
+		_capture_measured(swept, elapsed_ms, Geometry.norm_deg(frame.rs_angle - base))
+		_abort()
+		return null
 
 	end_rel = Geometry.norm_deg(frame.rs_angle - base)
 	var end_ok := _end_ok(end_rel)
@@ -289,15 +367,18 @@ func update(frame: Frame) -> Hit:
 					"太快了：%.0fms 就转到位了（至少 %.0fms）" % [elapsed_ms, min_ms],
 					elapsed_ms,
 				))
+			_capture_measured(swept, elapsed_ms, end_rel)
 			_abort()
 		return null
 
 	if not in_range or not end_ok:
+		_capture_measured(swept, elapsed_ms, end_rel)
 		return null
 
 	active = false
 	armed = false
 	_turn_sign = 0
+	_capture_measured(swept, elapsed_ms, end_rel)
 	var summary := "旋转 %.0f°（相对 %.0f°→%.0f°）" % [absf(acc), start_rel, end_rel]
 	return Hit.new(elapsed_ms, _describe(), summary)
 
