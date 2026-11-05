@@ -81,8 +81,14 @@ static func now_ms() -> int:
 
 ## 轮转目标：`input_log.txt` → `input_log.1.txt`（与主文件同目录、同扩展名）。
 static func rotated_path(path: String = "") -> String:
-	var target := path if not path.is_empty() else LOG_PATH
+	var target := path if not path.is_empty() else default_path()
 	return target.get_basename() + ".1." + target.get_extension()
+
+
+## 生产路径是 adb 可读的绝对路径；桌面 / 无头开发环境退回 user://，
+## 免得每次启动都去 /storage 撞一个与输入无关的 ERROR（安卓分支不受影响）。
+static func default_path() -> String:
+	return LOG_PATH if OS.get_name() == "Android" else "user://input_log.txt"
 
 
 ## 失败次数（每个会话最多增长一次）。套件用它证明「只记一次」。
@@ -108,7 +114,7 @@ static func _emit(line: String, path: String = "") -> void:
 static func _append(line: String, path: String = "", max_bytes: int = MAX_BYTES) -> bool:
 	if _failed:
 		return false
-	var target := path if not path.is_empty() else LOG_PATH
+	var target := path if not path.is_empty() else default_path()
 	if not _ensure_open(target, max_bytes):
 		return false
 	if _file == null:

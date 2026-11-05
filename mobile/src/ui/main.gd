@@ -74,7 +74,7 @@ func _ready() -> void:
 	# 默认每帧 flush 一次累积输入；必须关掉，事件时间戳才有亚帧意义。
 	Input.set_use_accumulated_input(false)
 	# 输入事件日志的会话头：每次启动一行，日志按进程分段。写入失败不影响任何判定。
-	InputLog.start_session(str(ProjectSettings.get_setting("application/config/version", "0.1.0")))
+	InputLog.start_session(_app_version())
 	_config_error.visible = false
 	_onboarding.visible = false
 	_practice_container.visible = false
@@ -104,6 +104,13 @@ func _ready() -> void:
 	_sampler.device_list_changed.connect(_on_device_list_changed)
 	add_child(_sampler)
 	_on_device_list_changed(_sampler.connected_devices())
+
+
+## 工程里没有 `application/config/version` 时 `get_setting` 返回空串而不是默认值；
+## 空版本号会让会话头变成 `v= `。用导出配置里的 versionName 兜底。
+func _app_version() -> String:
+	var version := str(ProjectSettings.get_setting("application/config/version", ""))
+	return version if not version.is_empty() else "0.1.0"
 
 
 func _process(delta: float) -> void:

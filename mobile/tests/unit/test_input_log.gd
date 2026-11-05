@@ -102,6 +102,11 @@ func _check_constants(r) -> void:
 		"轴节流最小变化必须是 0.02（实际 %s）" % str(InputLog.AXIS_MIN_DELTA))
 	r.check(InputLog.AXIS_MIN_INTERVAL_MS == 16,
 		"轴节流最小间隔必须是 16 ms（实际 %d）" % InputLog.AXIS_MIN_INTERVAL_MS)
+	var fallback_ok := InputLog.default_path() == InputLog.LOG_PATH \
+		if OS.get_name() == "Android" else InputLog.default_path().begins_with("user://")
+	r.check(fallback_ok,
+		"安卓必须用 adb 可读的绝对路径，其他平台必须退回 user://（实际 %s）"
+			% InputLog.default_path())
 
 
 ## 轮转：> 阈值时前半段进 `.1`、后半段留在主文件；只丢最旧的一半。
