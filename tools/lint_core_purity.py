@@ -60,7 +60,7 @@ RULES: List[Tuple[str, re.Pattern[str]]] = [
     ("resource_type", re.compile(r"\bResource\b")),
     ("tool_annotation", re.compile(r"^\s*@tool\b")),
     ("outer_layer_dep", re.compile(
-        r"(?:preload|load)\s*\(\s*\"res://src/(?:platform|ui|app)/")),
+        r"(?:preload|load)\s*\(\s*\"res://src/(?:platform|ui|app|input)/")),
 ]
 
 # 这些规则必须看到字符串字面量的内容，所以对 strip_comments() 的结果匹配。

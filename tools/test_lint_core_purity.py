@@ -183,10 +183,15 @@ def test_extended_rules_have_teeth() -> None:
     check("preload(res://src/app → outer_layer_dep",
           _rules(cases["outer_layer_dep"]) == ["outer_layer_dep"],
           str(_rules(cases["outer_layer_dep"])))
+    check("preload(res://src/input → outer_layer_dep",
+          _rules("const X := preload(\"res://src/input/pad_sampler.gd\")\n") == ["outer_layer_dep"],
+          str(_rules("const X := preload(\"res://src/input/pad_sampler.gd\")\n")))
     check("preload(res://src/core) 不算反向依赖",
           _rules("const X := preload(\"res://src/core/geometry.gd\")\n") == [])
     check("注释里的 preload(res://src/app 不算命中",
           _rules("# 不要写 preload(\"res://src/app/config_store.gd\")\n") == [])
+    check("注释里的 preload(res://src/input 不算命中",
+          _rules("# 不要写 preload(\"res://src/input/pad_sampler.gd\")\n") == [])
 
 
 def test_exit_codes() -> None:

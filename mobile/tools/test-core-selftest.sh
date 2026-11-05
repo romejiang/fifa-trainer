@@ -1,15 +1,20 @@
 #!/usr/bin/env bash
-# 闸门反例自测：证明 test-core.sh 的五种「假绿」路径都会变红，且正例仍然绿。
+# 闸门反例自测：证明 test-core.sh 的六种「假绿」路径都会变红，且正例仍然绿。
 #
 #   bash mobile/tools/test-core-selftest.sh
 #
-# 五条反例对应 RESEARCH §Q1 的失败表，缺一条就等于允许一种假绿：
+# 六条反例对应 RESEARCH §Q1 的失败表，缺一条就等于允许一种假绿：
 #   stub_rc0_silent      —— 解析失败但退出码 0：没有 TESTS_DONE 哨兵
 #   stub_hang            —— 入口运行时错误挂死：看门狗必须杀掉并判红
 #   stub_fail            —— 真的失败：failures=1 且退出码非零
 #   stub_zero_assertions —— 套件全被跳过：failures=0 但零断言
 #   fixture_missing      —— tap 黄金夹具不见了：生成器自己的缺失提示必须让闸门变红
+#   joy_axis_canary      —— mobile/src 下出现手写轴枚举常量：INPUT-02 断言必须先于导入命中
 # 最后一条是正例：用真 Godot 跑一次完整闸门，必须成功。
+#
+# 计数口径：现有 4 条反例 + 1 条正例 = cases=5；04-02 加 fixture_missing 后是
+# 5 条反例 + 1 条正例 = cases=6；本任务加 joy_axis_canary 后是 6 条反例 + 1 条正例
+# = cases=7 —— 所以它是「第 6 条反例 / 第 7 个用例」，不是第 7 条反例。
 #
 # 每个 stub 都必须按参数分支：test-core.sh 的导入步骤**没有**看门狗（只有对信号
 # 终止的有界重试）。挂死型 stub 如果对导入也 sleep，反例脚本会先把自己挂死，
@@ -31,7 +36,15 @@ restore_fixture() {
         mv "$fixture_backup" "$fixture"
     fi
 }
-trap 'rm -rf "$tmp"; restore_fixture' EXIT
+
+# 第 6 条反例（joy_axis_canary）要临时新建一个含轴枚举常量前缀的 .gd。
+# 清理同样挂在 EXIT 上：反例 fail() 时也必须删掉它，否则一次失败的运行会留下
+# 一个让闸门持续变红的文件。
+canary="$repo_root/mobile/src/input/__joy_axis_canary.gd"
+remove_canary() {
+    rm -f "$canary"
+}
+trap 'rm -rf "$tmp"; restore_fixture; remove_canary' EXIT
 
 fail() {  # $1=用例名 $2=原因
     echo "SELFTEST_FAIL $1: $2" >&2
@@ -123,6 +136,31 @@ if [ "$fixture_sha_before" != "$fixture_sha_after" ]; then
 fi
 echo "✓ 反例 fixture_missing 已变红"
 
+# 第 6 条反例（第 7 个用例）：mobile/src 下出现了手写的轴枚举常量。
+#
+# 这条断言扫描注释，所以 canary 用最小内容：只要含那个前缀，闸门就必须在导入之前
+# 命中。GODOT_BIN=/bin/false 是「没有调用 Godot」的机械证据 —— 断言若被挪到导入
+# 之后，/bin/false 会让闸门因为别的原因变红，日志里就不会出现 INPUT-02。
+#
+# 为什么必须有这条反例：新断言若没有反例，就会在有人写回常量时静默通过。
+mkdir -p "$(dirname "$canary")"
+printf 'extends RefCounted\n\nconst CANARY := "JOY_AXIS_"\n' >"$canary"
+if GODOT_BIN=/bin/false bash "$gate" >"$tmp/joy_axis_canary.log" 2>&1; then
+    remove_canary
+    sed 's/^/    /' "$tmp/joy_axis_canary.log" >&2
+    fail "joy_axis_canary" "闸门返回 0，手写轴枚举常量没有被抓住"
+fi
+if ! grep -qF "INPUT-02" "$tmp/joy_axis_canary.log"; then
+    remove_canary
+    sed 's/^/    /' "$tmp/joy_axis_canary.log" >&2
+    fail "joy_axis_canary" "闸门变红了，但不是因为轴枚举常量（日志缺「INPUT-02」）"
+fi
+remove_canary
+if [ -n "$(git -C "$repo_root" status --porcelain mobile/src/input/)" ]; then
+    fail "joy_axis_canary" "临时 canary 没有被清理干净"
+fi
+echo "✓ 反例 joy_axis_canary 已变红（导入之前命中 INPUT-02）"
+
 echo "▸ 正例：用真 Godot 跑一次完整闸门…"
 if ! GODOT_BIN="" bash "$gate" >"$tmp/positive.log" 2>&1; then
     sed 's/^/    /' "$tmp/positive.log" >&2
@@ -133,4 +171,4 @@ if ! grep -qF "✓ 核心闸门通过" "$tmp/positive.log"; then
 fi
 echo "✓ 正例 真 Godot 闸门已变绿"
 
-echo "SELFTEST_OK cases=6"
+echo "SELFTEST_OK cases=7"

@@ -45,7 +45,7 @@
 | `input_singleton` | `Input.` | 手柄状态是环境输入，必须由调用方采样后作为参数传入 |
 | `time_singleton` | `Time.` | 时钟必须显式传入 `now`，否则回放测试不可能确定 |
 | `node_type` | `Node` | 场景树类型；core 用 `RefCounted` 承载数据 |
-| `fileaccess_io` | `FileAccess` | 读真实文件系统属于 `src/app/config_store.gd` |
+| `fileaccess_io` | `FileAccess` | 读真实文件系统属于 `src/app/`（`config_store.gd` / `profile_store.gd`） |
 | `logging` | `print(`、`prints(`、`printt(`、`printerr(`、`print_rich(`、`print_debug(`、`push_error(`、`push_warning(` | 日志是副作用；错误必须走返回值（RESIL-02） |
 | `os_singleton` | `OS.` | 平台信息是环境状态 |
 | `engine_singleton` | `Engine.` | 编辑器 / 引擎状态是环境状态 |
@@ -55,7 +55,11 @@
 | `resource_loader` | `ResourceLoader` | 资源系统按路径缓存，等于隐式全局状态 |
 | `resource_type` | `Resource` | `Resource` 按路径缓存，`load()` 两次返回同一实例，可变状态会跨测试泄漏；core 的数据对象一律用 `RefCounted` |
 | `tool_annotation` | 行首 `@tool` | `--import` 隐含 `--editor`，`@tool` 脚本可能在导入期被执行，产生副作用 |
-| `outer_layer_dep` | `preload` / `load` 指向 `res://src/platform|ui|app/` | 依赖方向：`core` 不得反向依赖外层 |
+| `outer_layer_dep` | `preload` / `load` 指向 `res://src/platform|ui|app|input/` | 依赖方向：`core` 不得反向依赖外层。`input` 是引擎绑定层（`Input.` / `Time.` / `Node`），core 只收它产出的值 |
+
+依赖方向严格单向：`core ← input ← ui`，`app` 只做 I/O。`src/input/` 是引擎绑定层
+（`PadSampler` 是唯一出现 `Input.` / `Time.` 的采样代码），`src/ui/` 是唯一同时知道
+三者的组合根；core 只接收它们产出的值，绝不 `preload` 它们。
 
 ### 规则只管「用」，不管「提」
 
@@ -73,8 +77,9 @@
 **例外二：`RegEx`。** 与 `JSON` 同级：纯计算，结果确定。覆盖层合并与配置校验都需要它。
 
 **非例外：`FileAccess`。** 它看起来也「只是读文件」，但它读的是真实文件系统 —— 路径、
-权限、外部修改都会让结果不可复现。I/O 只允许出现在 `src/app/config_store.gd`，core 接收
-`PackedByteArray` 并返回 `ConfigResult`。同样被拒绝的还有 `DirAccess`。
+权限、外部修改都会让结果不可复现。I/O 只允许出现在 `src/app/`（`config_store.gd` 与
+`profile_store.gd`），core 接收 `PackedByteArray` 并返回 `ConfigResult`。同样被拒绝的
+还有 `DirAccess`。
 
 ## 4. 怎么跑、退出码什么意思
 
@@ -84,9 +89,9 @@
 bash mobile/tools/test-core.sh
 ```
 
-它按固定顺序跑：配置副本校验 → lint 反例自测 → 真 lint → 几何黄金校验 → 无头导入 →
-几何套件。lint 两步都排在所有 Godot 调用之前 —— 纯文本、毫秒级、零依赖，没有理由等
-引擎装好才跑。
+它按固定顺序跑：配置副本校验 → lint 反例自测 → 真 lint → 几何黄金校验 → tap 黄金校验
+→ 轴枚举常量零出现 → 配置判定对等 → 无头导入 → 核心套件。前七步都排在所有 Godot 调用
+之前 —— 纯文本、毫秒级、零依赖，没有理由等引擎装好才跑。
 
 也可以单独跑扫描器：
 
@@ -177,6 +182,16 @@ python3 tools/lint_core_purity.py --list-rules      # 逐行打印规则 id
 3. **`select_taps_skill(config)` 按 `kind == "taps"` 选，绝不按名字或下标。**
    只练绿色搓射是「筛选」的结果；真实配置把绿色搓射排在 `skills` 最后，
    任何按下标取的做法都会读到马赛回旋。
+
+### Phase 4 的修饰键范围
+
+**只有 `required_button = "RB"` 可用。** 默认值就是 RB，本阶段不做修饰键切换 UI。
+
+`LT` / `RT` 在 Godot 里是**轴**，不是按钮：`PadStateBuffer.pressed_dict()` 只由按钮索引
+产生，不会也不应该把扳机轴伪造成按钮。`shared/skills_config.json` 的 `modifier_options`
+虽然列了 `["RB", "RT"]`，但 RT 分支要到 Phase 5 接入扳机轴归一之后才启用 ——
+`AxisMapping` 已经预留 `lt_index` / `rt_index` / `lt_rest` / `rt_rest`。这不是遗漏，
+是写进设备层与文档的范围声明。
 
 ### 本阶段的范围收缩（Phase 5 必须还原）
 

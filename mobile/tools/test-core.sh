@@ -69,6 +69,16 @@ if ! python3 "$repo_root/tools/gen_tap_golden.py" --check; then
     exit 1
 fi
 
+# 轴枚举常量的零出现断言（INPUT-02）。纯文本、毫秒级、零 Godot 依赖 —— 放在导入
+# 之前，反例自测才能在几秒内变红，而不必跑完整个 Godot 套件。
+# 注意：这条断言**扫描注释**，所以源码里解释这条规则时必须用中文，不能把常量名写进
+# 注释；下面这条 grep 本身不扫 tools/，只扫 mobile/src。
+echo "▸ 校验 mobile/src 下没有手写 Godot 轴枚举常量（INPUT-02）…"
+if grep -R --include='*.gd' -n "JOY_AXIS_" "$repo_root/mobile/src"; then
+    echo "✗ mobile/src 下不允许出现 Godot 轴枚举常量前缀：轴序号必须由探针给出（INPUT-02）" >&2
+    exit 1
+fi
+
 # 第四步：跨语言配置判定对等。纯 Python、不需要 Godot，越早失败越省时间；
 # 而且必须排在任何 Godot 调用之前 ——「两端语义分叉」比「某一端自己红了」
 # 更需要先知道。它只校验 Python 侧判定与语料一致、且每处分歧都有记录；
