@@ -18,7 +18,7 @@ affects: [desktop-ui, design-system, gui-redraw]
 actuals:
   tokens: 26725        # 106900 chars / 4，最终 gui.py
   tasks: 3
-  commits: 3
+  commits: 5
 
 tech-stack:
   added: []
@@ -50,9 +50,9 @@ metrics:
   tasks: 3
   files: 1
 status: complete
-commits: 3
+commits: 5
 plan_head_before: c8f97a7f041f0bce9251fcafe025dcb3a3d006ff
-plan_head_after: 65051df
+plan_head_after: 5d114d0
 ---
 
 # Quick Task 261105-wi7: 桌面版亮色 UI 重做 Summary
@@ -82,6 +82,8 @@ Each task was committed atomically:
 1. **Task 1: 亮色壳层 —— 调色板、绘制工具、背景/顶栏/底栏** - `c290a0e` (feat)
 2. **Task 2: 动作面板 + 结果卡 + 最近尝试** - `9640afb` (feat)
 3. **Task 3: 连接中 / 无手柄 / 配置错误 / 校准弹窗 + 全量回归** - `65051df` (feat)
+4. **精修：英雄区光带 / 状态胶囊 / 次级页面 / 紧凑布局** - `f7eba38` (fix)
+5. **边界处理：长动作名 / 空动作列表** - `5d114d0` (fix)
 
 _Note: 文档提交（SUMMARY/STATE/PLAN）由 orchestrator 处理，本 executor 未提交任何 .planning 产物。_
 
