@@ -43,11 +43,11 @@ func show_outcome(outcome: Outcome) -> void:
 		return
 	_shown_seq = outcome.seq
 	if outcome.ok:
-		_title.text = "✓ 做对了"
+		_title.text = "✓ 做对了 · %s" % outcome.skill_name
 		_reason.text = outcome.detail
 		_title.add_theme_color_override("font_color", SUCCESS_COLOR)
 	else:
-		_title.text = "✗ 没做对"
+		_title.text = "✗ 没做对 · %s" % outcome.skill_name
 		_reason.text = outcome.message
 		_title.add_theme_color_override("font_color", FAILURE_COLOR)
 	_remaining = HOLD_SECONDS

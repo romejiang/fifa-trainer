@@ -30,6 +30,7 @@ func run(r) -> void:
 	_check_facing_frozen(r)
 	_check_null_contract(r)
 	_check_main_source(r)
+	_check_drain_source(r)
 	r.complete()
 
 
@@ -93,6 +94,11 @@ func _check_facing_frozen(r) -> void:
 
 
 ## 组 4：null 契约。无档案不是「崩溃」也不是「用默认校准」，而是四个字段写 0。
+##
+## 行为断言之外还要一条源码断言：`AxisMapping.snapshot_*` 自己也对 null 返回 ZERO，
+## 所以「删掉早退直接调 snapshot_*」在行为上**看不出区别**。显式早退的价值是让这条
+## 语义不依赖被调方的实现细节（被调方将来若改成抛错就晚了）—— 只有结构断言能钉住它，
+## 变异验证 3 正是删这一行。
 func _check_null_contract(r) -> void:
 	var raw := _raw([1.0, -1.0, 1.0, -1.0, 0.5, 0.5, 0.0, 0.0])
 	var frame := FrameBuilder.make(raw, null, null, DEADZONE, 0.0, {})
@@ -105,6 +111,9 @@ func _check_null_contract(r) -> void:
 	var half := FrameBuilder.make(raw, profile.axes, null, DEADZONE, 0.0, {})
 	r.eq_float(half.rs_mag, 0.0, EPSILON, "只有映射没有校准时 rs_mag 必须是 0")
 	r.eq_float(half.ls_mag, 0.0, EPSILON, "只有映射没有校准时 ls_mag 必须是 0")
+	var builder := _read_source("res://src/core/frame_builder.gd")
+	r.check(builder.contains("if mapping == null or calibration == null"),
+		"FrameBuilder.fill 必须有显式的无档案早退（不依赖 snapshot_* 的 null 判断）")
 
 
 ## 组 5：组合根的源码结构。`FrameBuilder` 必须存在、不能有第二份归一化、类型必须是
@@ -128,6 +137,30 @@ func _check_main_source(r) -> void:
 		"FrameBuilder 调用点必须对 _profile 做 null 安全处理")
 	r.check(source.contains("_profile = null"),
 		"设备列表变化 / 解绑时必须显式清掉 _profile")
+
+
+## 组 6：唯一 drain 点与「日志先写」。这两条在运行期都看不出来 —— 第二个 drain
+## 只会让屏幕上少一条结果，日志写在横幅之后只会让日志少一条 —— 只能用源码结构钉死。
+func _check_drain_source(r) -> void:
+	var practice := _read_source(PRACTICE_PATH)
+	var main := _read_source(MAIN_PATH)
+	r.check(not practice.is_empty(), "必须能读到 %s" % PRACTICE_PATH)
+	if practice.is_empty():
+		return
+	var log_index := practice.find("InputLog.outcome(")
+	var banner_index := practice.find("show_outcome(")
+	r.check(log_index >= 0, "practice_screen 必须写 OUTCOME 日志行")
+	r.check(banner_index >= 0, "practice_screen 必须把结果交给横幅")
+	r.check(log_index >= 0 and banner_index >= 0 and log_index < banner_index,
+		"日志必须在 show_outcome 之前写（日志 %d，横幅 %d）" % [log_index, banner_index])
+	var drains := _count(practice, "pop_outcomes(")
+	r.check(drains == 1, "practice_screen 必须恰好一个 drain 点（实际 %d）" % drains)
+	var main_drains := _count(main, "pop_outcomes(")
+	r.check(main_drains == 0, "main.gd 不得再 drain 一次（实际 %d）" % main_drains)
+	r.check(practice.contains("var _runtime: GestureEngine"),
+		"practice_screen._runtime 的类型必须是 GestureEngine")
+	r.check(practice.contains("setup(p_runtime: GestureEngine"),
+		"practice_screen.setup 的参数类型必须是 GestureEngine")
 
 
 ## 用同一组 raw 对照 `snapshot_*` + `Geometry`：四个字段逐项一致。
@@ -212,3 +245,16 @@ static func _read_source(path: String) -> String:
 	if not FileAccess.file_exists(path):
 		return ""
 	return FileAccess.get_file_as_string(path)
+
+
+## 非重叠计数：源码结构断言用它证明「恰好一次 / 零次」。
+static func _count(text: String, needle: String) -> int:
+	var total := 0
+	var start := 0
+	while true:
+		var found := text.find(needle, start)
+		if found < 0:
+			break
+		total += 1
+		start = found + needle.length()
+	return total

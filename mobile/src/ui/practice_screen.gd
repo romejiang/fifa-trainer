@@ -3,9 +3,10 @@ extends Control
 ## 练习屏 S12–S14 的渲染器：只读运行时，不推进判定。
 ##
 ## 三条边界，违反任何一条都会让「一次尝试一条判定」变成假绿：
-##   1. **判定推进点唯一**：`TapRuntime` 只在组合根（`main.gd`）里被推进；本屏只消费
-##      `pop_outcomes()`。这里既不读设备、也不读按钮边沿数组 —— 同一次按下不能有
-##      第二个解释者。
+##   1. **判定推进点唯一**：`GestureEngine` 只在组合根（`main.gd`）里被推进；本屏只消费
+##      引擎的结果队列。这里既不读设备、也不读按钮边沿数组 —— 同一次按下不能有
+##      第二个解释者。**日志与横幅在本屏同一个 drain 循环里**：先写 `OUTCOME` 行、
+##      再交给横幅，两个消费者共享同一次取走的结果，`main.gd` 里没有第二个 drain。
 ##   2. **结果全量 drain**：每帧把队列取空、逐条交给横幅。假设「最多一条」会在
 ##      同帧两条时静默丢掉一条；队列是结构，不是约定。
 ##   3. **文案来自判定**：成功显示 `Outcome.detail`、失败显示 `Outcome.message`，
@@ -40,7 +41,7 @@ const IDLE_DISPLAY := "等待第一下"
 ## `show_outcome`。无类型引用是正确的写法，不是遗漏。
 @onready var _banner = %ResultBanner
 
-var _runtime: TapRuntime = null
+var _runtime: GestureEngine = null
 var _buffer: PadStateBuffer = null
 var _accum: float = 0.0
 ## 上一次写入 `%SuccessCount` 的整串文本；相同就跳过赋值。
@@ -53,10 +54,11 @@ func _ready() -> void:
 
 ## 依赖唯一入口。`main.gd` 在 `flow.can_enter_practice()` 首次为真时调用，
 ## 那时 `effective_layout()` 必非空；本屏只按传入值选文案，不猜。
-func setup(p_runtime: TapRuntime, p_layout: StringName, p_buffer: PadStateBuffer) -> void:
+func setup(p_runtime: GestureEngine, p_layout: StringName, p_buffer: PadStateBuffer) -> void:
 	_runtime = p_runtime
 	_buffer = p_buffer
-	_action_name.text = _runtime.skill_name
+	# 多动作自由练习没有「唯一动作名」：标题来自引擎的通用串。
+	_action_name.text = _runtime.display_title
 	_hint.text = _hint_text(p_layout)
 	# 清掉上一场会话的显示与计数缓存；横幅的 `_shown_seq` 不随之重置（序号单调）。
 	_banner.clear()
@@ -73,8 +75,12 @@ func _process(delta: float) -> void:
 	if _runtime == null:
 		return
 	# 全量 drain：本帧有几条就显示几条，不假设最多一条。
+	# 日志必须写在 `show_outcome` **之前**：横幅只显示最后一条，日志要留下每一条
+	# （D5-2/D5-3 的「每次恰好一条」靠它核对）。本循环是唯一的 drain 点。
 	var outcomes: Array[Outcome] = _runtime.pop_outcomes()
 	for outcome in outcomes:
+		InputLog.outcome(Time.get_ticks_msec(), outcome.skill_name, outcome.ok,
+			outcome.code, outcome.elapsed_ms, outcome.seq, outcome.measured)
 		_banner.show_outcome(outcome)
 	_accum += delta
 	if _accum < 0.1:
