@@ -3,16 +3,16 @@ gsd_state_version: "1.0"
 current_phase: 4
 current_phase_name: 设备输入层 + 绿色搓射竖切
 status: executing
-stopped_at: Phase 4 planned (7 plans, 7 waves), ready to execute
-last_updated: "2026-11-05T01:33:50.058Z"
+stopped_at: Completed 04-01-PLAN.md
+last_updated: "2026-11-05T09:24:50.000Z"
 last_activity: 2026-11-05
-last_activity_desc: Phase 3 complete, transitioned to Phase 4
-state_head: 9649a1738fa04f44fc047b6e00a28010bb3334a4
+last_activity_desc: 04-01 tap 检测器移植 + 黄金回放完成
+state_head: 26e565606711e38c42aae3acc3a600842e285150
 progress:
   total_phases: 10
   completed_phases: 3
   total_plans: 23
-  completed_plans: 16
+  completed_plans: 17
   percent: 30
 ---
 
@@ -27,17 +27,17 @@ See: .planning/PROJECT.md (updated 2026-11-04)
 
 ## Current Position
 
-Phase: 4 (设备输入层 + 绿色搓射竖切) — READY TO EXECUTE
-Plan: Not started
-Status: Ready to execute
-Last activity: 2026-11-05 — Phase 4 planned: 7 plans, 7 waves, plan checker passed
+Phase: 4 (设备输入层 + 绿色搓射竖切) — EXECUTING
+Plan: 2 of 7
+Status: Executing Phase 4
+Last activity: 2026-11-05 — 04-01 tap 检测器移植 + 黄金回放完成
 
 Progress: [███░░░░░░░] 30%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 16
+- Total plans completed: 17
 - Average duration: — min
 - Total execution time: 0.9 hours
 
@@ -74,6 +74,7 @@ Progress: [███░░░░░░░] 30%
 | Phase 3 P04 | 7min | 3 tasks | 13 files |
 | Phase 3 P05 | 4min | 3 tasks | 6 files |
 | Phase 3 P06 | 3min | 3 tasks | 12 files |
+| Phase 4 P01 | 5min | 2 tasks | 16 files |
 
 ## Accumulated Context
 
@@ -184,6 +185,13 @@ Recent decisions affecting current work:
 - [Phase 3]: `load_config` 必须把 `merged.warnings` 追加进 `ConfigResult`：纯合并测试全绿而生产路径丢 warning 是本次明确防的假绿
 - [Phase 3]: 配置读盘先取长度再分配缓冲：超过 1 MiB 在内存分配之前拒绝；仍然按字节读，BOM 不会被 `get_file_as_string()` 静默剥掉
 - [Phase 3]: `save_overrides` 只接受 `user://` 目标与临时路径；`res://` 与绝对路径一律 `ERR_UNAUTHORIZED`，且不创建目录或文件
+- [Phase 4]: `Frame.now` 用秒、`buttons` 用 canonical 名 → true 的 Dictionary；与参考实现 `(now - t0) * 1000.0` 和 frozenset 语义逐字对齐
+- [Phase 4]: tap 黄金夹具只能是 `tools/gen_tap_golden.py` 的产物；生成器直接跑 `desktop/padskills/detectors.py`，`--check` 逐字节比对且绝不写盘
+- [Phase 4]: 回放必须复刻引擎分支：修饰键不满足时 `observe()` 然后 `reset()`（顺序不能反），否则 `hold_short` 一条都不会出现
+- [Phase 4]: `reset()` 产 `hold_short`、`abandon()` 静默，两者不可合并；`abandon()` 最后一行按 `_prev_pressed` 重算 `_armed`
+- [Phase 4]: 4ms 网格上取不到 450ms / 750ms：`det_success_mid_450` 用 448、`det_too_slow_boundary_750` 尾巴停在 748；超时严格大于由 752 的用例证明
+- [Phase 4]: `elapsed_ms` 的整性判据用 1e-6 容差 + `round()`，不用 `float.is_integer()`：`(548/1000 - 100/1000)*1000` 会带 1e-13 噪声
+- [Phase 4]: 正向哨兵 `TAP_GOLDEN_DETECTOR cases=N mismatches=0` 必须打印在 `r.complete()` 之前；`cases` 是实际回放的 detector 条数，`mismatches` 只统计真实比较差异
 
 ### Pending Todos
 
@@ -210,6 +218,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-11-04T19:56:30.000Z
-Stopped at: Phase 3 complete, ready to plan Phase 4
+Last session: 2026-11-05T09:24:50.000Z
+Stopped at: Completed 04-01-PLAN.md
 Resume file: None

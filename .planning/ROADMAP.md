@@ -136,7 +136,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 
 **Plans**: 7 plans, 7 waves
 **Wave 1**
-- [ ] 04-01-PLAN.md — tap 检测器逐行移植 + Python 生成黄金夹具 + `TAP_GOLDEN_DETECTOR` 哨兵（成功标准 1）
+- [x] 04-01-PLAN.md — tap 检测器逐行移植 + Python 生成黄金夹具 + `TAP_GOLDEN_DETECTOR` 哨兵（成功标准 1）(completed 2026-11-05)
 
 **Wave 2** *(blocked on Wave 1 completion)*
 - [ ] 04-02-PLAN.md — `TapRuntime` 引擎子集（冷却 / 手势锁 / 单槽失败 / 分组）+ `layout_confirmed` 硬门 + `TAP_GOLDEN_RUNTIME` + 闸门第 5 条反例
@@ -272,7 +272,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 →
 | 1. 仓库拆分 + 配置单一真源 + 桌面回归闸门 | 5/5 | Complete    | 2026-11-04 |
 | 2. 安卓工具链 + 真机冒烟 APK | 5/5 | Complete    | 2026-11-05 |
 | 3. 纯核心地基 | 6/6 | Complete    | 2026-11-05 |
-| 4. 设备输入层 + 绿色搓射竖切 | 0/7 | Planned | - |
+| 4. 设备输入层 + 绿色搓射竖切 | 1/7 | In progress | - |
 | 5. 全动作判定对等性 | 0/0 | Not started | - |
 | 6. 训练循环 | 0/0 | Not started | - |
 | 7. 反馈呈现 | 0/0 | Not started | - |
