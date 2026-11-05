@@ -146,6 +146,20 @@ func find(key: String) -> DeviceProfile:
 	return null
 
 
+## 删掉整份档案文件（诊断覆盖层按 Y 的「一键重来」）。
+##
+## 只碰 `_path` 这一个文件：不删目录、不删 `.tmp`、不碰输入日志或任何其他用户数据
+## （T-04-23）。文件不存在视为成功 —— 清除是幂等的，重复按 Y 不会出错。
+## 与 `save_all()` 一样先判 `user://`：导出后的 APK 里 `res://` 只读，写守卫必须由
+## 代码强制，不能靠调用方自觉。
+func clear() -> Error:
+	if not _path.begins_with("user://"):
+		return ERR_UNAUTHORIZED
+	if not FileAccess.file_exists(_path):
+		return OK
+	return DirAccess.remove_absolute(_path)
+
+
 ## 丢弃后立刻删除：否则每次启动都会重复丢弃、重复提示。
 func _discard_corrupt() -> Dictionary:
 	_discard()

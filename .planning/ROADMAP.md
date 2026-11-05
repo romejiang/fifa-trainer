@@ -17,7 +17,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 1: 仓库拆分 + 配置单一真源 + 桌面回归闸门** - `desktop/` + `mobile/` + `shared/`，桌面 230 项检查全绿，配置漂移可被脚本抓住 (completed 2026-11-04)
 - [x] **Phase 2: 安卓工具链 + 真机冒烟 APK** - 签名 APK 能装能启动，中文不豆腐，`*.json` 真进包，能读到手柄原始轴 (completed 2026-11-05)
 - [x] **Phase 3: 纯核心地基** - 几何 / 领域模型 / 配置校验 / 无头运行 / 架构 lint，零引擎依赖 (completed 2026-11-05)
-- [ ] **Phase 4: 设备输入层 + 绿色搓射竖切** - 引导式配对、轴探测、校准、布局确认，真机上产出第一次判定
+- [x] **Phase 4: 设备输入层 + 绿色搓射竖切** - 引导式配对、轴探测、校准、布局确认，真机上产出第一次判定 (completed 2026-11-06)
 - [ ] **Phase 5: 全动作判定对等性** - 三类检测器 + 引擎仲裁 1:1 移植，5 个动作黄金向量逐条一致，抽稀不漂移
 - [ ] **Phase 6: 训练循环** - 10 次一组、免触摸自动推进、待触发/冷却可见、暂停恢复
 - [ ] **Phase 7: 反馈呈现** - 实测 vs 区间时序条、实时轨迹、音效、支架距离可读布局
@@ -134,7 +134,7 @@ Decimal phases appear between their surrounding integers in numeric order.
   4. 布局建议（Xbox / PlayStation）自动给出，但必须用户按键确认后才进入练习，未确认不前进一步
   5. 在真机上做一次绿色搓射，屏幕产出且仅产出一次判定并显示成功或失败原因；快速连做两次得到两次独立判定（事件流保住了帧内反转）
 
-**Plans**: 9 plans, 9 waves
+**Plans**: 11/11 plans complete, 11 waves
 **Wave 1**
 - [x] 04-01-PLAN.md — tap 检测器逐行移植 + Python 生成黄金夹具 + `TAP_GOLDEN_DETECTOR` 哨兵（成功标准 1）(completed 2026-11-05)
 
@@ -157,14 +157,22 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] 04-08-PLAN.md — 引导 UX 修复：探针实时读数 + 2 次软重试 + 纯语言文案 + 停止屏增量 + 屏上诊断覆盖层（D1/D2 的新证据通道），并重建 APK (completed 2026-11-05)
 
 **Wave 8** *(blocked on Wave 7 completion)*
-- [ ] 04-07-PLAN.md — 签名 APK + 真机 D0–D6 清单（`checkpoint:human-verify`，无设备不得勾选）
+- [x] 04-07-PLAN.md — 签名 APK + 真机 D0–D6 清单（completed 2026-11-06；D2 换手柄拒绝面部分验证，第二只手柄未测）
       — **2026-11-05 真机结果：D0 失败**（探针三次拒绝 + 停止屏「没有收到摇杆事件（events_motion = 1931）」）；D1–D6 未执行（`run-as: package not debuggable`；只有一只 Xbox 手柄）。**用户最终决定保留四步探针、修 UX**（不做单屏检测）；修复与重建由 04-08 承担，本计划改为 Wave 8，必须等 04-08 的新 APK 出来后再走查；成功标准 2/3/4/5 仍未闭合。
       — **2026-11-05 21:19–21:30 第二次走查（新包 27,046,027 B）：D0 仍然失败**，卡在探针第 1/4 步「上」：`PAD_AXIS i=4/i=5` 先报 0.000、首次上报后变 -1.000，静止基线按 0 记 → 57 行 `PROBE_REJECT ambiguous_axes key=up`、`margin 0.000`。用户要求「换一种检测方式或跳过」。D1–D6 未执行；成功标准 2/3/4/5 仍未闭合。修复方向：采静止基线前等所有轴上报过一次，或排除从未上报的轴；修完必须重建 APK 并重新走查
       — **2026-11-05 04-08 已交付新包**：`mobile/build/fifa-trainer.apk`（27,046,027 字节，证书 `e1841a17…32e046` 不变，v2 验签通过，只含 arm64）。D1/D2 改走「LB+RB 打开诊断覆盖层 + `adb exec-out screencap`」，不再需要 `run-as`；D2 拒绝面因缺第二只手柄仍记为未执行。**重走 D0–D6 前必须先卸载重装这个新包**
-      — **2026-11-05 04-09 已把首启路径换成单页输入设置**（`InputSetup` + `input_setup_screen`，组合根不再驱动 `OnboardingFlow`；`trigger_rest = min`）。新包 **27,067,065 B**（证书不变）。下一次走查先卸载重装这个包，D0 只有 8 步，见 `ACCEPTANCE.md` §6「本次待验收」
+      — **2026-11-05 04-09 已把首启路径换成单页输入设置**（`InputSetup` + `input_setup_screen`，组合根不再驱动 `OnboardingFlow`；`trigger_rest = min`）。新包 **27,067,065 B**（证书不变）。下一次走查先卸载重装这个包，D0 只有 8 步，见 `ACCEPTANCE.md` §6「D0 操作说明」
+      — **2026-11-05 04-10 已加输入事件日志**：按键边沿与轴变化写入 `/sdcard/Android/data/com.fifaskill.trainer/files/input_log.txt` 并镜像 logcat `INPUT_EVT`，`adb exec-out cat` 可直接回放；新包 **27,071,318 B**（证书不变）。D0 操作与 04-09 相同，下一次走查用这个包
+      — **2026-11-05 04-11 已修三个真机缺陷**：X/Y 退出设置页（与练习手势撞车、误翻 X 符号）、A 在量程未满时不再保存默认校准、布局必须由 Start 切换并由 A 确认；诊断覆盖层按 Y 可删档回设置页。新包 **27,079,510 B**（证书不变）。下一次走查请卸载重装这个包，D0 按 `ACCEPTANCE.md` §6「D0 操作说明（04-11）」的 11 步走
 
 **Wave 9** *(blocked on Wave 8 completion)*
 - [x] 04-09-PLAN.md — 单页输入设置：`InputSetup` 纯逻辑（轴对 / 符号 / 中点 / 量程 / 扳机 rest=min）+ 一页式屏 + 组合根切换 + 第 17 套件 + 重建 APK (completed 2026-11-05)
+
+**Wave 10** *(blocked on Wave 9 completion)*
+- [x] 04-10-PLAN.md — `InputLog` 输入事件日志（按键边沿 + 轴节流，文件 2 MB 轮转 + logcat `INPUT_EVT`）+ `PadSampler` 接线 + 会话头 + 第 18 套件 + 重建 APK (completed 2026-11-05)
+
+**Wave 11** *(blocked on Wave 10 completion)*
+- [x] 04-11-PLAN.md — 设置页保存门（量程未满 `build_profile` 返回 null）+ 布局 Start/A 确认 + 旧档案失效（`can_enter_practice` 四合一门）+ X/Y 退出设置页 + 诊断页 Y 清除档案 + 重建 APK (completed 2026-11-05)
 
 **UI hint**: yes
 
@@ -181,7 +189,27 @@ Decimal phases appear between their surrounding integers in numeric order.
   4. 每次判定返回结构化 `measured{}`（起止角、扫过角、每步耗时、保持时长），反馈层可直接消费，无需二次计算
   5. 250 Hz → 60 / 90 / 120 Hz 抽稀重跑不漂移；若漂移，报告给出证据与阈值调整记录，且 `release_hold_ms` 与 `global_cooldown_ms` 有专门的边界夹具
 
-**Plans**: TBD
+**Plans**: 7 plans, 7 waves
+**Wave 1**
+- [x] 05-01-PLAN.md — 参考冻结 + 生成器骨架 + 10 条已知用例（tracer：Python 参考 → 夹具 → GDScript 回放 → `GESTURE_GOLDEN` 哨兵）
+
+**Wave 2** *(blocked on Wave 1 completion)*
+- [ ] 05-02-PLAN.md — 检测器语料扩到 50 条：六类边界 + 变体配置 + 反向对照 + 变异验证
+
+**Wave 3** *(blocked on Wave 2 completion)*
+- [ ] 05-03-PLAN.md — `GestureEngine` + `ActiveSkill` + `TapRuntime` 子类 + 29 条引擎语料（`GESTURE_RUNTIME`）
+
+**Wave 4** *(blocked on Wave 3 completion)*
+- [ ] 05-04-PLAN.md — `measured{}` 全链（三检测器 + `Outcome`）+ `test_measured`（`MEASURED`）
+
+**Wave 5** *(blocked on Wave 4 completion)*
+- [ ] 05-05-PLAN.md — 250→120/90/60 Hz 抽稀矩阵 + 漂移白名单 + 变异验证（`DECIMATION`）
+
+**Wave 6** *(blocked on Wave 5 completion)*
+- [ ] 05-06-PLAN.md — 左摇杆轴对/符号/校准 + `snapshot_ls()` + schema v2 迁移门 + 设置页同一页补齐
+
+**Wave 7** *(blocked on Wave 6 completion)*
+- [ ] 05-07-PLAN.md — 组合根接全技能引擎 + `OUTCOME` 日志 + `analyze_input_log.py` + 真机 D5-0…D5-8
 
 ### Phase 6: 训练循环 — 10 次一组、免触摸推进、暂停恢复
 
@@ -282,8 +310,8 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 →
 | 1. 仓库拆分 + 配置单一真源 + 桌面回归闸门 | 5/5 | Complete    | 2026-11-04 |
 | 2. 安卓工具链 + 真机冒烟 APK | 5/5 | Complete    | 2026-11-05 |
 | 3. 纯核心地基 | 6/6 | Complete    | 2026-11-05 |
-| 4. 设备输入层 + 绿色搓射竖切 | 5/7 | In progress | - |
-| 5. 全动作判定对等性 | 0/0 | Not started | - |
+| 4. 设备输入层 + 绿色搓射竖切 | 11/11 | Complete    | 2026-11-06 |
+| 5. 全动作判定对等性 | 1/7 | In progress | - |
 | 6. 训练循环 | 0/0 | Not started | - |
 | 7. 反馈呈现 | 0/0 | Not started | - |
 | 8. 长期使用韧性 | 0/0 | Not started | - |

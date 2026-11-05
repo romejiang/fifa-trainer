@@ -532,6 +532,7 @@ static func _profile() -> DeviceProfile:
 	profile.calibration.scale_x = 0.98
 	profile.calibration.scale_y = 0.97
 	profile.quality = {
+		"range_ready": true,
 		"up": {"samples": 30, "margin": 0.7, "separation": 6.0},
 		"right": {"samples": 28, "margin": 0.68, "separation": 5.4},
 	}

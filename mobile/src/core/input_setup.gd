@@ -17,6 +17,11 @@ extends RefCounted
 ##   3. **扳机静止值 = 观测到的最小值**：设备先报 0.000、后跳到 -1.000 时，min 自己
 ##      收敛到 -1.000，不需要「等所有轴都上报过一次」这类时序假设。
 ##
+## 写档案的两道门（04-11，真机实测之后）：`can_save()` 要求量程真的推满，
+## `mark_layout_confirmed()` 要求人在同一页上确认过布局。两者都没有「默认放行」
+## 分支 —— 04-09 的真机上，用户在量程没推满时按了一次 A，程序就把 `scale=1.0`、
+## `center=0` 写成了「校准」，下次启动直接复用，圆点从此和手柄对不上。
+##
 ## 轴对识别只看「最近 1 秒内谁在动」：窗口按帧数计（`RECENT_SAMPLES` 帧，60 Hz 下
 ## 正好 1 秒）。core 不读时钟，帧数就是唯一可注入、可复现的时间口径。
 
@@ -66,6 +71,10 @@ var _frame_index: int = 0
 var _manual_index: int = -1
 var _x_sign: int = 1
 var _y_sign: int = 1
+## 空 = 还没手动切过：显示与保存都用 `_layout_for(device_name)` 的建议值。
+var _layout_cycle: StringName = &""
+## 只有页面在 A 的保存路径上调 `mark_layout_confirmed()` 之后才为 true。
+var _layout_confirmed: bool = false
 
 
 func _init() -> void:
@@ -95,6 +104,10 @@ func reset() -> void:
 	_manual_index = -1
 	_x_sign = 1
 	_y_sign = 1
+	# 布局也一起回到建议值：B 是「清空重来」，留一个隐藏的手动布局会让页面
+	# 显示的键名和用户以为的不一样。
+	_layout_cycle = &""
+	_layout_confirmed = false
 
 
 ## 喂一帧。`values` 少于 8 根时，缺的轴保持上一帧的值（不制造一次假的「回中」）。
@@ -184,6 +197,35 @@ func y_sign() -> int:
 	return _y_sign
 
 
+## 当前布局：手动切过就用切换结果，否则用设备名给出的建议值。
+##
+## `device_name` 由调用方传进来（core 不碰引擎），空串时 `_layout_for` 落到 Xbox：
+## 布局只影响屏幕上显示的键名，不影响任何判定。
+func layout_cycle(device_name: String = "") -> StringName:
+	if _layout_cycle != &"":
+		return _layout_cycle
+	return _layout_for(device_name)
+
+
+## Start 键：在 Xbox / PlayStation 之间来回切。第一次切从当前显示值出发，
+## 所以「Xbox 手柄按一下 Start」直接变成 PlayStation，而不是原地不动。
+func cycle_layout(device_name: String) -> void:
+	if layout_cycle(device_name) == DeviceProfile.LAYOUT_XBOX:
+		_layout_cycle = DeviceProfile.LAYOUT_PLAYSTATION
+	else:
+		_layout_cycle = DeviceProfile.LAYOUT_XBOX
+
+
+## A 的保存路径在 `build_profile()` 之前调用。没有这一步，写出来的档案
+## `layout_confirmed` 永远是 false，复用门会把它拒之门外。
+func mark_layout_confirmed() -> void:
+	_layout_confirmed = true
+
+
+func layout_confirmed() -> bool:
+	return _layout_confirmed
+
+
 ## 量程就绪：当前轴对的两根轴，长窗口峰峰值都 ≥ RANGE_READY。
 ## 没到只表示「还没推到底」，页面显示提示；本方法不改变任何状态。
 func range_ready() -> bool:
@@ -191,6 +233,12 @@ func range_ready() -> bool:
 	if pair == PAIR_NONE:
 		return false
 	return axis_span(pair.x) >= RANGE_READY and axis_span(pair.y) >= RANGE_READY
+
+
+## 能不能写档案：量程真的推满了才允许。没有轴对、或任何一根轴的峰峰值没到门槛，
+## 都返回 false —— 04-09 的真机就是在这里放行了一次 `scale=1.0` 的「默认校准」。
+func can_save() -> bool:
+	return range_ready()
 
 
 ## 中点 = (min + max) / 2，量程半宽 = (max - min) / 2，都取当前轴对的长窗口。
@@ -266,10 +314,14 @@ func recent_range(axis: int) -> float:
 ## 构造 per-device 档案。**只在用户按 A 时由界面调用** —— 自动识别结果必须先显示在
 ## 屏幕上（轴对、符号、量程），由人确认之后才落盘（INPUT-04 / T-04-18）。
 ##
+## 量程没推满时返回 **null**：默认校准（scale=1.0 / center=0）不是校准，写进去之后
+## 复用门会把它当成「这台手柄已经校准过」，下次启动直接进练习，圆点与手柄对不上。
+## 界面必须在 A 分支先问 `can_save()`，拿到 null 只能提示、不能落盘。
+##
 ## 没有轴对时 rs 索引写 -1：这份档案不可用，界面也不该走到这里（A 分支会先拦下）。
-## 量程为 0（一次都没推）时按 1.0 使用：宁可写「未校准的原始值」，
-## 也不写一份 `Calibration.from_dict` 必然拒绝、进而让 `load_all()` 丢掉整个文件的档案。
 func build_profile(device_name: String, device_guid: String, now_iso: String) -> DeviceProfile:
+	if not can_save():
+		return null
 	var profile := DeviceProfile.new()
 	profile.profile_id = PROFILE_ID
 	profile.device_name = device_name
@@ -309,10 +361,10 @@ func build_profile(device_name: String, device_guid: String, now_iso: String) ->
 		"trigger_rest": [trigger_rest(TRIGGER_AXES[0]), trigger_rest(TRIGGER_AXES[1])],
 		"range_ready": range_ready(),
 	}
-	profile.layout = _layout_for(device_name)
-	# 本页没有布局选择步骤：认得出品牌就按品牌存，认不出按 Xbox 存。
-	# 空布局会让练习屏直接显示「布局未确认，请返回引导重选」，而引导屏已经不是首启路径。
-	profile.layout_confirmed = true
+	# 布局必须在同一页上由人确认（Start 切换、A 确认）。`_layout_confirmed` 只有
+	# `mark_layout_confirmed()` 能置位，所以 build_profile 自己永远不会写 true。
+	profile.layout = layout_cycle(device_name)
+	profile.layout_confirmed = _layout_confirmed
 	profile.button_index_ok = true
 	profile.probed_at_iso = now_iso
 	return profile
@@ -360,8 +412,9 @@ func _usable_scale(value: float) -> float:
 	return minf(value, 1.0)
 
 
-## 品牌识别失败时按 Xbox 存：安卓上绝大多数手柄走 XInput 映射，键名只是屏幕提示；
-## 存空布局却会让练习屏进入「布局未确认」的死角，而这一版没有布局选择步骤。
+## 品牌识别失败时按 Xbox 建议：安卓上绝大多数手柄走 XInput 映射，键名只是屏幕提示；
+## 空布局却会让练习屏进入「布局未确认」的死角。识别成功只是**建议值**，用户仍可
+## 用 Start 切换、按 A 确认 —— 这里不写档案，也不代表已确认。
 func _layout_for(device_name: String) -> StringName:
 	var suggested := DeviceProfile.suggest_layout(device_name)
 	if suggested != &"":

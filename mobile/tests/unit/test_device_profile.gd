@@ -307,6 +307,7 @@ func _check_profile_schema(r) -> void:
 
 func _check_reuse_gate(r) -> void:
 	var profile := _legal_profile()
+	r.check(profile.can_enter_practice(), "完整档案（标记 + 合理校准 + 已确认布局）→ 可进练习")
 	r.check(profile.can_reuse(2, -1, 3, -1), "四值逐项相等 → 可复用")
 	r.check(not profile.can_reuse(2, 1, 3, -1),
 		"同名手柄 + rs_x_sign 反了 → 拒绝（绝不部分应用）")
@@ -318,7 +319,36 @@ func _check_reuse_gate(r) -> void:
 	var bare := DeviceProfile.new()
 	r.check(not bare.can_reuse(2, -1, 3, -1), "axes 为 null → 拒绝")
 
-	# 复用门的范围：只比四项 index+sign。校准完全不同仍然可复用（整份采用档案里的校准）。
+	# 04-11 的档案自洽门：旧档案 / 默认校准 / 越界中点都必须被拒，而不是靠四项比较。
+	var legacy := _legal_profile()
+	legacy.quality = {"up": {"samples": 31, "margin": 0.72, "separation": 6.1}}
+	r.check(not legacy.can_enter_practice(), "旧档案缺 quality.range_ready → 拒绝")
+	r.check(not legacy.can_reuse(2, -1, 3, -1), "旧档案缺标记时 can_reuse 也为 false")
+
+	var not_ready := _legal_profile()
+	not_ready.quality = {"range_ready": false, "span_x": 1.0, "span_y": 1.0}
+	r.check(not not_ready.can_reuse(2, -1, 3, -1),
+		"range_ready=false（量程没推满就保存）→ 拒绝")
+
+	var legacy_default := _legal_profile()
+	legacy_default.calibration = Calibration.new()
+	legacy_default.quality = {}
+	r.check(not legacy_default.can_enter_practice(),
+		"旧档案（默认校准 + 无 range_ready 标记）→ 拒绝")
+
+	var narrow := _legal_profile()
+	narrow.calibration.scale_x = 0.2
+	r.check(not narrow.can_enter_practice(), "半量程 0.2 < Calibration.MIN_SCALE → 拒绝")
+
+	var off_center := _legal_profile()
+	off_center.calibration.center_x = 0.8
+	r.check(not off_center.can_enter_practice(), "中点 0.8 越界 → 拒绝")
+
+	var unconfirmed := _legal_profile()
+	unconfirmed.layout_confirmed = false
+	r.check(not unconfirmed.can_enter_practice(), "布局未确认 → 拒绝")
+
+	# 复用门的范围：只比四项 index+sign，校准数值不参与（但必须落在合理区间）。
 	var recalibrated := _legal_profile()
 	recalibrated.calibration = Calibration.new()
 	recalibrated.calibration.center_x = 0.30
@@ -326,7 +356,7 @@ func _check_reuse_gate(r) -> void:
 	recalibrated.calibration.scale_x = 0.55
 	recalibrated.calibration.scale_y = 0.60
 	r.check(recalibrated.can_reuse(2, -1, 3, -1),
-		"同轴同符号但校准完全不同 → 仍可复用（复用门只比四项）")
+		"同轴同符号、校准不同但仍合理 → 可复用（门看档案自洽，不比校准数值）")
 
 
 func _check_angle_seam(r) -> void:
@@ -463,7 +493,7 @@ func _legal_profile() -> DeviceProfile:
 	profile.calibration.center_y = -0.003
 	profile.calibration.scale_x = 0.98
 	profile.calibration.scale_y = 0.97
-	profile.quality = {"up": {"samples": 31, "margin": 0.72, "separation": 6.1}}
+	profile.quality = {"range_ready": true, "up": {"samples": 31, "margin": 0.72, "separation": 6.1}}
 	profile.layout = DeviceProfile.LAYOUT_XBOX
 	profile.layout_confirmed = true
 	profile.button_index_ok = true

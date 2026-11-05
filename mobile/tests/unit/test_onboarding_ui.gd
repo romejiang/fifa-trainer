@@ -13,9 +13,14 @@ extends RefCounted
 ##   1. 探针屏的人话（`live_readout` / `plain_rejection` / `cross_check_plain` / `stop_message`）；
 ##   2. 诊断覆盖层的两页格式（`format_profiles` / `format_events`）与行宽上限；
 ##   3. 覆盖层不产判定的机械证明（`set_layout_confirmed(false)` → 零 Outcome）。
+##
+## 04-11 追加第四组：设置页与覆盖层的**按键语义**。X / Y 曾经与练习手势撞车并在真机上
+## 误翻了符号，所以「X / Y 返回无动作」必须是一条无头可断言的机械事实，而不是靠人记得
+## 不要在两处写分支。
 
 const ONBOARDING := preload("res://src/ui/onboarding_screen.gd")
 const DIAGNOSTICS := preload("res://src/ui/diagnostics_overlay.gd")
+const INPUT_SETUP := preload("res://src/ui/input_setup_screen.gd")
 
 ## 8 根轴的空读数：与 onboarding_screen 的 AXIS_COUNT 同宽。
 const AXIS_COUNT := 8
@@ -32,6 +37,9 @@ func run(r) -> void:
 	_check_diagnostics_events(r)
 	_check_diagnostics_line_width(r)
 	_check_overlay_produces_no_outcome(r)
+	_check_setup_key_map(r)
+	_check_setup_texts(r)
+	_check_overlay_key_map(r)
 	r.complete()
 
 
@@ -213,6 +221,78 @@ func _check_overlay_produces_no_outcome(r) -> void:
 
 	runtime.set_layout_confirmed(true)
 	r.check(runtime.layout_confirmed, "关闭覆盖层后必须恢复布局确认")
+
+
+## 9. 设置页按键语义：X / Y 无动作；符号归十字键；布局归 Start。
+##
+## 这是 04-11 第一个真机缺陷的机械证明：X / Y 与「按住 RB 连按两下 X」的练习手势
+## 共用同一颗键，设置页里每按一次都会翻符号 —— 用户存下去的 X 就是反的。
+func _check_setup_key_map(r) -> void:
+	for index in [JoyButton.JOY_BUTTON_X, JoyButton.JOY_BUTTON_Y]:
+		r.check(INPUT_SETUP.action_for_button(index) == INPUT_SETUP.ACTION_NONE,
+			"X / Y（索引 %d）在设置页必须没有功能（实际 %s）" % [
+				index, String(INPUT_SETUP.action_for_button(index))])
+
+	r.check(INPUT_SETUP.action_for_button(JoyButton.JOY_BUTTON_DPAD_LEFT)
+		== INPUT_SETUP.ACTION_X_SIGN, "十字键左翻 X 符号")
+	r.check(INPUT_SETUP.action_for_button(JoyButton.JOY_BUTTON_DPAD_RIGHT)
+		== INPUT_SETUP.ACTION_X_SIGN, "十字键右翻 X 符号")
+	r.check(INPUT_SETUP.action_for_button(JoyButton.JOY_BUTTON_DPAD_UP)
+		== INPUT_SETUP.ACTION_Y_SIGN, "十字键上翻 Y 符号")
+	r.check(INPUT_SETUP.action_for_button(JoyButton.JOY_BUTTON_DPAD_DOWN)
+		== INPUT_SETUP.ACTION_Y_SIGN, "十字键下翻 Y 符号")
+	r.check(INPUT_SETUP.action_for_button(JoyButton.JOY_BUTTON_START)
+		== INPUT_SETUP.ACTION_LAYOUT, "Start 切布局")
+	r.check(INPUT_SETUP.action_for_button(JoyButton.JOY_BUTTON_A)
+		== INPUT_SETUP.ACTION_SAVE, "A 保存")
+	r.check(INPUT_SETUP.action_for_button(JoyButton.JOY_BUTTON_B)
+		== INPUT_SETUP.ACTION_CLEAR, "B 清空")
+	r.check(INPUT_SETUP.action_for_button(JoyButton.JOY_BUTTON_LEFT_SHOULDER)
+		== INPUT_SETUP.ACTION_PAIR_PREV, "LB 上一对轴")
+	r.check(INPUT_SETUP.action_for_button(JoyButton.JOY_BUTTON_RIGHT_SHOULDER)
+		== INPUT_SETUP.ACTION_PAIR_NEXT, "RB 下一对轴")
+	r.check(INPUT_SETUP.action_for_button(JoyButton.JOY_BUTTON_BACK)
+		== INPUT_SETUP.ACTION_NONE, "未分配的键（Back）必须无动作")
+
+
+## 10. 设置页文案：布局行逐字给出「按 Start 切换，按 A 确认」；符号提示不再指向 X/Y。
+func _check_setup_texts(r) -> void:
+	var xbox := INPUT_SETUP.layout_text(DeviceProfile.LAYOUT_XBOX)
+	r.check(xbox == "布局：Xbox（按 Start 切换，按 A 确认）",
+		"Xbox 布局行必须逐字一致（实际 %s）" % xbox)
+	var playstation := INPUT_SETUP.layout_text(DeviceProfile.LAYOUT_PLAYSTATION)
+	r.check(playstation.contains("布局：PlayStation"),
+		"PlayStation 布局行必须点名 PlayStation（实际 %s）" % playstation)
+	r.check(playstation.contains("按 Start 切换，按 A 确认"),
+		"两种布局行都必须带同一句操作提示（实际 %s）" % playstation)
+
+	var signs := INPUT_SETUP.signs_text(1, -1)
+	r.check(signs.contains("十字键左右翻"), "符号提示必须指向十字键左右（实际 %s）" % signs)
+	r.check(signs.contains("十字键上下翻"), "符号提示必须指向十字键上下（实际 %s）" % signs)
+	r.check(not signs.contains("按 X 切换"),
+		"符号提示不得再把 X 当翻转键（实际 %s）" % signs)
+	r.check(not signs.contains("按 Y 切换"),
+		"符号提示不得再把 Y 当翻转键（实际 %s）" % signs)
+	r.check(INPUT_SETUP.RANGE_NOT_READY_HELP.contains("量程还没推满"),
+		"量程未满的提示必须说「量程还没推满」")
+	r.check(INPUT_SETUP.RANGE_NOT_READY_HELP.contains("四个方向"),
+		"量程未满的提示必须告诉用户往四个方向推")
+
+
+## 11. 覆盖层按键语义：十字键翻页、Y 清除档案，其余无动作。
+func _check_overlay_key_map(r) -> void:
+	r.check(DIAGNOSTICS.action_for_button(JoyButton.JOY_BUTTON_DPAD_LEFT)
+		== DIAGNOSTICS.ACTION_PREV, "覆盖层十字键左翻到上一页")
+	r.check(DIAGNOSTICS.action_for_button(JoyButton.JOY_BUTTON_DPAD_RIGHT)
+		== DIAGNOSTICS.ACTION_NEXT, "覆盖层十字键右翻到下一页")
+	r.check(DIAGNOSTICS.action_for_button(JoyButton.JOY_BUTTON_Y)
+		== DIAGNOSTICS.ACTION_CLEAR, "覆盖层 Y 清除档案")
+	for index in [JoyButton.JOY_BUTTON_A, JoyButton.JOY_BUTTON_B,
+			JoyButton.JOY_BUTTON_X, JoyButton.JOY_BUTTON_START]:
+		r.check(DIAGNOSTICS.action_for_button(index) == DIAGNOSTICS.ACTION_NONE,
+			"覆盖层里 A/B/X/Start（索引 %d）必须无动作" % index)
+	r.check(ProfileStore.PROFILES_PATH == "user://profiles/controllers.json",
+		"清除动作只针对这一份档案路径（实际 %s）" % ProfileStore.PROFILES_PATH)
 
 
 ## 一条合成的绿色搓射：参数与真实配置一致，只为这一段服务。

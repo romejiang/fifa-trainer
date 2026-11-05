@@ -1,6 +1,6 @@
 extends Control
 
-## D1/D2 的**证据出口**：一页零交互、零判定、只读的诊断文本，靠
+## D1/D2 的**证据出口**：一页零判定、只读的诊断文本，靠
 ## `adb exec-out screencap -p` 拍照取证。
 ##
 ## 为什么需要它：release APK 不可调试（`run-as: package not debuggable`），
@@ -9,9 +9,11 @@ extends Control
 ## 是唯一一条既不需要 debuggable 构建、也不需要第二只手柄的出口。
 ##
 ## 三条硬约束：
-##   1. **只读，不删档。** 读的是 `ProfileStore.PROFILES_PATH` 的**原始字节**，
+##   1. **正常渲染不写、不删。** 读的是 `ProfileStore.PROFILES_PATH` 的**原始字节**，
 ##      绝不调用 `ProfileStore.load_all()` —— 那个函数对损坏文件会删档，而损坏的
 ##      文件正是要拍下来的证据。解析失败就显示「解析失败」，不补默认值冒充真档案。
+##      **唯一的写操作是用户按 Y 清除档案**（04-11）：调 `ProfileStore.clear()`，
+##      只删 `user://profiles/controllers.json` 这一个文件，然后发信号回设置页。
 ##   2. **零 Outcome。** 覆盖层自身不推进任何判定：组合根在打开时把运行时的布局
 ##      确认置为 false（静默 `abandon()` 并清空未取走的结果），覆盖层可见期间
 ##      `_process` 早退、不 tick 运行时。屏幕上出现的判定只能来自真实尝试。
@@ -21,6 +23,9 @@ extends Control
 ## 排版：22 px（调试面字号，正式屏不得引用），每行不超过 `MAX_LINE_CHARS` 个字符。
 ## `autowrap_mode = 0` 意味着超宽的行会被**直接裁掉**，截图证据就少一半 —— 「每行
 ## 不超宽」不是审美要求，是取证要求，`test_onboarding_ui` 逐行断言它。
+
+## 用户按 Y 清除档案成功之后通知组合根：关闭覆盖层、回到设置页。
+signal profile_cleared
 
 const PAGE_PROFILES := 0
 const PAGE_EVENTS := 1
@@ -34,12 +39,21 @@ const REFRESH_SECONDS := 1.0
 const RAW_PREVIEW_CHARS := 160
 const RAW_PREVIEW_SPLIT := 80
 
+## 按键语义：十字键左右翻页、Y 清除档案。其余索引一律无动作。
+const ACTION_PREV := &"prev"
+const ACTION_NEXT := &"next"
+const ACTION_CLEAR := &"clear"
+const ACTION_NONE := &""
+
 @onready var _panel: Label = %Panel
 
 var _page: int = 0
 var _accum: float = 0.0
 var _buffer: PadStateBuffer = null
 var _sampler: PadSampler = null
+## 档案的唯一 I/O 入口由组合根注入；为 null 时清除动作返回 `ERR_UNCONFIGURED`，
+## 绝不自己 `new` 一个指向默认路径的实例再删 —— 那样测试与真实路径会分叉。
+var _store: ProfileStore = null
 var _cached_raw: String = ""
 var _cached_trigger: Dictionary = {}
 
@@ -49,9 +63,12 @@ func _ready() -> void:
 
 
 ## 依赖唯一入口。组合根在 `add_child()` 之后调用 —— 此时 `@onready` 已经解析。
-func setup(p_buffer: PadStateBuffer, p_sampler: PadSampler) -> void:
+## `p_store` 是 Y 清除档案的唯一 I/O 入口；不传时覆盖层仍然只读，Y 会返回错误码。
+func setup(p_buffer: PadStateBuffer, p_sampler: PadSampler,
+		p_store: ProfileStore = null) -> void:
 	_buffer = p_buffer
 	_sampler = p_sampler
+	_store = p_store
 	_page = PAGE_PROFILES
 	refresh()
 
@@ -68,6 +85,49 @@ func next_page() -> void:
 func prev_page() -> void:
 	_page = posmod(_page - 1, PAGE_COUNT)
 	refresh()
+
+
+## 覆盖层的按键语义（纯函数，套件直接断言）：十字键左右翻页，Y 清除档案。
+## 其余按键一律返回 `ACTION_NONE` —— 覆盖层可见时组合根会把所有边沿送进来。
+static func action_for_button(index: int) -> StringName:
+	match index:
+		JoyButton.JOY_BUTTON_DPAD_LEFT:
+			return ACTION_PREV
+		JoyButton.JOY_BUTTON_DPAD_RIGHT:
+			return ACTION_NEXT
+		JoyButton.JOY_BUTTON_Y:
+			return ACTION_CLEAR
+	return ACTION_NONE
+
+
+## 组合根在覆盖层可见期间调用的唯一入口。X / A / B 等没有语义 —— 覆盖层不做判定，
+## 也不把按键转发给设置页或练习屏。
+func handle_button(index: int) -> void:
+	match action_for_button(index):
+		ACTION_PREV:
+			prev_page()
+		ACTION_NEXT:
+			next_page()
+		ACTION_CLEAR:
+			clear_profile()
+
+
+## Y：删掉整份输入档案并通知组合根回到设置页。
+##
+## 失败时**不**发信号：留在覆盖层上，档案页仍然显示原文件，用户可以再按一次。
+## 失败只打一行 ASCII 日志（`PROFILE_CLEAR_ERROR`），不猜测原因、不重试。
+func clear_profile() -> Error:
+	if _store == null:
+		return ERR_UNCONFIGURED
+	var err := _store.clear()
+	if err != OK:
+		print("PROFILE_CLEAR_ERROR code=%d" % err)
+		return err
+	_cached_raw = ""
+	_cached_trigger = {}
+	refresh()
+	profile_cleared.emit()
+	return OK
 
 
 ## 重新读一次原始档案并重画当前页。

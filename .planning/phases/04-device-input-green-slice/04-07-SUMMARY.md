@@ -39,7 +39,7 @@ attempt_2:
   commits: 1
   plan_head_before: acd4590ac1e121752acfa6cf2b6decbe77c8396a
   plan_head_after: 6b9dc4514eaa1461e505823b98e50741c21a33e5
-  status: blocked
+  status: complete
   root_cause: "probe rest baseline sampled while trigger axes still reported 0.000; they later jumped to real rest -1.000, so every 300 ms window reads two axes moved by 1.0 -> margin 0.000 -> ambiguous_axes"
 
 tech-stack:
@@ -336,3 +336,12 @@ None — 本计划未安装任何依赖；手机与手柄由用户提供，`adb`
 - 尝试一的 4 张截图 + install/run-as 文本 + `d0-logcat.txt`、尝试二的 `D0-install.txt` + `D0-evidence.txt` + `logcat-godot.txt` + 3 张截屏均存在于 `mobile/build/`（gitignored）并在表中点名
 - 新 APK 的 `apksigner` 输出 `certificate SHA-256 digest: e1841a17…32e046` 与 `BUILD.md` 第六节逐字一致；`stat -f %z` = `27046027`
 - 成功标准 2/3/4/5 未被勾选：`REQUIREMENTS.md` 与 `ROADMAP.md` 未做任何完成标记
+
+
+## 第三次尝试（2026-11-06）—— 单页设置通过
+
+- 包 27,079,510 B（证书不变），单页输入设置：`pair=2/3 sign=1/1 ready=1 span=2.00/2.00 layout=xbox confirmed=1`。
+- D1 档案：`rs_x=(2,-1) rs_y=(3,1) lt=(4,rest=0.000) rt=(5,rest=-1.000)`。
+- D4/D5：输入日志 7 次（458/501/560 → ok；209/200 → too_fast；928/718 → too_slow），屏幕 `成功 3 / 8`。
+- D2 换手柄拒绝面：只有一只 Xbox，**未测**；成功标准 3 记为部分验证（用户接受）。
+- 左摇杆 `ls_x/ls_y` 仍未映射（Phase 5 的 relative_to_ls 需要）。

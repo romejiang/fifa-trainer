@@ -15,10 +15,10 @@ extends Control
 ##   * `TapRuntime.tick()` 只在练习屏可见时推进 —— 输入设置页零 Outcome 的机械保证
 ##     （运行时另有 `layout_confirmed` 硬门，两层都在）。
 ##
-## 复用：启动时若本设备（guid 优先）已有档案、且结构可用（rs 映射齐全 + 校准存在 +
-## 有布局）→ 直接进练习；否则显示输入设置页。没有「先探一次再逐项比较」的窗口 ——
-## 那正是被用户否掉的分步流程。四项 index+sign 的复用门仍在 `DeviceProfile.can_reuse`
-## 里，供将来重新引入「探一次」的界面使用，本文件不再驱动它。
+## 复用：启动时若本设备（guid 优先）已有档案、且 `DeviceProfile.can_enter_practice()`
+## 为真（rs 映射齐全 + 校准合理 + 布局已确认 + `quality.range_ready` 标记）→ 直接进练习；
+## 否则显示输入设置页。04-09 / 04-10 在量程没推满时保存的「默认校准」档案没有这个标记，
+## 因此会被丢弃、设置页重新出现 —— 这是 04-11 的第二个真机缺陷修法。
 ##
 ## 时间单位：`Frame.now` 是**秒**（`Time.get_ticks_usec()` 除以一百万），与
 ## `TapDetector` / `TapRuntime` 的 `* 1000.0` 换算一致。`PadSampler` 的
@@ -39,6 +39,8 @@ const DIAGNOSTICS_SCENE := preload("res://src/ui/diagnostics_overlay.tscn")
 ## 换轴对（输入设置屏对「两键同时按住」另有一道守卫，见 `handle_button`）。
 const DIAGNOSTICS_CHORD_SECONDS := 0.8
 const DIAGNOSTICS_CHORD_BUTTONS: Array[int] = [9, 10]
+## 练习屏按住 B 这么久就回设置页。B 不参与绿色搓射，不会和判定冲突。
+const BACK_HOLD_SECONDS := 1.0
 
 
 @onready var _config_error: Label = %ConfigError
@@ -57,6 +59,8 @@ var _diagnostics = null
 ## 组合键已经按住多久、本轮是否已经触发过（按住不放只开一次，不会来回抖）。
 var _chord_hold: float = 0.0
 var _chord_latched: bool = false
+## 练习屏按住 B 的累计秒数。
+var _back_hold: float = 0.0
 ## 打开覆盖层前的布局确认值；关闭时原样恢复。
 var _layout_was_confirmed: bool = false
 
@@ -121,11 +125,22 @@ func _process(delta: float) -> void:
 	# 「组合键进行中」置位，边沿分派才会跳过它们。
 	_tick_diagnostics_chord(delta)
 	if _diagnostics != null and _diagnostics.visible:
-		# 覆盖层可见期间：只翻页，不 tick 运行时、不分派按键、不推进判定。
+		# 覆盖层可见期间：只处理它自己的按键（十字键翻页 / Y 清除档案），
+		# 不 tick 运行时、不把边沿转发给设置页、不推进判定。
 		_flush_diagnostics_edges()
 		_diagnostics.call("tick", delta)
 		return
 	_flush_button_edges()
+	# 练习屏返回：按住 B 一秒。读的是当前按住状态，不是边沿 —— 松开即清零。
+	if _in_practice:
+		if bool(_sampler.buffer.pressed_dict().has("B")):
+			_back_hold += delta
+			if _back_hold >= BACK_HOLD_SECONDS:
+				_back_hold = 0.0
+				_leave_practice()
+				return
+		else:
+			_back_hold = 0.0
 	_log_diagnostics(delta)
 	if not _in_practice:
 		# 输入设置页零 Outcome：连 `tick()` 都不调用。运行时的 `layout_confirmed`
@@ -161,11 +176,14 @@ func _build_practice_screen() -> void:
 
 ## 实例化诊断覆盖层。**必须排在最后**：同一个父节点下后加的子节点画在上面，
 ## 否则诊断文本会被别的屏盖住，screencap 取证就白拍了。
+##
+## 档案 store 一起注入：覆盖层按 Y 时调 `ProfileStore.clear()`，只删那一份文件。
 func _build_diagnostics() -> void:
 	_diagnostics = DIAGNOSTICS_SCENE.instantiate()
 	add_child(_diagnostics)
 	_diagnostics.visible = false
-	_diagnostics.call("setup", _sampler.buffer, _sampler)
+	_diagnostics.connect("profile_cleared", _on_profile_cleared)
+	_diagnostics.call("setup", _sampler.buffer, _sampler, _profile_store)
 
 
 ## 组合键计时。读的是**当前按住状态**，不是边沿数组。
@@ -206,7 +224,9 @@ func _close_diagnostics() -> void:
 	_seen_edges = _sampler.buffer.button_edges().size()
 
 
-## 覆盖层可见期间的边沿消费者：只认十字键左 / 右（13 / 14）翻页，其余一律丢弃。
+## 覆盖层可见期间的边沿消费者：所有按下的边沿都交给覆盖层自己的 `handle_button`。
+## 键位语义只有一处定义（覆盖层的 `action_for_button`）：十字键左右翻页、Y 清除档案，
+## 其余无动作 —— 组合根不再维护第二份 match。
 func _flush_diagnostics_edges() -> void:
 	var edges: Array = _sampler.buffer.button_edges()
 	var total := edges.size()
@@ -216,12 +236,24 @@ func _flush_diagnostics_edges() -> void:
 		var edge: Dictionary = edges[position]
 		if not bool(edge.get("pressed", false)):
 			continue
-		match int(edge["index"]):
-			13:
-				_diagnostics.call("prev_page")
-			14:
-				_diagnostics.call("next_page")
+		_diagnostics.call("handle_button", int(edge["index"]))
 	_seen_edges = total
+
+
+## 覆盖层按 Y 清除档案之后的唯一后续动作：关覆盖层、退出练习、回到设置页。
+##
+## 不清 `_profile_store` 实例（它只是路径句柄），但把 `_reuse_checked` 置为真：
+## 文件已经删了，即使下次设备列表变化也不需要再试一次复用 —— 用户此刻应该在
+## 设置页上重新推摇杆，而不是被自动带回练习。
+func _on_profile_cleared() -> void:
+	_diagnostics.visible = false
+	_layout_was_confirmed = false
+	_leave_practice()
+	if _setup != null:
+		_setup.visible = true
+		_setup.call("reset_stats")
+	_reuse_checked = true
+	_seen_edges = _sampler.buffer.button_edges().size()
 
 
 ## 1 Hz 诊断日志：D5 / D6 的抄录来源（adb logcat -s godot:I）。
@@ -302,6 +334,7 @@ func _leave_practice() -> void:
 	if _setup == null or _practice == null:
 		return
 	_in_practice = false
+	_back_hold = 0.0
 	_runtime.set_layout_confirmed(false)
 	_practice.visible = false
 	_practice_container.visible = false
@@ -309,11 +342,11 @@ func _leave_practice() -> void:
 	_seen_edges = _sampler.buffer.button_edges().size()
 
 
-## 复用：本设备已有档案且结构可用 → 直接进练习。
+## 复用：本设备已有档案且**档案自洽** → 直接进练习。
 ##
-## 只判「结构可用」而不逐项比较四项 index+sign：没有探针就没有「本次观测值」，
-## 拿档案自己的值去比自己是假绿。`DeviceProfile.can_reuse` 的四项比较仍在，
-## 留给将来重新引入「探一次」的界面（那是 04-05 的 REUSE_CHECK，本计划不驱动它）。
+## 只判档案自身能否用（`DeviceProfile.can_enter_practice()`），不在启动时逐项比较
+## 四项 index+sign：没有探针就没有「本次观测值」，拿档案自己的值去比自己是假绿。
+## 四项比较仍在 `can_reuse()` 里，留给将来重新引入「探一次」的界面。
 func _try_reuse_profile() -> void:
 	if _reuse_checked or _in_practice or _sampler.buffer.device < 0:
 		return
@@ -326,8 +359,9 @@ func _try_reuse_profile() -> void:
 
 
 func _profile_usable(profile: DeviceProfile) -> bool:
-	return profile != null and profile.axes != null and profile.axes.has_rs() \
-		and profile.calibration != null and profile.layout != &""
+	if profile == null:
+		return false
+	return profile.can_enter_practice()
 
 
 ## 设备列表信号与主动播种共用的唯一回调体。

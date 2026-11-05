@@ -490,6 +490,10 @@ func build_profile() -> DeviceProfile:
 	profile.calibration.scale_x = _scale.x
 	profile.calibration.scale_y = _scale.y
 	profile.quality = quality.duplicate(true)
+	# 这条流程的中点是实测、量程是按满行程采的；`can_enter_practice()` 用这个标记
+	# 区分「真的校准过」与 04-09 写出的默认校准。缺了它，本类自己产出的档案会被
+	# 自己的复用门拒绝（04-11 的档案自洽门）。
+	profile.quality["range_ready"] = true
 	profile.layout = layout
 	profile.layout_confirmed = true
 	profile.button_index_ok = button_index_ok

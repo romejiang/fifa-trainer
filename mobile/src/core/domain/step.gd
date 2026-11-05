@@ -20,3 +20,12 @@ func _init(p_angles: Array[float] = [], p_hold_ms := 0.0) -> void:
 	# 浅拷贝足够：Array[float] 的元素是值类型。
 	angles = p_angles.duplicate()
 	hold_ms = p_hold_ms
+
+
+## 与 config.py:162-163 的 `Step.label()` 逐字一致：多方向步用 "/" 连接。
+## 例：[90.0, 270.0] -> 「右/左」；顺序与配置里的书写顺序一致，不排序。
+func label() -> String:
+	var parts := PackedStringArray()
+	for angle in angles:
+		parts.append(DirectionTable.direction_name(angle))
+	return "/".join(parts)

@@ -1,19 +1,20 @@
 ---
 gsd_state_version: "1.0"
-current_phase: 4
-current_phase_name: 设备输入层 + 绿色搓射竖切
+current_phase: 5
+current_phase_name: 全动作判定对等性 — 三类检测器 + 引擎仲裁 + 抽稀矩阵
+current_plan: 2
 status: executing
-stopped_at: 04-09 单页输入设置已交付（新 APK 27,067,065 B）— 首启不再有四步探针；D0–D6 仍待 04-07 用新包重走
-last_updated: "2026-11-05T16:36:26.519Z"
-last_activity: "2026-11-06 — 完成 quick task 261105-wi7：桌面版 UI 改为 design/desktop.html 的亮色风格（9d8dca9）"
+stopped_at: Completed 05-02-PLAN.md
+last_updated: "2026-11-06T02:30:00.000Z"
+last_activity: "2026-11-06 — 完成 quick task 261105-wi7（桌面版 UI 亮色改版）；05-02 变体配置完成"
 state_head: 9d8dca9767b923b3f62ce068cb4f0e9489464efa
 progress:
   total_phases: 10
-  completed_phases: 3
-  total_plans: 24
-  completed_plans: 24
-  percent: 32
-last_activity_desc: 04-09 完成：InputSetup 纯逻辑 + 一页式 input_setup_screen + 组合根换首启路径 + 重建 APK；扳机静止值改为观测最小值
+  completed_phases: 4
+  total_plans: 34
+  completed_plans: 27
+  percent: 40
+last_activity_desc: Phase 5 plan 02 complete — 6 条变体配置与 relative/absolute 反向对照；quick task 261105-wi7 完成桌面版 UI 亮色改版（高 DPI / 系统字体 / 照片 / 摇杆）
 ---
 
 # Project State
@@ -23,23 +24,25 @@ last_activity_desc: 04-09 完成：InputSetup 纯逻辑 + 一页式 input_setup_
 See: .planning/PROJECT.md (updated 2026-11-04)
 
 **Core value:** 用真手柄、在任何地方都能练，判定准、反馈看得懂。
-**Current focus:** Phase 4 — 设备输入层 + 绿色搓射竖切
+**Current focus:** Phase 5 — 全动作判定对等性 — 三类检测器 + 引擎仲裁 + 抽稀矩阵
 
 ## Current Position
 
-Phase: 4 (设备输入层 + 绿色搓射竖切) — 代码侧已收口，真机清单未闭合
-Plan: 9 of 9（04-01…04-06、04-08、04-09 完成；04-07 是 Wave 9 的真机走查，两次尝试都失败）
-Status: Blocked — 04-09 已把首启路径换成单页输入设置并重建 APK；等 04-07 用新包重走 D0–D6
-Last activity: 2026-11-06 — Completed quick task 261105-wi7: 桌面版 UI 改为 design/desktop.html 的亮色风格（9d8dca9）
+Current Plan: 2
+Total Plans in Phase: 7
+Phase: 5 (全动作判定对等性 — 三类检测器 + 引擎仲裁 + 抽稀矩阵) — EXECUTING
+Plan: 2 of 7
+Status: Executing Phase 5
+Last activity: 2026-11-06 — 05-02 完成：6 条变体配置与 relative/absolute 反向对照；随后完成 quick task 261105-wi7（桌面版亮色 UI）
 
-Progress: [███░░░░░░░] 32%
+Progress: [████░░░░░░] 40%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 18
+- Total plans completed: 27
 - Average duration: — min
-- Total execution time: 0.9 hours
+- Total execution time: 1.2 hours
 
 **By Phase:**
 
@@ -48,6 +51,7 @@ Progress: [███░░░░░░░] 32%
 | 1 | 5 | - | - |
 | 2 | 5 | - | - |
 | 3 | 6 | - | - |
+| 4 | 11 | - | - |
 
 **Recent Trend:**
 - Last 5 plans: —
@@ -82,6 +86,9 @@ Progress: [███░░░░░░░] 32%
 | Phase 4 P06 | 9min | 3 tasks | 16 files |
 | Phase 4 P08 | 34min | 5 tasks | 15 files |
 | Phase 4 P09 | 21min | 3 tasks | 14 files |
+| Phase 4 P10 | 13min | 2 tasks | 9 files |
+| Phase 4 P11 | 18min | 2 tasks | 16 files |
+| Phase 5 P01 | 14min | 3 tasks | 16 files |
 
 ## Accumulated Context
 
@@ -212,6 +219,12 @@ Recent decisions affecting current work:
 - [Phase 4]: 探针的 `rs_y` 只能来自「向下」步，禁止用「向上取反」推导；上下接线反了必须被 `validate_cross` 在探针阶段抓住
 - [Phase 4]: `evaluate_step` 返回有符号 `delta`；`validate_cross` 只消费 `axis/sign/separation`，不重算 —— 两边各写一份键名会在 `_check_evaluate_feeds_cross` 立刻变红
 - [Phase 4]: `low_separation`（separation < 3.0）是唯一且可达的 warning；`weak_step` 不可达，不写
+- [Phase 5]: 手势黄金夹具放 `mobile/tests/fixtures/gesture_golden.json` 而非 ROADMAP 写的 `shared/golden_vectors.json`：唯一消费者是 Godot，`shared/` 在 `res://` 之外读不到
+- [Phase 5]: 夹具的 `configs` 注册表存**完整**配置对象，每个用例只认 `configs[case.config]`；回放套件禁止回落到 `res://assets/config/` 的出厂副本，生成器用 `is` 身份比较确认
+- [Phase 5]: 检测器一律 `build_detector(skill)` / `DetectorFactory.build(skill)` 按 `skill.kind` 分派；生成器断言类名，套件用 2 arc / 2 sequence / 1 taps 三条点名检查兜底
+- [Phase 5]: `direction_name()` 的数字回落分支在参考实现里不可达（八向间隔 45°，最近卡点恒 ≤ 22.5°）；保留为死分支以维持逐行对等，`30°` 的真实结果是「前右」
+- [Phase 5]: `_assert_not_rounding_cliff` 在 `update()` 之前预演会被 `%.0f` 格式化的 `swept` / `end_rel`；踩单车语料因此选 0.72°/帧（500ms），避开 4.5° 刀口
+- [Phase 5]: 失败码只写数学可达的配置：油炸丸子不写 `too_fast`；`overshoot` / `wrong_direction` 出厂配置不可达，留给变体配置用例
 - [Phase 4]: 复用门只比较实测的四个 index+sign；`calibration.center/scale` 与探针 `rest` 不参与，同名不同映射必须 `can_reuse() == false`
 - [Phase 4]: `DeviceProfile.from_dict` 任一字段非法 → null + ConfigError，整份丢弃绝不部分恢复；`profile_id` 固定 "primary" 但字段与序列化必须存在
 - [Phase 4]: `suggest_layout` 认不出设备名返回空，调用方必须让用户二选一；绝不预选 Xbox
@@ -256,6 +269,15 @@ Recent decisions affecting current work:
 - [Phase 4]: 复用判据降级为「同 guid key + 结构可用（rs 齐全 + 校准存在 + 有布局）」：没有探针就没有本次观测的四项 index+sign，拿档案自己比自己等于假绿；四项比较仍留在 `DeviceProfile.can_reuse`，等重新引入「探一次」的界面再接回
 - [Phase 4]: 设置页写档案时 `scale = 0` 按 1.0 存（未校准直通），并用 `DeviceProfile.from_dict` 往返断言证明这份档案不会被 `load_all()` 整份丢弃；空设备名兜底为「未知手柄」
 - [Phase 4]: A 的两个前置（没有手柄 / 还没有轴对）只在 `%Help` 多一行提示，不切屏、不记失败、不清空已采数据 —— 那是「没有可保存的映射」，不是判定失败
+- [Phase 4]: 输入事件日志的唯一目的是「事后可回放」：每行都有毫秒时间戳，格式是纯函数（`format_button` / `format_axis`），套件逐字断言；不做实时面板、不做解析器
+- [Phase 4]: 日志写 `Android/data/<包名>/files/input_log.txt`（adb 可读，release 包不需要 `run-as`）并镜像 logcat `INPUT_EVT`；非 Android 平台退回 `user://`，避免桌面开发去 `/storage` 撞无关错误
+- [Phase 4]: 日志失败只记一次 `INPUT_LOG_ERROR` 并短路本会话写入：按钮边沿永不节流，轴按 `|Δ| < 0.02 且 < 16 ms` 节流；2 MB 轮转只丢最旧的一半
+- [Phase 4]: 04-11：X / Y 在设置页**彻底无功能** —— 它们与「按住 RB 连按两下 X」共用同一颗键，真机上还误翻了 X 符号；符号改十字键左右（X）/ 上下（Y），布局改 Start 切换、A 确认
+- [Phase 4]: 04-11：保存门写在数据源上 —— `InputSetup.can_save()` 为假时 `build_profile()` 返回 null；量程没推满时 A 只把 `%Help` 换成「量程还没推满…」，不写档案、不切屏
+- [Phase 4]: 04-11：`layout_confirmed` 只有一个置真入口 `mark_layout_confirmed()`（由 A 的保存路径调用）；`build_profile()` 自己永远不写 true，只切换布局不算确认
+- [Phase 4]: 04-11：旧档案失效靠写入时的事实标记 `quality.range_ready == true`；`DeviceProfile.can_enter_practice()` 把「rs 映射 + 校准半量程 ≥ 0.5 + 中点 ±0.5 + 布局已确认 + 标记」合成一扇门，`can_reuse()` 先过它再比四项
+- [Phase 4]: 04-11：默认 `scale=1.0 / center=0` 与「真的推到 ±1.0」在数值上不可区分，所以不能靠校准数值识别默认校准 —— 只能靠保存时量程是否真的推满
+- [Phase 4]: 04-11：诊断覆盖层按 Y 调 `ProfileStore.clear()`（只删 `user://profiles/controllers.json`、不存在视为成功、`res://` 返回 ERR_UNAUTHORIZED）并发信号回设置页；覆盖层从「只读」变为「正常渲染只读，唯一例外是 Y 清除」
 
 ### Pending Todos
 
@@ -265,7 +287,9 @@ None yet.
 
 - **Phase 4 真机清单 D0 失败（04-07 Task 2，checkpoint:human-verify / blocking-human）— 尝试一（旧包 27,012,856 B）**：手机 Motorola XT2175-2 / Android 12（`ZY22F5FXX9`），D0 在探针重试循环失败：`两轴同时动了：margin 0.001 < 0.25`（20:15:38）/ `上与右落在同一根轴（2/2）`（20:15:46）/ `上下没有互为反号：上 (轴 2, 符号 -1)、下 (轴 3, 符号 1)`（20:18:22）；20:15:50 出现停止屏「没有收到摇杆事件（events_motion = 1931）」。D1–D6 未执行；成功标准 2/3/4/5 均不得勾选。
 - **Phase 4 真机清单 D0 仍然失败 — 尝试二（新包 27,046,027 B，04-08 重建）**：干净卸载后安装成功（`versionName=0.1.0`，`lastUpdateTime=2026-11-05 21:19:05`，证书 `e1841a17…32e046` 不变），D0 卡在探针第 1/4 步「上」：`PAD_AXIS i=4/i=5` 在 21:22:32.677 报 `v=0.000`，21:22:54.846 变成 `v=-1.000`（真实静止值）；静止基线按 0 记 → 每窗口 `margin 0.000 < 0.25` → 57 行 `PROBE_REJECT code=ambiguous_axes key=up soft=1`。用户按 B 重来、重新推右摇杆均无效，要求「换一种检测方式或跳过」。D1–D6 未执行；成功标准 2/3/4/5 仍未闭合。**04-09 已修**：整条探针链被单页输入设置替换，`trigger_rest = min`，扳机跳变不再参与轴对识别；新包 27,067,065 B（证书不变），待 04-07 用新包重走。
-- **04-09 交付后的待办（04-07）**：先 `adb uninstall com.fifaskill.trainer` → `adb install -r mobile/build/fifa-trainer.apk`（27,067,065 B）。新 D0 只有 8 步（ACCEPTANCE §6「本次待验收」）：看轴表 → 推圆点 → X/Y 翻符号 → 推到底 → A 保存 → 练习屏；证据多一条 `adb logcat -s godot:I | grep INPUT_SETUP`（每秒一行 axis pair / sign / span / rest）。成功标准 2/3/4/5 仍未勾选。
+- **04-11 交付后的待办（04-07，最新包）**：先 `adb uninstall com.fifaskill.trainer` → `adb install -r mobile/build/fifa-trainer.apk`（**27,079,510 B**，证书 `e1841a17…32e046` 不变，`gate-b.sh` 全绿）。D0 按 `ACCEPTANCE.md` §6「D0 操作说明（04-11）」的 11 步走：X/Y **不应**改变符号（改十字键）、量程未满按 A 应停在设置页、布局行必须 `布局：Xbox（按 Start 切换，按 A 确认）`、覆盖层按 Y 应删档回设置页。`INPUT_SETUP` 每秒一行现在带 `layout=` / `confirmed=`。成功标准 2/3/4/5 仍未勾选。
+- **04-10 的验收待办（历史，包已被 04-11 取代）**：`InputLog` 写入 `/sdcard/Android/data/com.fifaskill.trainer/files/input_log.txt` 并镜像 logcat `adb logcat -s godot:I | grep INPUT_EVT`；新包仍包含同一套日志，读取命令不变
+- **04-09 的验收待办（历史，包已被 04-10 / 04-11 取代）**：单页输入设置 8 步；符号由 X/Y 翻转的说明已过时，04-11 起改十字键
 - **D1/D2 的 `run-as` 通道不可用（已绕过，不是已解决）**：release APK 不可调试，`adb shell run-as com.fifaskill.trainer …` 返回 `run-as: package not debuggable`。04-08 增加屏上诊断覆盖层，D1/D2 的证据改为「LB+RB 打开覆盖层 + `adb exec-out screencap`」；但覆盖层**只读**，D2 拒绝面所需的「改写外层 key」仍然做不到
 - **用户已决定保留四步探针（2026-11-05，本条关闭）**：用户否决单屏输入检测，改为「保留四步探针、只修 UX」；04-08 按此执行（实时读数 / 两次软重试 / 纯语言文案 / 增量停止屏）。原 blocker 与 04-07 的记录保留为历史
 - **D2 缺第二只手柄**：现场只有 Xbox Series X Controller（`getevent -pl` 仅列出 `Xbox Wireless Controller`）；拒绝面（DualSense 或另一只轴映射不同的手柄）未执行，成功标准 3 不得声称完整
@@ -298,6 +322,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-11-05T13:58:00.000Z
-Stopped at: 04-09 完成 —— 首启路径换成一页式输入设置（`InputSetup` + `input_setup_screen`），组合根不再驱动 `OnboardingFlow`，扳机静止值改为观测最小值；新 APK 27,067,065 B（证书 `e1841a17…32e046` 不变）。D0–D6 待 04-07 用新包重走，成功标准 2/3/4/5 仍未闭合
+Last session: 2026-11-05T18:20:00.000Z
+Stopped at: Completed 05-01-PLAN.md
 Resume file: None
