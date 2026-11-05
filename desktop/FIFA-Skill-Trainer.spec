@@ -5,7 +5,7 @@ a = Analysis(
     ['app.py'],
     pathex=[],
     binaries=[],
-    datas=[],
+    datas=[('padskills/assets', 'padskills/assets')],
     hiddenimports=['pygame._sdl2.controller', 'padskills.xinput_source'],
     hookspath=[],
     hooksconfig={},

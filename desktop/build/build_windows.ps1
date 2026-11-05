@@ -20,6 +20,7 @@ uv run pyinstaller `
     --hidden-import pygame._sdl2.controller `
     --hidden-import padskills.xinput_source `
     --exclude-module XInput `
+    --add-data "padskills\assets;padskills\assets" `
     app.py
 
 if ($LASTEXITCODE -ne 0) {

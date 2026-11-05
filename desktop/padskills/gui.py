@@ -179,6 +179,23 @@ def find_cjk_font() -> Optional[str]:
     return None
 
 
+def _asset_path(name: str) -> Optional[Path]:
+    """定位随包发布的图片：源码运行、PyInstaller onefile/onedir 都能找。"""
+    roots = [Path(__file__).resolve().parent / "assets"]
+    meipass = getattr(sys, "_MEIPASS", None)
+    if meipass:
+        roots.append(Path(meipass) / "padskills" / "assets")
+    exe_dir = Path(sys.executable).resolve().parent
+    roots.append(exe_dir / "padskills" / "assets")
+    # macOS .app：PyInstaller 的 datas 默认落在 Contents/Resources
+    roots.append(exe_dir.parent / "Resources" / "padskills" / "assets")
+    for root in roots:
+        path = root / name
+        if path.exists():
+            return path
+    return None
+
+
 class FontBook:
     """按字号缓存字体对象。"""
 
@@ -1565,59 +1582,6 @@ class TrainerApp:
         self.pg.draw.line(self.screen, color, (cx, cy),
                           (cx + r * 0.42, cy + r * 0.30), 1)
 
-    def _football_surface(self, radius: int):
-        """黑白足球贴图：4 倍分辨率绘制后缩小，边缘比直接画圆更干净。"""
-        r = max(10, int(radius))
-        key = ("football", r)
-
-        def make():
-            scale = 4
-            size = r * 2
-            hi = self.pg.Surface((size * scale, size * scale),
-                                 self.pg.SRCALPHA)
-            cx = cy = size * scale // 2
-            rr = r * scale
-            white = (255, 255, 255)
-            black = (29, 29, 31)
-
-            def pentagon(px: float, py: float, pr: float, rot: float):
-                pts = []
-                for i in range(5):
-                    ang = math.radians(rot + i * 72)
-                    pts.append((px + math.cos(ang) * pr,
-                                py + math.sin(ang) * pr))
-                return pts
-
-            self.pg.draw.circle(hi, white, (cx, cy), rr)
-            self.pg.draw.circle(hi, black, (cx, cy), rr, max(1, scale * 2))
-
-            # 中心黑五边形 + 外圈五块黑斑，黑白相间才像足球
-            self.pg.draw.polygon(hi, black, pentagon(cx, cy, rr * 0.34, -90))
-            outer = []
-            for i in range(5):
-                ang = math.radians(-90 + i * 72)
-                px = cx + math.cos(ang) * rr * 0.66
-                py = cy + math.sin(ang) * rr * 0.66
-                outer.append((px, py))
-                self.pg.draw.polygon(
-                    hi, black, pentagon(px, py, rr * 0.24, -90 + i * 72 + 36))
-
-            # 接缝：中心五边形 -> 外圈黑斑 -> 球缘
-            for i, (px, py) in enumerate(outer):
-                ang = math.radians(-90 + i * 72)
-                vx = cx + math.cos(ang) * rr * 0.34
-                vy = cy + math.sin(ang) * rr * 0.34
-                self.pg.draw.line(hi, black, (vx, vy), (px, py),
-                                  max(1, scale))
-                edge = math.atan2(py - cy, px - cx)
-                self.pg.draw.line(
-                    hi, black, (px, py),
-                    (cx + math.cos(edge) * rr * 0.98,
-                     cy + math.sin(edge) * rr * 0.98), max(1, scale))
-
-            return self.pg.transform.smoothscale(hi, (size, size))
-        return self._cached(key, make)
-
     def _icon_warning(self, cx: float, cy: float, size: float, color) -> None:
         """警告三角线框图标：三角 + 感叹号。"""
         r = size / 2.0
@@ -1765,12 +1729,30 @@ class TrainerApp:
             return surf
         return self._cached(key, make)
 
-    def _header_surface(self):
-        """顶栏底稿：白→浅青渐变 + 程序化青色 Hero + 底部绿→青强调线。
+    def _hero_photo(self):
+        """顶栏右侧的球场照片；文件缺失或解码失败时返回 None。"""
+        key = ("hero-photo",)
 
-        半透明光带必须画在独立的 overlay 上再正常 blit。直接往 SRCALPHA
-        表面上画半透明图形会把该像素的 alpha 覆盖成低值，等于在 Hero 上
-        "打穿"一个洞，看起来就是刺眼的白色三角。
+        def make():
+            path = _asset_path("hero_pitch.jpg")
+            if path is None:
+                return False
+            try:
+                img = self.pg.image.load(str(path))
+                try:
+                    img = img.convert()
+                except Exception:
+                    pass
+                return img
+            except Exception:
+                return False
+        return self._cached(key, make) or None
+
+    def _header_surface(self):
+        """顶栏底稿：白→浅青渐变 + 右侧球场照片 + 底部绿→青强调线。
+
+        照片只铺到计时胶囊左侧（约 80% 的 Hero 宽），避免足球被白色
+        胶囊盖住；照片缺失时退回程序化青色光带，不在顶栏留白块。
         """
         w, h = W - 2 * MARGIN_X, HEADER_H
         key = ("header", w, h)
@@ -1782,43 +1764,58 @@ class TrainerApp:
                                          x / max(1, w - 1))
                 self.pg.draw.line(surf, color, (x, 0), (x, h))
 
-            # 右侧约 66% 宽的程序化 Hero：纵向青色渐变
             hero_w = int(w * 0.66)
             hero = self.pg.Surface((hero_w, h), self.pg.SRCALPHA)
-            for y in range(h):
-                color = self._lerp_color((44, 181, 232), CYAN,
-                                         y / max(1, h - 1))
-                self.pg.draw.line(hero, color, (0, y), (hero_w, y))
+            photo = self._hero_photo()
+            if photo is not None:
+                photo_w = int(hero_w * 0.80)
+                iw, ih = photo.get_size()
+                scale = max(photo_w / iw, h / ih)
+                sw = max(1, int(iw * scale + 0.5))
+                sh = max(1, int(ih * scale + 0.5))
+                scaled = self.pg.transform.smoothscale(photo, (sw, sh))
+                panel = self.pg.Surface((photo_w, h), self.pg.SRCALPHA)
+                panel.blit(scaled, (-max(0, (sw - photo_w) // 2),
+                                    -max(0, (sh - h) // 2)))
+                # 右缘 16px 淡出，照片不会在计时胶囊左边留下硬切口
+                rfade = self.pg.Surface((photo_w, h), self.pg.SRCALPHA)
+                for x in range(photo_w):
+                    t = (1.0 if x <= photo_w - 16
+                         else (photo_w - x) / 16.0)
+                    alpha = int(255 * max(0.0, min(1.0, t)))
+                    self.pg.draw.line(rfade, (255, 255, 255, alpha),
+                                      (x, 0), (x, h))
+                panel.blit(rfade, (0, 0),
+                           special_flags=self.pg.BLEND_RGBA_MULT)
+                hero.blit(panel, (0, 0))
+            else:
+                # 兜底：程序化青色渐变 + 柔和斜向光带（不画球）
+                for y in range(h):
+                    color = self._lerp_color((44, 181, 232), CYAN,
+                                             y / max(1, h - 1))
+                    self.pg.draw.line(hero, color, (0, y), (hero_w, y))
+                glow = self.pg.Surface((hero_w, h), self.pg.SRCALPHA)
+                for fx, peak, band_w in ((0.26, 26, 84), (0.48, 20, 120),
+                                         (0.72, 24, 68)):
+                    band = self.pg.Surface((band_w, h * 2),
+                                           self.pg.SRCALPHA)
+                    for x in range(band_w):
+                        t = 1.0 - abs(x - band_w / 2.0) / (band_w / 2.0)
+                        alpha = int(peak * max(0.0, t) ** 1.4)
+                        if alpha > 0:
+                            self.pg.draw.line(
+                                band, (255, 255, 255, alpha),
+                                (x, 0), (x, band.get_height()))
+                    band = self.pg.transform.rotate(band, -22)
+                    glow.blit(band,
+                              (int(hero_w * fx) - band.get_width() // 2,
+                               -band.get_height() // 3))
+                hero.blit(glow, (0, 0))
 
-            glow = self.pg.Surface((hero_w, h), self.pg.SRCALPHA)
-            # 三条柔和斜向光带：中间亮、两侧透明，旋转后没有硬边
-            for fx, peak, band_w in ((0.26, 26, 84), (0.48, 20, 120),
-                                     (0.72, 24, 68)):
-                band = self.pg.Surface((band_w, h * 2), self.pg.SRCALPHA)
-                for x in range(band_w):
-                    t = 1.0 - abs(x - band_w / 2.0) / (band_w / 2.0)
-                    alpha = int(peak * max(0.0, t) ** 1.4)
-                    if alpha > 0:
-                        self.pg.draw.line(band, (255, 255, 255, alpha),
-                                          (x, 0), (x, band.get_height()))
-                band = self.pg.transform.rotate(band, -22)
-                glow.blit(band, (int(hero_w * fx) - band.get_width() // 2,
-                                 -band.get_height() // 3))
-
-            # 黑白足球：先在 overlay 上垫一圈白光，再贴实心黑白球
-            bx, by, br = hero_w - 190, int(h * 0.52), 46
-            for pad, alpha in ((16, 16), (9, 26), (2, 38)):
-                self.pg.draw.circle(glow, (255, 255, 255, alpha),
-                                    (bx, by), br + pad)
-
-            hero.blit(glow, (0, 0))
-            ball = self._football_surface(br)
-            hero.blit(ball, (bx - br, by - br))
-
-            # 左侧柔和淡入：Hero 从 5% 处开始出现，35% 处完全实心
+            # 左侧柔和淡入：照片从 2% 处开始出现，18% 处完全实心
             fade = self.pg.Surface((hero_w, h), self.pg.SRCALPHA)
             for x in range(hero_w):
-                t = (x / max(1, hero_w) - 0.05) / 0.35
+                t = (x / max(1, hero_w) - 0.02) / 0.18
                 alpha = int(255 * (0.0 if t < 0.0 else 1.0 if t > 1.0 else t))
                 self.pg.draw.line(fade, (255, 255, 255, alpha), (x, 0),
                                   (x, h))

@@ -22,6 +22,7 @@ uv run pyinstaller \
     --osx-bundle-identifier com.fifaskill.trainer \
     --hidden-import pygame._sdl2.controller \
     --exclude-module XInput \
+    --add-data "padskills/assets:padskills/assets" \
     app.py
 
 app="dist/FIFA Skill Trainer.app"
