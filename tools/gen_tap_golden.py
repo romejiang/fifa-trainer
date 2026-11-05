@@ -26,6 +26,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import io
 import json
 import sys
 from pathlib import Path
@@ -35,7 +36,9 @@ sys.path.insert(0, str(_REPO_ROOT / "desktop"))
 
 from padskills.config import parse_config  # noqa: E402
 from padskills.detectors import Frame, TapDetector  # noqa: E402
-from padskills.input_source import PadState, canonical_button  # noqa: E402
+from padskills.engine import Engine  # noqa: E402
+from padskills.input_source import GamepadSource, PadState, canonical_button  # noqa: E402
+from padskills.rumble import RumbleEngine  # noqa: E402
 
 STEP_MS = 4
 HZ = 250
@@ -245,6 +248,158 @@ CASES = (
 )
 
 
+# 运行时用例：驱动 `Engine._tick`（不是 `Engine.run()` —— 那是 250 Hz 墙钟循环）。
+#
+# 右摇杆恒回中是本阶段移动端的范围收缩，正好让 Python 引擎的手势锁在
+# `gesture_release_ms`（150 ms）后自动解锁；rt_gesture_lock / rt_release_hold_rearm
+# 依赖这一条。所有变化点与结束时刻都必须落在 4 ms 网格上（552 / 556 / 680 / 700 /
+# 900 / 1352 都能被 4 整除），不允许出现 550 / 554 / 698 / 1350 这类偏离网格的写法。
+#
+# rt_gesture_lock 的时间线推导（用它说明「锁被写漏必然偏离 2 条」）：
+#   552 命中 → 556 松 X，锁从这一帧起算 → 708 是 556+150=706 之后的首个网格帧，解锁；
+#   680 / 700 那段「第一下 + 20ms 后第二下」因为在锁定期内，检测器完全没看到；
+#   解锁后检测器才第一次看到 X 已松开，重新武装要 120 ms（828）；
+#   合法一发在 900 / 1352（间隔 452），恰好 2 条 ok。
+#   若锁被写漏：556 起算的松开到 676 就重新武装，680 的按下会建立 _t0，
+#   700 的第二下间隔 20ms 必然多出一条 too_fast。
+RUNTIME_CASES = (
+    # 1. 两发，每发内两下 X 间隔 500 ms，发与发之间留 700 ms 空档。
+    {
+        "id": "rt_two_shots_500",
+        "end_ms": 1820,
+        "changes": (
+            (0, ()),
+            (4, ("RB",)),
+            (100, ("RB", "X")),
+            (104, ("RB",)),
+            (600, ("RB", "X")),
+            (604, ("RB",)),
+            (1304, ("RB", "X")),
+            (1308, ("RB",)),
+            (1804, ("RB", "X")),
+            (1808, ("RB",)),
+        ),
+    },
+    # 2. 发与发之间留 1000 ms 空档：成功标准 5 的「快速连做两次」上界。
+    {
+        "id": "rt_two_shots_1000",
+        "end_ms": 2120,
+        "changes": (
+            (0, ()),
+            (4, ("RB",)),
+            (100, ("RB", "X")),
+            (104, ("RB",)),
+            (600, ("RB", "X")),
+            (604, ("RB",)),
+            (1604, ("RB", "X")),
+            (1608, ("RB",)),
+            (2104, ("RB", "X")),
+            (2108, ("RB",)),
+        ),
+    },
+    # 3. 手势锁：锁定期内一段「本来会报 too_fast」的按压不许产出第三条判定。
+    {
+        "id": "rt_gesture_lock",
+        "end_ms": 1372,
+        "changes": (
+            (0, ()),
+            (4, ("RB",)),
+            (100, ("RB", "X")),
+            (104, ("RB",)),
+            (552, ("RB", "X")),
+            (556, ("RB",)),
+            (680, ("RB", "X")),
+            (684, ("RB",)),
+            (700, ("RB", "X")),
+            (704, ("RB",)),
+            (900, ("RB", "X")),
+            (904, ("RB",)),
+            (1352, ("RB", "X")),
+            (1356, ("RB",)),
+        ),
+    },
+    # 4. 重新武装：「锁满前」与「锁满后但未武装」各一次 rising 按压都被挡住，
+    #    之后再做一发合法 400–600。这条只证明重新武装，手势锁由第 3 条单独证明。
+    {
+        "id": "rt_release_hold_rearm",
+        "end_ms": 1520,
+        "changes": (
+            (0, ()),
+            (4, ("RB",)),
+            (100, ("RB", "X")),
+            (104, ("RB",)),
+            (552, ("RB", "X")),
+            (556, ("RB",)),
+            (680, ("RB", "X")),
+            (684, ("RB",)),
+            (800, ("RB", "X")),
+            (804, ("RB",)),
+            (1000, ("RB", "X")),
+            (1004, ("RB",)),
+            (1500, ("RB", "X")),
+            (1504, ("RB",)),
+        ),
+    },
+    # 5. 一次尝试只一条判定：第一下之后松开 RB → 恰好一条 hold_short，
+    #    其后的 20 帧（300→380）不许再冒出第二条。
+    {
+        "id": "rt_one_verdict_per_attempt",
+        "end_ms": 380,
+        "changes": (
+            (0, ()),
+            (4, ("RB",)),
+            (100, ("RB", "X")),
+            (104, ("RB",)),
+            (300, ("X",)),
+        ),
+    },
+    # 6. 布局硬门：移动端独有结构，期望**直接写空**（Python 引擎没有这个概念，
+    #    它的时间线本来会命中一次 448ms，伪称来自参考实现就是造假）。
+    {
+        "id": "rt_layout_gate_blocks",
+        "layout_confirmed": False,
+        "end_ms": 560,
+        "changes": (
+            (0, ()),
+            (4, ("RB",)),
+            (100, ("RB", "X")),
+            (104, ("RB",)),
+            (548, ("RB", "X")),
+            (552, ("RB",)),
+        ),
+    },
+)
+
+# 两个分支各有一条 reachable 的合成时序在 GDScript 侧（不占夹具）：
+# 真实配置的 450 ms 下，手势锁 150 + 重新武装 120 + 最短间隔 400 = 670 ms，
+# 所以「第二发命中在第一发后 670~870 ms」必然先越过逐动作冷却 450，却还没到
+# global_cooldown_ms = 1000。同一段时间线换 cooldown_ms = 900 就落到逐动作分支。
+
+
+class _NullSource(GamepadSource):
+    """只用于构造引擎；生成器直接手工喂 `_tick`，`poll()` 永不被调用。"""
+
+    name = "空手柄"
+    layout_source = "测试"
+
+    def poll(self) -> PadState:
+        return PadState()
+
+
+class _CollectingEngine(Engine):
+    """把**全部** Outcome 收集起来；只看 `last_outcome` 会漏掉中间结果。"""
+
+    collected: list
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.collected = []
+
+    def _record(self, active, ok, code, message, elapsed_ms, now, detail=""):
+        super()._record(active, ok, code, message, elapsed_ms, now, detail)
+        self.collected.append(self.last_outcome)
+
+
 def repo_root() -> Path:
     """仓库根目录：以脚本位置（tools/ 的上一级）为锚，不依赖调用方的 cwd。"""
     return _REPO_ROOT
@@ -258,10 +413,17 @@ def _sha256(root: Path, rel: Path) -> str:
     return hashlib.sha256((root / rel).read_bytes()).hexdigest()
 
 
-def _load_skill(root: Path):
-    """从唯一真源加载绿色搓射：不写第二份配置副本。"""
+def _load_config(root: Path):
+    """从唯一真源加载整份配置：不写第二份配置副本。
+
+    runtime 用例要用到 `global_cooldown_ms` 与 `input.gesture_release_ms`，
+    所以这里返回 AppConfig，而不是只挑出 Skill。
+    """
     data = json.loads((root / CONFIG_REL).read_text(encoding="utf-8"))
-    cfg = parse_config(data, root / CONFIG_REL)
+    return parse_config(data, root / CONFIG_REL)
+
+
+def _pick_skill(cfg):
     for skill in cfg.skills:
         if skill.name == SKILL_NAME:
             return skill
@@ -388,9 +550,86 @@ def _case_payload(case: dict, skill) -> dict:
     return payload
 
 
+def _drive_runtime(cfg, frames: list, case_id: str):
+    """用 `Engine._tick` 逐帧驱动参考引擎，收集**全部** Outcome 与 taps 计数。
+
+    不跑 `Engine.run()`：那是 250 Hz 墙钟循环，夹具需要的是确定性的注入时间轴。
+    """
+    # out 指向 StringIO：Engine 每次命中都会 _write 一行「✓ 绿色搓射…」，
+    # 生成器只需要夹具字节，不要在 --check 的输出里刷屏。
+    engine = _CollectingEngine(
+        cfg, _NullSource(), RumbleEngine(None, enabled=False), out=io.StringIO()
+    )
+    # counters 只从**唯一**的 taps 动作读。真实配置把绿色搓射排在 skills 最后
+    # （index 4），`engine.skills[0]` 是马赛回旋（arc）；按下标取会让
+    # rt_two_shots_500 期望 hits=2 而实际读到 0。
+    tap_actives = [a for a in engine.skills if a.skill.kind == "taps"]
+    if len(tap_actives) != 1:
+        raise SystemExit(
+            f"✗ {case_id}: 运行时夹具需要唯一的 taps 动作，实际 {len(tap_actives)} 个"
+        )
+    active = tap_actives[0]
+
+    for t_ms, label in frames:
+        buttons = frozenset(part for part in label.split("+") if part)
+        # rs_x / rs_y 恒为 0：右摇杆恒回中是移动端本阶段的收缩，正好让 Python 的
+        # 手势锁在 gesture_release_ms 后自动解锁。
+        engine._tick(t_ms / 1000.0, PadState(buttons=buttons))
+
+    outcomes = [
+        {
+            "ok": outcome.ok,
+            "code": outcome.code,
+            "elapsed_ms": _normalize_elapsed_ms(outcome.elapsed_ms, case_id, "Outcome"),
+            "message": outcome.message,
+            "detail": outcome.detail,
+        }
+        for outcome in engine.collected
+    ]
+    counters = {
+        "hits": active.hits,
+        "attempts": active.attempts,
+        "group_hits": active.group_hits,
+        "groups_done": active.groups_done,
+        "suppressed": engine.suppressed,
+    }
+    return outcomes, counters
+
+
+def _runtime_case_payload(case: dict, cfg) -> dict:
+    case_id = case["id"]
+    frames = _build_frames(case)
+    payload = {"id": case_id, "kind": "runtime", "frames": frames}
+    confirmed = bool(case.get("layout_confirmed", True))
+    if confirmed:
+        outcomes, counters = _drive_runtime(cfg, frames, case_id)
+    else:
+        # 布局硬门是移动端独有的结构：Python 引擎没有这个分支，它的时间线本来
+        # 会命中一次 448ms。期望直接写空，不伪称来自参考实现。
+        payload["layout_confirmed"] = False
+        outcomes = []
+        counters = {
+            "hits": 0,
+            "attempts": 0,
+            "group_hits": 0,
+            "groups_done": 0,
+            "suppressed": 0,
+        }
+    payload["expect"] = {"outcomes": outcomes, "counters": counters}
+    return payload
+
+
 def build_payload(root: Path) -> dict:
     """按 Python 参考实现逐用例推导夹具内容（纯计算，不写盘）。"""
-    skill = _load_skill(root)
+    cfg = _load_config(root)
+    skill = _pick_skill(cfg)
+    detector_cases = [_case_payload(case, skill) for case in CASES]
+    runtime_cases = [_runtime_case_payload(case, cfg) for case in RUNTIME_CASES]
+    seen: set[str] = set()
+    for payload in detector_cases + runtime_cases:
+        if payload["id"] in seen:
+            raise SystemExit(f"✗ 夹具 id 重复：{payload['id']}")
+        seen.add(payload["id"])
     return {
         "schema_version": 1,
         "source": {
@@ -398,7 +637,7 @@ def build_payload(root: Path) -> dict:
             "sha256": {name: _sha256(root, rel) for name, rel in SOURCE_RELS.items()},
         },
         "meta": {"hz": HZ, "step_ms": STEP_MS, "skill": skill.name},
-        "cases": [_case_payload(case, skill) for case in CASES],
+        "cases": detector_cases + runtime_cases,
     }
 
 
@@ -461,9 +700,11 @@ def check(root: Path) -> int:
         )
         return 1
     payload = build_payload(root)
+    detector_count = sum(1 for case in payload["cases"] if case["kind"] == "detector")
+    runtime_count = sum(1 for case in payload["cases"] if case["kind"] == "runtime")
     print(
         "✓ tap 黄金夹具与 Python 参考一致"
-        f"（detector {len(payload['cases'])} 条）"
+        f"（detector {detector_count} 条、runtime {runtime_count} 条）"
     )
     return 0
 

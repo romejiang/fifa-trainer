@@ -157,4 +157,14 @@ if ! grep -qE '^TAP_GOLDEN_DETECTOR cases=[1-9][0-9]* mismatches=0$' "$tmp/tests
 fi
 echo "✓ tap 黄金回放：$(grep -E '^TAP_GOLDEN_DETECTOR ' "$tmp/tests.log")"
 
-echo "✓ 核心闸门通过：配置一致、边界干净、黄金未漂移、tap 回放一致、核心套件全绿"
+# 运行时回放的正向哨兵：与 detector 分开，12 条检测器用例不能替 6 条运行时用例作证。
+# cases 的阈值就是套件自己的断言条数（6），手删 runtime 用例会让套件先红，
+# 这里再兜一层：哨兵缺失或 mismatches 非 0 都判红。
+if ! grep -qE '^TAP_GOLDEN_RUNTIME cases=[1-9][0-9]* mismatches=0$' "$tmp/tests.log"; then
+    echo "✗ 没有 TAP_GOLDEN_RUNTIME cases=N mismatches=0（运行时期望未回放或跨语言判定有差异）" >&2
+    grep -E '^TAP_GOLDEN_RUNTIME ' "$tmp/tests.log" >&2 || true
+    exit 1
+fi
+echo "✓ tap 运行时回放：$(grep -E '^TAP_GOLDEN_RUNTIME ' "$tmp/tests.log")"
+
+echo "✓ 核心闸门通过：配置一致、边界干净、黄金未漂移、tap 回放一致、运行时判定一致、核心套件全绿"
