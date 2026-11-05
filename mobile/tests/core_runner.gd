@@ -52,6 +52,7 @@ const SUITES := {
 	"green_slice": preload("res://tests/unit/test_green_slice.gd"),
 	"models": preload("res://tests/unit/test_models.gd"),
 	"onboarding_flow": preload("res://tests/unit/test_onboarding_flow.gd"),
+	"onboarding_ui": preload("res://tests/unit/test_onboarding_ui.gd"),
 	"overlay_merge": preload("res://tests/unit/test_overlay_merge.gd"),
 	"pad_sampler": preload("res://tests/unit/test_pad_sampler.gd"),
 	"profile_store": preload("res://tests/unit/test_profile_store.gd"),

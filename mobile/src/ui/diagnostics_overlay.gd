@@ -105,7 +105,7 @@ func tick(delta: float) -> void:
 func _trigger_from_raw(raw: String) -> Dictionary:
 	if raw.is_empty() or _sampler == null:
 		return {}
-	var parsed: Variant = JSON.parse_string(raw)
+	var parsed: Variant = _parse(raw)
 	if typeof(parsed) != TYPE_DICTIONARY:
 		return {}
 	var root: Dictionary = parsed
@@ -157,7 +157,7 @@ static func page_text(page: int, raw: String, buffer: PadStateBuffer, in_tid: in
 static func format_profiles(raw: String) -> String:
 	if raw.is_empty():
 		return "档案：controllers.json 尚未生成（走完引导并进入练习后才会写入）"
-	var parsed: Variant = JSON.parse_string(raw)
+	var parsed: Variant = _parse(raw)
 	if typeof(parsed) != TYPE_DICTIONARY:
 		return _corrupt_text(raw)
 	var root: Dictionary = parsed
@@ -304,6 +304,18 @@ static func _dict(value: Variant) -> Dictionary:
 	if typeof(value) == TYPE_DICTIONARY:
 		return value
 	return {}
+
+
+## JSON 解析的唯一入口。
+##
+## 用 `JSON.new().parse()` 而不是 `JSON.parse_string()`：后者解析失败时会自己
+## `ERR_PRINT`（"Parse JSON failed"），而坏档案是**预期路径**（D1 要拍的就是它），
+## 不该在 logcat 里制造一行看起来像崩溃的错误。这里只返回 null，由调用方决定显示什么。
+static func _parse(raw: String) -> Variant:
+	var json := JSON.new()
+	if json.parse(raw) != OK:
+		return null
+	return json.data
 
 
 static func _text(entry: Dictionary, key: String, fallback: String) -> String:
