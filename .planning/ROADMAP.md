@@ -134,7 +134,7 @@ Decimal phases appear between their surrounding integers in numeric order.
   4. 布局建议（Xbox / PlayStation）自动给出，但必须用户按键确认后才进入练习，未确认不前进一步
   5. 在真机上做一次绿色搓射，屏幕产出且仅产出一次判定并显示成功或失败原因；快速连做两次得到两次独立判定（事件流保住了帧内反转）
 
-**Plans**: 10 plans, 10 waves
+**Plans**: 11 plans, 11 waves
 **Wave 1**
 - [x] 04-01-PLAN.md — tap 检测器逐行移植 + Python 生成黄金夹具 + `TAP_GOLDEN_DETECTOR` 哨兵（成功标准 1）(completed 2026-11-05)
 
@@ -163,12 +163,16 @@ Decimal phases appear between their surrounding integers in numeric order.
       — **2026-11-05 04-08 已交付新包**：`mobile/build/fifa-trainer.apk`（27,046,027 字节，证书 `e1841a17…32e046` 不变，v2 验签通过，只含 arm64）。D1/D2 改走「LB+RB 打开诊断覆盖层 + `adb exec-out screencap`」，不再需要 `run-as`；D2 拒绝面因缺第二只手柄仍记为未执行。**重走 D0–D6 前必须先卸载重装这个新包**
       — **2026-11-05 04-09 已把首启路径换成单页输入设置**（`InputSetup` + `input_setup_screen`，组合根不再驱动 `OnboardingFlow`；`trigger_rest = min`）。新包 **27,067,065 B**（证书不变）。下一次走查先卸载重装这个包，D0 只有 8 步，见 `ACCEPTANCE.md` §6「D0 操作说明」
       — **2026-11-05 04-10 已加输入事件日志**：按键边沿与轴变化写入 `/sdcard/Android/data/com.fifaskill.trainer/files/input_log.txt` 并镜像 logcat `INPUT_EVT`，`adb exec-out cat` 可直接回放；新包 **27,071,318 B**（证书不变）。D0 操作与 04-09 相同，下一次走查用这个包
+      — **2026-11-05 04-11 已修三个真机缺陷**：X/Y 退出设置页（与练习手势撞车、误翻 X 符号）、A 在量程未满时不再保存默认校准、布局必须由 Start 切换并由 A 确认；诊断覆盖层按 Y 可删档回设置页。新包 **27,079,510 B**（证书不变）。下一次走查请卸载重装这个包，D0 按 `ACCEPTANCE.md` §6「D0 操作说明（04-11）」的 11 步走
 
 **Wave 9** *(blocked on Wave 8 completion)*
 - [x] 04-09-PLAN.md — 单页输入设置：`InputSetup` 纯逻辑（轴对 / 符号 / 中点 / 量程 / 扳机 rest=min）+ 一页式屏 + 组合根切换 + 第 17 套件 + 重建 APK (completed 2026-11-05)
 
 **Wave 10** *(blocked on Wave 9 completion)*
 - [x] 04-10-PLAN.md — `InputLog` 输入事件日志（按键边沿 + 轴节流，文件 2 MB 轮转 + logcat `INPUT_EVT`）+ `PadSampler` 接线 + 会话头 + 第 18 套件 + 重建 APK (completed 2026-11-05)
+
+**Wave 11** *(blocked on Wave 10 completion)*
+- [x] 04-11-PLAN.md — 设置页保存门（量程未满 `build_profile` 返回 null）+ 布局 Start/A 确认 + 旧档案失效（`can_enter_practice` 四合一门）+ X/Y 退出设置页 + 诊断页 Y 清除档案 + 重建 APK (completed 2026-11-05)
 
 **UI hint**: yes
 
