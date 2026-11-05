@@ -132,6 +132,18 @@ _ADVICE = {
 # 中文字体
 # ---------------------------------------------------------------------------
 
+def _pingfang_paths() -> List[str]:
+    """macOS 的苹方可能以 MobileAsset 形式安装；不要在运行时用私有 UI 变体。"""
+    root = Path("/System/Library/AssetsV2")
+    if not root.exists():
+        return []
+    try:
+        return sorted(str(path) for path in root.glob(
+            "com_apple_MobileAsset_Font*/**/PingFang.ttc"))
+    except OSError:
+        return []
+
+
 def _font_files() -> List[str]:
     if sys.platform == "win32":
         return [
@@ -141,8 +153,7 @@ def _font_files() -> List[str]:
             r"C:\Windows\Fonts\simsun.ttc",
         ]
     if sys.platform == "darwin":
-        return [
-            "/System/Library/Fonts/PingFang.ttc",
+        return _pingfang_paths() + [
             "/System/Library/Fonts/Hiragino Sans GB.ttc",
             "/System/Library/Fonts/STHeiti Medium.ttc",
             "/Library/Fonts/Arial Unicode.ttf",
@@ -196,27 +207,169 @@ def _asset_path(name: str) -> Optional[Path]:
     return None
 
 
+def _first_existing(paths: List[str]) -> Optional[str]:
+    for path in paths:
+        if os.path.exists(path):
+            return path
+    return None
+
+
+def _ui_font_paths() -> Tuple[Optional[str], Optional[str], Optional[str]]:
+    """(常规主字体, 粗体主字体, 中文回退字体)。
+
+    macOS 用苹果默认的 SF Pro Text + 苹方；Windows 用微软雅黑；
+    Linux 用 Noto Sans CJK。主字体负责 ASCII，中文走回退字体。
+    """
+    if sys.platform == "darwin":
+        regular = _first_existing([
+            "/Library/Fonts/SF-Pro-Text-Regular.otf",
+            "/Library/Fonts/SF-Pro-Display-Regular.otf",
+            "/System/Library/Fonts/SFNS.ttf",
+            "/System/Library/Fonts/HelveticaNeue.ttc",
+        ])
+        bold = _first_existing([
+            "/Library/Fonts/SF-Pro-Text-Semibold.otf",
+            "/Library/Fonts/SF-Pro-Text-Bold.otf",
+            "/Library/Fonts/SF-Pro-Display-Semibold.otf",
+            "/System/Library/Fonts/SFNS.ttf",
+            "/System/Library/Fonts/HelveticaNeue.ttc",
+        ])
+        cjk = _first_existing(_pingfang_paths() + [
+            "/System/Library/Fonts/Hiragino Sans GB.ttc",
+            "/System/Library/Fonts/STHeiti Medium.ttc",
+            "/Library/Fonts/Arial Unicode.ttf",
+        ])
+        return regular, bold, cjk
+
+    if sys.platform == "win32":
+        regular = _first_existing([
+            r"C:\Windows\Fonts\msyh.ttc",
+            r"C:\Windows\Fonts\msyhbd.ttc",
+            r"C:\Windows\Fonts\simhei.ttf",
+            r"C:\Windows\Fonts\simsun.ttc",
+        ])
+        bold = _first_existing([
+            r"C:\Windows\Fonts\msyhbd.ttc",
+            r"C:\Windows\Fonts\msyh.ttc",
+            r"C:\Windows\Fonts\simhei.ttf",
+        ])
+        return regular, bold, regular
+
+    regular = _first_existing([
+        "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
+        "/usr/share/fonts/noto-cjk/NotoSansCJK-Regular.ttc",
+        "/usr/share/fonts/truetype/wqy/wqy-microhei.ttc",
+        "/usr/share/fonts/truetype/arphic/uming.ttc",
+    ])
+    return regular, regular, regular
+
+
+class _UiFont:
+    """ASCII 走主字体（SF Pro / 微软雅黑），中文走回退字体（苹方）。"""
+
+    def __init__(self, primary, fallback) -> None:
+        self.primary = primary
+        self.fallback = fallback
+        self.height = max(primary.get_height(), fallback.get_height()) + 2
+        self.ascent = max(primary.get_ascent(), fallback.get_ascent())
+
+    @staticmethod
+    def _is_ascii(ch: str) -> bool:
+        return ord(ch) < 128
+
+    def _runs(self, text: str) -> List[Tuple[bool, str]]:
+        runs: List[Tuple[bool, str]] = []
+        chars: List[str] = []
+        kind: Optional[bool] = None
+        for ch in text:
+            flag = self._is_ascii(ch)
+            if kind is not None and flag != kind:
+                runs.append((kind, "".join(chars)))
+                chars = []
+            kind = flag
+            chars.append(ch)
+        if chars and kind is not None:
+            runs.append((kind, "".join(chars)))
+        return runs
+
+    def _font(self, ascii_run: bool):
+        return self.primary if ascii_run else self.fallback
+
+    def size(self, text: str) -> Tuple[int, int]:
+        width = 0
+        for flag, run in self._runs(text):
+            width += self._font(flag).size(run)[0]
+        return width, self.height
+
+    def get_height(self) -> int:
+        return self.height
+
+    def get_ascent(self) -> int:
+        return self.ascent
+
+    def render(self, text: str, antialias: bool, color):
+        import pygame
+
+        if not text:
+            return pygame.Surface((1, 1), pygame.SRCALPHA)
+        parts = []
+        total = 0
+        for flag, run in self._runs(text):
+            font = self._font(flag)
+            part = font.render(run, antialias, color)
+            parts.append((part, font.get_ascent()))
+            total += part.get_width()
+        surf = pygame.Surface((max(1, total), max(1, self.height)),
+                              pygame.SRCALPHA)
+        x = 0
+        for part, ascent in parts:
+            surf.blit(part, (x, max(0, self.ascent - ascent)))
+            x += part.get_width()
+        return surf
+
+
 class FontBook:
-    """按字号缓存字体对象。"""
+    """按字号缓存字体对象；ASCII 与中文分别用对应平台的系统字体。"""
 
     def __init__(self) -> None:
-        self.path = find_cjk_font()
-        self.cjk_ok = self.path is not None
+        self.regular_path, self.bold_path, self.cjk_path = _ui_font_paths()
+        self.path = self.cjk_path or self.regular_path
+        self.cjk_ok = self.cjk_path is not None
         self._cache = {}
+
+    @staticmethod
+    def _load(path: Optional[str], px: int, synthetic_bold: bool):
+        import pygame
+
+        if path:
+            font = pygame.font.Font(path, px)
+        else:
+            font = pygame.font.SysFont(None, px)
+        if synthetic_bold:
+            font.set_bold(True)
+        return font
 
     def get(self, size: float, bold: bool = False):
         """按字号取字体；设计稿里的 .5 号字在这里四舍五入成像素。"""
-        import pygame
-
         px = max(6, int(size + 0.5))
         key = (px, bold)
         font = self._cache.get(key)
         if font is None:
-            if self.path:
-                font = pygame.font.Font(self.path, px)
+            if bold:
+                primary_path = self.bold_path or self.regular_path
+                synthetic = not self.bold_path
             else:
-                font = pygame.font.SysFont(None, px)
-            font.set_bold(bold)
+                primary_path = self.regular_path
+                synthetic = False
+            primary = self._load(primary_path, px, synthetic)
+            fallback_path = self.cjk_path or primary_path
+            fallback_synthetic = bold
+            if (bold and sys.platform == "win32" and self.bold_path
+                    and self.cjk_path == self.regular_path):
+                fallback_path = self.bold_path
+                fallback_synthetic = False
+            fallback = self._load(fallback_path, px, fallback_synthetic)
+            font = _UiFont(primary, fallback)
             self._cache[key] = font
         return font
 
@@ -387,6 +540,154 @@ def _build_rumble(cfg: AppConfig, source: GamepadSource) -> Tuple[RumbleEngine, 
 
 
 # ---------------------------------------------------------------------------
+# 高 DPI 绘制代理
+#
+# UI 代码全部按 960x660 的逻辑坐标写。Retina / 高 DPI 窗口拿到的真实绘制
+# 表面是 1920x1320；如果直接把 1x 画面交给系统放大，字和线就是一块一块的。
+# 这层代理只把「画到 self.screen 上」的坐标放大，命中区和布局仍保持 1x，
+# 所以鼠标点击、_focus_hits 等逻辑一行都不用改。
+# ---------------------------------------------------------------------------
+
+
+class _ScreenProxy:
+    """逻辑坐标（1x）到真实绘制表面的桥；scale 通常是 2。"""
+
+    __slots__ = ("real", "scale")
+
+    def __init__(self, surface, scale: float) -> None:
+        self.real = surface
+        self.scale = max(1.0, float(scale))
+
+    def blit(self, source, dest, *args, **kwargs):
+        s = self.scale
+        if hasattr(dest, "x"):
+            point = (int(dest.x * s), int(dest.y * s))
+        else:
+            point = (int(dest[0] * s), int(dest[1] * s))
+        return self.real.blit(source, point, *args, **kwargs)
+
+    def fill(self, color, rect=None, special_flags=0):
+        if rect is not None:
+            s = self.scale
+            if hasattr(rect, "x"):
+                rect = (int(rect.x * s), int(rect.y * s),
+                        int(rect.w * s), int(rect.h * s))
+            else:
+                rect = tuple(int(value * s) for value in rect)
+        return self.real.fill(color, rect, special_flags)
+
+    def get_size(self):
+        return (int(self.real.get_width() / self.scale),
+                int(self.real.get_height() / self.scale))
+
+    def get_width(self) -> int:
+        return self.get_size()[0]
+
+    def get_height(self) -> int:
+        return self.get_size()[1]
+
+    def get_rect(self, **kwargs):
+        rect = self.real.get_rect()
+        rect.width = self.get_width()
+        rect.height = self.get_height()
+        rect.x = 0
+        rect.y = 0
+        for key, value in kwargs.items():
+            setattr(rect, key, value)
+        return rect
+
+    def __getattr__(self, name):
+        return getattr(self.real, name)
+
+
+class _DrawProxy:
+    """把画在 _ScreenProxy 上的坐标/线宽放大；本地缓存表面保持原样。"""
+
+    __slots__ = ("owner", "real")
+
+    def __init__(self, owner, real_draw) -> None:
+        self.owner = owner
+        self.real = real_draw
+
+    def _scale(self, surface) -> float:
+        return surface.scale if isinstance(surface, _ScreenProxy) else 1.0
+
+    @staticmethod
+    def _surface(surface):
+        return surface.real if isinstance(surface, _ScreenProxy) else surface
+
+    @staticmethod
+    def _rect(rect, s: float):
+        if hasattr(rect, "x"):
+            return (int(rect.x * s), int(rect.y * s),
+                    int(rect.w * s), int(rect.h * s))
+        return (int(rect[0] * s), int(rect[1] * s),
+                int(rect[2] * s), int(rect[3] * s))
+
+    @staticmethod
+    def _pt(point, s: float):
+        return (int(point[0] * s), int(point[1] * s))
+
+    @staticmethod
+    def _pts(points, s: float):
+        return [(int(point[0] * s), int(point[1] * s)) for point in points]
+
+    @staticmethod
+    def _width(width, s: float) -> int:
+        return 0 if not width else max(1, int(round(width * s)))
+
+    def rect(self, surface, color, rect, width=0, border_radius=0, **kwargs):
+        s = self._scale(surface)
+        for key in list(kwargs):
+            if (key.startswith("border_") and key.endswith("_radius")
+                    and kwargs[key] not in (-1, 0)):
+                kwargs[key] = int(round(kwargs[key] * s))
+        return self.real.rect(
+            self._surface(surface), color, self._rect(rect, s),
+            width=self._width(width, s),
+            border_radius=int(round(border_radius * s)) if border_radius else 0,
+            **kwargs)
+
+    def circle(self, surface, color, center, radius, width=0, **kwargs):
+        s = self._scale(surface)
+        return self.real.circle(
+            self._surface(surface), color, self._pt(center, s),
+            max(1, int(round(radius * s))), width=self._width(width, s),
+            **kwargs)
+
+    def line(self, surface, color, start_pos, end_pos, width=1):
+        s = self._scale(surface)
+        return self.real.line(
+            self._surface(surface), color, self._pt(start_pos, s),
+            self._pt(end_pos, s), self._width(width, s))
+
+    def lines(self, surface, color, closed, points, width=1):
+        s = self._scale(surface)
+        return self.real.lines(
+            self._surface(surface), color, closed, self._pts(points, s),
+            self._width(width, s))
+
+    def polygon(self, surface, color, points, width=0):
+        s = self._scale(surface)
+        return self.real.polygon(
+            self._surface(surface), color, self._pts(points, s),
+            self._width(width, s))
+
+
+class _PygameProxy:
+    """除 draw 外全部转给真实 pygame 模块。"""
+
+    __slots__ = ("owner", "draw")
+
+    def __init__(self, owner) -> None:
+        self.owner = owner
+        self.draw = _DrawProxy(owner, owner._real_pg.draw)
+
+    def __getattr__(self, name):
+        return getattr(self.owner._real_pg, name)
+
+
+# ---------------------------------------------------------------------------
 # 主窗口
 # ---------------------------------------------------------------------------
 
@@ -399,8 +700,12 @@ class TrainerApp:
 
     def __init__(self, pygame_module, config_path: Optional[str],
                  index: Optional[int], demo: bool):
-        self.pg = pygame_module
+        self._real_pg = pygame_module
+        self.pg = _PygameProxy(self)
         self.screen = None
+        self.window = None
+        self._window_focused = False
+        self._scale = 1.0
         self._clock = pygame_module.time.Clock()
         self._fonts = FontBook()
         # 绘制缓存：渐变卡、阴影、圆角遮罩都按尺寸/颜色缓存，60fps 下不重复生成
@@ -903,6 +1208,11 @@ class TrainerApp:
 
     def _shutdown(self) -> None:
         try:
+            if self.window is not None:
+                self.window.destroy()
+        except Exception:
+            pass
+        try:
             self.pg.quit()
         except Exception:
             pass
@@ -922,6 +1232,13 @@ class TrainerApp:
                 self._running = False
                 if self.engine is not None:
                     self.engine.stop()
+            elif event.type == getattr(pg, "WINDOWCLOSE", -1):
+                # 高 DPI 窗口走 SDL Window API，关闭事件不是 QUIT
+                self._running = False
+                if self.engine is not None:
+                    self.engine.stop()
+            elif event.type == pg.MOUSEMOTION:
+                self._mouse = (event.pos[0], event.pos[1])
             elif event.type == getattr(pg, "JOYDEVICEADDED", -1):
                 if mode == "device":
                     self._retry = True
@@ -963,10 +1280,11 @@ class TrainerApp:
         elif key == pg.K_t:
             if mode == "play" and self.engine is not None:
                 self._cycle_modifier()
-        elif pg.K_1 <= key <= pg.K_9:
-            # 数字键 = 点对应卡片的专项开关（从上往下 1、2、3…）
+        elif pg.K_1 <= key <= pg.K_9 or pg.K_KP1 <= key <= pg.K_KP9:
+            # 数字键（主键盘或小键盘）= 点对应卡片的专项开关
             if mode == "play" and self.engine is not None:
-                index = key - pg.K_1
+                base = pg.K_1 if key <= pg.K_9 else pg.K_KP1
+                index = key - base
                 if 0 <= index < len(self.engine.skills):
                     self._toggle_focus(self.engine.skills[index])
         elif key == pg.K_PAGEUP:
@@ -1392,10 +1710,20 @@ class TrainerApp:
     def _draw(self, now: float) -> None:
         if self.screen is None:
             return
-        try:
-            self._mouse = self.pg.mouse.get_pos()
-        except Exception:
-            self._mouse = (-1, -1)
+        real = (self.screen.real if isinstance(self.screen, _ScreenProxy)
+                else self.screen)
+        scale = max(1.0, real.get_width() / W)
+        if abs(scale - self._scale) > 0.01:
+            self._scale = scale
+            self._cache.clear()
+        self.screen = _ScreenProxy(real, scale)
+        # 高 DPI 窗口下 pygame.mouse.get_pos() 绑定不到这个 SDL 窗口，
+        # 由 _handle_events 里的 MOUSEMOTION 事件维护 self._mouse。
+        if self.window is None:
+            try:
+                self._mouse = self.pg.mouse.get_pos()
+            except Exception:
+                self._mouse = (-1, -1)
         self.screen.blit(self._bg_surface(), (0, 0))
         self._draw_header(now)
         if self.config_error is not None:
@@ -1412,7 +1740,13 @@ class TrainerApp:
             if self._cal_open:
                 self._draw_calibration()
         try:
-            self.pg.display.flip()
+            if self.window is not None:
+                self.window.flip()
+                if not self._window_focused:
+                    self.window.focus()
+                    self._window_focused = True
+            else:
+                self.pg.display.flip()
         except Exception:
             pass
 
@@ -1427,13 +1761,17 @@ class TrainerApp:
         return surf
 
     def _round_mask(self, w: int, h: int, radius: int):
-        """圆角遮罩：用 BLEND_RGBA_MULT 把任意表面切成圆角。"""
-        key = ("mask", w, h, radius)
+        """圆角遮罩：用 BLEND_RGBA_MULT 把任意表面切成圆角（按 DPI 放大）。"""
+        s = self._scale
+        sw = max(1, int(round(w * s)))
+        sh = max(1, int(round(h * s)))
+        sr = max(0, int(round(radius * s)))
+        key = ("mask", sw, sh, sr)
 
         def make():
-            surf = self.pg.Surface((max(1, w), max(1, h)), self.pg.SRCALPHA)
+            surf = self.pg.Surface((sw, sh), self.pg.SRCALPHA)
             self.pg.draw.rect(surf, (255, 255, 255, 255), surf.get_rect(),
-                              border_radius=max(0, radius))
+                              border_radius=sr)
             return surf
         return self._cached(key, make)
 
@@ -1446,28 +1784,34 @@ class TrainerApp:
                 int(a[2] + (b[2] - a[2]) * t + 0.5))
 
     def _vgrad_surface(self, w: int, h: int, top, bottom, radius: int):
-        """竖直线性渐变，最后切圆角。"""
-        key = ("vg", w, h, top, bottom, radius)
+        """竖直线性渐变，最后切圆角（按 DPI 放大）。"""
+        s = self._scale
+        sw = max(1, int(round(w * s)))
+        sh = max(1, int(round(h * s)))
+        key = ("vg", sw, sh, top, bottom, radius)
 
         def make():
-            surf = self.pg.Surface((max(1, w), max(1, h)), self.pg.SRCALPHA)
-            for y in range(max(1, h)):
-                color = self._lerp_color(top, bottom, y / max(1, h - 1))
-                self.pg.draw.line(surf, color, (0, y), (w, y))
+            surf = self.pg.Surface((sw, sh), self.pg.SRCALPHA)
+            for y in range(sh):
+                color = self._lerp_color(top, bottom, y / max(1, sh - 1))
+                self.pg.draw.line(surf, color, (0, y), (sw, y))
             surf.blit(self._round_mask(w, h, radius), (0, 0),
                       special_flags=self.pg.BLEND_RGBA_MULT)
             return surf
         return self._cached(key, make)
 
     def _hgrad_surface(self, w: int, h: int, left, right, radius: int):
-        """水平线性渐变（进度条用），最后切圆角。"""
-        key = ("hg", w, h, left, right, radius)
+        """水平线性渐变（进度条用），最后切圆角（按 DPI 放大）。"""
+        s = self._scale
+        sw = max(1, int(round(w * s)))
+        sh = max(1, int(round(h * s)))
+        key = ("hg", sw, sh, left, right, radius)
 
         def make():
-            surf = self.pg.Surface((max(1, w), max(1, h)), self.pg.SRCALPHA)
-            for x in range(max(1, w)):
-                color = self._lerp_color(left, right, x / max(1, w - 1))
-                self.pg.draw.line(surf, color, (x, 0), (x, h))
+            surf = self.pg.Surface((sw, sh), self.pg.SRCALPHA)
+            for x in range(sw):
+                color = self._lerp_color(left, right, x / max(1, sw - 1))
+                self.pg.draw.line(surf, color, (x, 0), (x, sh))
             surf.blit(self._round_mask(w, h, radius), (0, 0),
                       special_flags=self.pg.BLEND_RGBA_MULT)
             return surf
@@ -1475,20 +1819,24 @@ class TrainerApp:
 
     def _shadow_surface(self, w: int, h: int, radius: int):
         """浅色阴影：小尺寸上叠几层低 alpha 圆角矩形，再放大得到柔和边缘。"""
-        key = ("shadow", w, h, radius)
+        s = self._scale
+        sw = max(1, int(round(w * s)))
+        sh = max(1, int(round(h * s)))
+        sr = max(1, int(round(radius * s)))
+        key = ("shadow", sw, sh, sr)
 
         def make():
-            sw, sh = max(8, w // 4), max(8, h // 4)
-            small = self.pg.Surface((sw, sh), self.pg.SRCALPHA)
-            step = max(1, sw // 26)
+            small_w, small_h = max(8, sw // 4), max(8, sh // 4)
+            small = self.pg.Surface((small_w, small_h), self.pg.SRCALPHA)
+            step = max(1, small_w // 26)
             for i in range(6):
                 inset = i * step
-                rect = self.pg.Rect(inset, inset, max(1, sw - 2 * inset),
-                                    max(1, sh - 2 * inset))
+                rect = self.pg.Rect(inset, inset,
+                                    max(1, small_w - 2 * inset),
+                                    max(1, small_h - 2 * inset))
                 self.pg.draw.rect(small, (20, 20, 30, 7 + i * 5), rect,
-                                  border_radius=max(1, radius // 4))
-            return self.pg.transform.smoothscale(
-                small, (max(1, w), max(1, h)))
+                                  border_radius=max(1, sr // 4))
+            return self.pg.transform.smoothscale(small, (sw, sh))
         return self._cached(key, make)
 
     def _card(self, rect, fill=CARD, radius: int = 14, border=LINE,
@@ -1626,10 +1974,13 @@ class TrainerApp:
               bold: bool = False, anchor: str = "topleft"):
         if not text:
             return None
-        font = self._fonts.get(size, bold)
+        s = self._scale
+        font = self._fonts.get(size * s, bold)
         surf = font.render(text, True, color)
-        rect = surf.get_rect(**{anchor: (x, y)})
-        self.screen.blit(surf, rect)
+        rect = surf.get_rect(**{anchor: (x * s, y * s)})
+        target = (self.screen.real if isinstance(self.screen, _ScreenProxy)
+                  else self.screen)
+        target.blit(surf, rect)
         return rect
 
     def _mark(self, x: float, y: float, size: float, ok: bool, color,
@@ -1655,13 +2006,15 @@ class TrainerApp:
 
     def _fit(self, text: str, size: float, width: int,
              bold: bool = False) -> str:
-        font = self._fonts.get(size, bold)
-        if font.size(text)[0] <= width:
+        s = self._scale
+        limit = width * s
+        font = self._fonts.get(size * s, bold)
+        if font.size(text)[0] <= limit:
             return text
         lo, hi = 0, len(text)
         while lo < hi:
             mid = (lo + hi + 1) // 2
-            if font.size(text[:mid] + "…")[0] <= width:
+            if font.size(text[:mid] + "…")[0] <= limit:
                 lo = mid
             else:
                 hi = mid - 1
@@ -1669,12 +2022,14 @@ class TrainerApp:
 
     def _wrap(self, text: str, size: float, width: int,
               bold: bool = False) -> List[str]:
-        font = self._fonts.get(size, bold)
+        s = self._scale
+        limit = width * s
+        font = self._fonts.get(size * s, bold)
         lines: List[str] = []
         cur = ""
         for token in _TOKEN.findall(text):
             trial = cur + token
-            if not cur or font.size(trial)[0] <= width:
+            if not cur or font.size(trial)[0] <= limit:
                 cur = trial
             else:
                 lines.append(cur.rstrip())
@@ -1706,8 +2061,10 @@ class TrainerApp:
     # -- 背景 / 顶栏底稿 ------------------------------------------------
 
     def _bg_surface(self):
-        """窗口底色 + 两团极淡的绿 / 青晕染，只生成一次。"""
-        key = ("bg", W, H)
+        """窗口底色 + 两团极淡的绿 / 青晕染，只生成一次（按 DPI 放大）。"""
+        s = self._scale
+        bw, bh = max(1, int(W * s)), max(1, int(H * s))
+        key = ("bg", bw, bh)
 
         def make():
             small = self.pg.Surface((120, 82), self.pg.SRCALPHA)
@@ -1722,8 +2079,8 @@ class TrainerApp:
                         continue
                     self.pg.draw.circle(small, color + (alpha,), (cx, cy),
                                         max(1, int(radius * t)))
-            big = self.pg.transform.smoothscale(small, (W, H))
-            surf = self.pg.Surface((W, H))
+            big = self.pg.transform.smoothscale(small, (bw, bh))
+            surf = self.pg.Surface((bw, bh))
             surf.fill(BG)
             surf.blit(big, (0, 0))
             return surf
@@ -1749,12 +2106,15 @@ class TrainerApp:
         return self._cached(key, make) or None
 
     def _header_surface(self):
-        """顶栏底稿：白→浅青渐变 + 右侧球场照片 + 底部绿→青强调线。
+        """顶栏底稿：白→浅青渐变 + 右侧球场照片（顶到最右边）+ 强调线。
 
-        照片只铺到计时胶囊左侧（约 80% 的 Hero 宽），避免足球被白色
-        胶囊盖住；照片缺失时退回程序化青色光带，不在顶栏留白块。
+        照片按高 DPI 比例绘制；左边 2%–18% 淡入，标题仍压在白色区上。
+        照片缺失时退回程序化青色光带，不在顶栏留白块。
         """
-        w, h = W - 2 * MARGIN_X, HEADER_H
+        s = self._scale
+        lw, lh = W - 2 * MARGIN_X, HEADER_H
+        w = max(1, int(round(lw * s)))
+        h = max(1, int(round(lh * s)))
         key = ("header", w, h)
 
         def make():
@@ -1764,30 +2124,17 @@ class TrainerApp:
                                          x / max(1, w - 1))
                 self.pg.draw.line(surf, color, (x, 0), (x, h))
 
-            hero_w = int(w * 0.66)
+            hero_w = max(1, int(round(lw * 0.66 * s)))
             hero = self.pg.Surface((hero_w, h), self.pg.SRCALPHA)
             photo = self._hero_photo()
             if photo is not None:
-                photo_w = int(hero_w * 0.80)
                 iw, ih = photo.get_size()
-                scale = max(photo_w / iw, h / ih)
+                scale = max(hero_w / iw, h / ih)
                 sw = max(1, int(iw * scale + 0.5))
                 sh = max(1, int(ih * scale + 0.5))
                 scaled = self.pg.transform.smoothscale(photo, (sw, sh))
-                panel = self.pg.Surface((photo_w, h), self.pg.SRCALPHA)
-                panel.blit(scaled, (-max(0, (sw - photo_w) // 2),
-                                    -max(0, (sh - h) // 2)))
-                # 右缘 16px 淡出，照片不会在计时胶囊左边留下硬切口
-                rfade = self.pg.Surface((photo_w, h), self.pg.SRCALPHA)
-                for x in range(photo_w):
-                    t = (1.0 if x <= photo_w - 16
-                         else (photo_w - x) / 16.0)
-                    alpha = int(255 * max(0.0, min(1.0, t)))
-                    self.pg.draw.line(rfade, (255, 255, 255, alpha),
-                                      (x, 0), (x, h))
-                panel.blit(rfade, (0, 0),
-                           special_flags=self.pg.BLEND_RGBA_MULT)
-                hero.blit(panel, (0, 0))
+                hero.blit(scaled, (-max(0, (sw - hero_w) // 2),
+                                   -max(0, (sh - h) // 2)))
             else:
                 # 兜底：程序化青色渐变 + 柔和斜向光带（不画球）
                 for y in range(h):
@@ -1797,10 +2144,11 @@ class TrainerApp:
                 glow = self.pg.Surface((hero_w, h), self.pg.SRCALPHA)
                 for fx, peak, band_w in ((0.26, 26, 84), (0.48, 20, 120),
                                          (0.72, 24, 68)):
-                    band = self.pg.Surface((band_w, h * 2),
-                                           self.pg.SRCALPHA)
-                    for x in range(band_w):
-                        t = 1.0 - abs(x - band_w / 2.0) / (band_w / 2.0)
+                    bw = max(1, int(round(band_w * s)))
+                    band = self.pg.Surface((bw, h * 2), self.pg.SRCALPHA)
+                    for x in range(bw):
+                        center = bw / 2.0
+                        t = 1.0 - abs(x - center) / max(1.0, center)
                         alpha = int(peak * max(0.0, t) ** 1.4)
                         if alpha > 0:
                             self.pg.draw.line(
@@ -1822,11 +2170,15 @@ class TrainerApp:
             hero.blit(fade, (0, 0), special_flags=self.pg.BLEND_RGBA_MULT)
             surf.blit(hero, (w - hero_w, 0))
 
-            # 先画 1px 卡片描边，底部强调线再压上去
-            self.pg.draw.rect(surf, LINE, (0, 0, w, h), 1, border_radius=14)
+            # 先画卡片描边，底部强调线再压上去
+            self.pg.draw.rect(
+                surf, LINE, (0, 0, w, h),
+                max(1, int(round(s))),
+                border_radius=max(1, int(round(14 * s))))
 
-            # 底部 2px 的绿→青强调线：同样画在 overlay 上正常混合
-            line = self.pg.Surface((w, 2), self.pg.SRCALPHA)
+            # 底部 2px（逻辑）的绿→青强调线：画在 overlay 上正常混合
+            line_h = max(1, int(round(2 * s)))
+            line = self.pg.Surface((w, line_h), self.pg.SRCALPHA)
             for x in range(w):
                 t = x / max(1, w - 1)
                 if t <= 0.24:
@@ -1838,10 +2190,11 @@ class TrainerApp:
                 else:
                     color, alpha = CYAN, int(145 * (1.0 - (t - 0.64) / 0.36))
                 if alpha > 0:
-                    self.pg.draw.line(line, color + (alpha,), (x, 0), (x, 1))
-            surf.blit(line, (0, h - 2))
+                    self.pg.draw.line(line, color + (alpha,),
+                                      (x, 0), (x, line_h - 1))
+            surf.blit(line, (0, h - line_h))
 
-            surf.blit(self._round_mask(w, h, 14), (0, 0),
+            surf.blit(self._round_mask(lw, lh, 14), (0, 0),
                       special_flags=self.pg.BLEND_RGBA_MULT)
             return surf
         return self._cached(key, make)
@@ -2408,10 +2761,12 @@ class TrainerApp:
 
     def _dialog_mask(self):
         """校准弹窗的半透明遮罩：rgba(28, 28, 32, .28)，只生成一次。"""
-        key = ("dialog-mask", W, H)
+        s = self._scale
+        bw, bh = max(1, int(W * s)), max(1, int(H * s))
+        key = ("dialog-mask", bw, bh)
 
         def make():
-            surf = self.pg.Surface((W, H), self.pg.SRCALPHA)
+            surf = self.pg.Surface((bw, bh), self.pg.SRCALPHA)
             surf.fill(DIALOG_MASK + (72,))
             return surf
         return self._cached(key, make)
@@ -2655,13 +3010,26 @@ def main_gui(config_path: Optional[str] = None, index: Optional[int] = None,
     except Exception:
         pass
 
+    # Retina / 高 DPI：用 SDL Window 拿到真实的 2x 绘制面。直接 set_mode
+    # 只有 960x660 像素，系统放大后文字和线条会有明显锯齿。
+    window = None
     try:
-        screen = pygame.display.set_mode(
-            (W, H), pygame.SCALED | pygame.RESIZABLE)
-    except pygame.error:
-        screen = pygame.display.set_mode((W, H))
+        from pygame._sdl2 import video
+        window = video.Window(APP_TITLE, size=(W, H),
+                              position=video.WINDOWPOS_CENTERED,
+                              allow_high_dpi=True)
+        window.focus()
+        screen = window.get_surface()
+    except Exception:
+        window = None
+        try:
+            screen = pygame.display.set_mode(
+                (W, H), pygame.SCALED | pygame.RESIZABLE)
+        except pygame.error:
+            screen = pygame.display.set_mode((W, H))
 
     app = TrainerApp(pygame, config_path, index, demo)
+    app.window = window
     app.screen = screen
     try:
         return app.run()
