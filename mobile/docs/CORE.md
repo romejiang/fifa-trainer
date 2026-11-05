@@ -126,4 +126,67 @@ python3 tools/lint_core_purity.py --list-rules      # 逐行打印规则 id
   也不会被打进 PCK）；
 - 能由 Python 推导的就写成生成器 + `--check`（参考 `tools/gen_geometry_golden.py`），
   手改即红；
+- `tap_golden.json` 是**生成物**：先跑 `python3 tools/gen_tap_golden.py`，再跑
+  `bash mobile/tools/test-core.sh`。`test_tap_detector` 与 `test_tap_runtime` 两个套件
+  共读同一份夹具，按 `kind`（`detector` / `runtime`）分工 —— 分开只为失败定位，
+  期望来源只有一处；
 - 手写的夹具必须在测试里有对应断言钉住，不能「放进目录就算数」。
+
+## 6. 数据与判定契约（Phase 4 起）
+
+这一节写的是**已经存在**的类型与字段，不是计划。UI、设备层、测试三方都按这一份读。
+
+### `Frame`
+
+| 字段 | 类型 | 口径 |
+|------|------|------|
+| `now` | `float` | **秒**。时间轴由调用方注入，core 不读时钟 |
+| `buttons` | `Dictionary` | canonical 按钮名 → `true`，例如 `{"RB": true}` |
+
+- **`Frame.buttons` 不要改成 `Array[String]`**：参考实现是 `frozenset`，逐帧
+  `button in buttons` 必须是 O(1)；数组还会引入「有序、去重」两个没人验证的前提。
+- **`now` 的单位是秒，不要加 `now_ms` 字段**：`elapsed_ms` 由 `(now - t0) * 1000.0`
+  现场换算，与 `desktop/padskills/detectors.py` 逐字一致。两套时间单位并存时，
+  总有一处会忘记换算。
+- 摇杆字段（`rs_mag` / `rs_angle` / `ls_*` / `facing`）Phase 5 才加：`TapDetector`
+  不读它们，提前造只会让「core 只承载判定真正需要的数据」这条边界先烂掉。
+
+### 三个判定值对象
+
+| 类型 | 字段 | 谁产生 |
+|------|------|--------|
+| `Hit` | `elapsed_ms` / `detail` / `summary` | 检测器在识别成功的那一刻构造 |
+| `Failure` | `code` / `message` / `elapsed_ms` | 检测器在 `_emit()` 时构造 |
+| `Outcome` | `skill_name` / `ok` / `code` / `message` / `elapsed_ms` / `at` / `detail` / `seq` | `TapRuntime` 在记录的瞬间构造 |
+
+- `summary` / `detail` / `message` **由检测器现场产生**：UI 只显示，测试逐字比对，
+  任何一方都不得重新拼装 —— 否则「与桌面版一致」会悄悄变成「与作者的理解一致」。
+- `Outcome.at` 是引擎时间轴上的秒（与 `Frame.now` 同口径）；`Outcome.detail` 在成功时
+  是 `Hit.summary`、失败时为空串（与 `engine.py:303-305` 相同）。
+- `Outcome` 自身不读时钟、不校验、不提供 getter：纯数据对象，公开字段直接用。
+
+### `TapRuntime` 的三条契约
+
+1. **`pop_outcomes()` 是 UI 唯一的结果入口，每帧全量 drain。** Python 的引擎用
+   `last_outcome` + `outcome_seq`，同一帧两条时第一条会被静默吞掉；移动端改成
+   `Array[Outcome]` 队列，`Outcome.seq` 从 1 单调递增。「不丢结果」是结构，不是约定。
+2. **`layout_confirmed == false` 时 `tick()` 不产任何 Outcome。** 这是运行时的第一早退，
+   位于手势锁判断**之前**：界面另有状态机，但绕过界面时这里仍然零输出。
+   `set_layout_confirmed(false)` 还会静默 `abandon()` —— 手柄中途断开不是一次尝试，
+   不得产出 `too_slow` / `hold_short`。
+3. **`select_taps_skill(config)` 按 `kind == "taps"` 选，绝不按名字或下标。**
+   只练绿色搓射是「筛选」的结果；真实配置把绿色搓射排在 `skills` 最后，
+   任何按下标取的做法都会读到马赛回旋。
+
+### 本阶段的范围收缩（Phase 5 必须还原）
+
+- **手势锁按「右摇杆恒回中」实现**：命中后固定锁满 `gesture_release_ms`（150 ms），
+  锁满时调一次 `on_idle()`。Phase 5 的 `Frame` 有了 `rs_mag` 之后，要还原成
+  「右摇杆真正回中才计时，推着就不解锁」。
+- **`idle_reset_ms` 计时器未移植**：引擎的 idle 路径只调用 `on_idle()`，而
+  `TapDetector.on_idle()` 是空实现，所以对 tap 场景零行为差异。Phase 5 移植
+  arc / sequence 时必须补上。
+- **`relative_to_ls` 技能被运行时拒绝**：本阶段没有左摇杆基准，构造时置
+  `_enabled = false`，`tick()` 永远不判。Phase 5 有 `facing` 之后必须还原。
+
+Phase 5 必须还原这三处，否则「范围收缩」会变成「功能缺失」。
