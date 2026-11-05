@@ -63,6 +63,12 @@ if ! python3 "$repo_root/tools/gen_geometry_golden.py" --check; then
     exit 1
 fi
 
+echo "▸ 校验 tap 黄金夹具未漂移…"
+if ! python3 "$repo_root/tools/gen_tap_golden.py" --check; then
+    echo "  运行 python3 tools/gen_tap_golden.py 重新生成黄金夹具后再试。" >&2
+    exit 1
+fi
+
 # 第四步：跨语言配置判定对等。纯 Python、不需要 Godot，越早失败越省时间；
 # 而且必须排在任何 Godot 调用之前 ——「两端语义分叉」比「某一端自己红了」
 # 更需要先知道。它只校验 Python 侧判定与语料一致、且每处分歧都有记录；
@@ -142,4 +148,13 @@ if grep -qE '^TESTS_ASSERTIONS=0$' "$tmp/tests.log"; then
     exit 1
 fi
 
-echo "✓ 核心闸门通过：配置一致、边界干净、黄金未漂移、两端判定对等、核心套件全绿"
+# tap 黄金回放的正向哨兵：套件自己打印实际回放条数与差异数。没有这一行，等于
+# 「夹具没被读过」也能绿；mismatches 必须为 0，且 cases 至少 1（真空绿的反面）。
+if ! grep -qE '^TAP_GOLDEN_DETECTOR cases=[1-9][0-9]* mismatches=0$' "$tmp/tests.log"; then
+    echo "✗ 没有 TAP_GOLDEN_DETECTOR cases=N mismatches=0（夹具未回放或跨语言判定有差异）" >&2
+    grep -E '^TAP_GOLDEN_DETECTOR ' "$tmp/tests.log" >&2 || true
+    exit 1
+fi
+echo "✓ tap 黄金回放：$(grep -E '^TAP_GOLDEN_DETECTOR ' "$tmp/tests.log")"
+
+echo "✓ 核心闸门通过：配置一致、边界干净、黄金未漂移、tap 回放一致、核心套件全绿"
