@@ -121,6 +121,10 @@ class AttemptLog:
 
 func _ready() -> void:
 	_build_attempt_rows()
+	# 未连接（或还没进入练习、`setup()` 尚未调用）时也要显示正确的默认状态：
+	# 场景里的静态文案不能停在「训练中」，否则首启无手柄会自相矛盾。
+	_refresh_header()
+	_refresh_pad()
 
 
 ## 依赖唯一入口。组合根进入练习时调用；本屏不读设备、不推进判定。

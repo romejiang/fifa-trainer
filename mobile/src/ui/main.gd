@@ -451,6 +451,11 @@ func _on_device_list_changed(devices: Array) -> void:
 		_reuse_checked = false
 		_setup.call("reset_stats")
 	_try_reuse_profile()
+	# 认不出的手柄（seed_known_defaults 为假）也要让主界面拿到 buffer：
+	# 顶部设备行与底部摇杆卡显示「已连接」与真实轴值，而不是停在未连接。
+	# 布局传空串 = 未确认；运行时 `layout_confirmed` 仍为假，零判定。
+	if not _in_practice and not _setup.visible and _sampler.buffer.device >= 0:
+		_practice.setup(_runtime, &"", _sampler.buffer)
 
 
 func _show_config_error(text: String) -> void:
