@@ -403,7 +403,8 @@ func _check_profile_schema(r) -> void:
 	r.check(scale_error_seen, "scale_x = 0.0 必须给出 invalid_scale（实测反例没被别的原因遮住）")
 
 
-## D-06 迁移门：v1 档案（缺 LS、schema=1）必须整份拒绝；v2 的四条拒绝面各有一条断言。
+## D-06 迁移门：v1 档案自动升级到 v2（补 Xbox 标准 LS 0/1 + ls_ready），
+## 版本 3 仍整份拒绝；v2 的四条拒绝面各有一条断言。
 func _check_ls_migration(r) -> void:
 	var base: Dictionary = _legal_profile().to_dict()
 	var errors: Array[ConfigError] = []
@@ -413,6 +414,7 @@ func _check_ls_migration(r) -> void:
 		"v2 齐全 + ls_ready = true → 可进练习")
 
 	# 04-11 时期的真实形状：schema_version = 1、ls = -1、没有 ls_ready。
+	# 用户已经在 Phase 4 确认过 RS 与布局；迁移只补 LS，不再把人挡回设置页。
 	var legacy: Dictionary = base.duplicate(true)
 	legacy["schema_version"] = 1
 	legacy["axes"]["ls_x"]["index"] = -1
@@ -420,9 +422,17 @@ func _check_ls_migration(r) -> void:
 	legacy["quality"].erase("ls_ready")
 	var legacy_errors: Array[ConfigError] = []
 	var legacy_loaded := DeviceProfile.from_dict(legacy, legacy_errors)
-	r.check(legacy_loaded == null, "v1 档案必须整份拒绝（不猜测迁移）")
-	r.check(_has_error_code(legacy_errors, &"unsupported_schema"),
-		"v1 档案的错误码必须是 unsupported_schema（实际 %s）" % _error_codes(legacy_errors))
+	r.check(legacy_loaded != null and legacy_errors.is_empty(),
+		"v1 档案必须自动迁移，不能整份拒绝（实际错误 %s）" % _error_codes(legacy_errors))
+	r.check(legacy_loaded != null and legacy_loaded.schema_version == DeviceProfile.SCHEMA_VERSION,
+		"v1 迁移后 schema_version 必须是当前常量")
+	r.check(legacy_loaded != null and legacy_loaded.axes.ls_x_index == 0
+		and legacy_loaded.axes.ls_y_index == 1,
+		"v1 迁移后 LS 必须是 (0,1)")
+	r.check(legacy_loaded != null and legacy_loaded.quality.get("migrated_from_v1") == true,
+		"v1 迁移必须在 quality 里留下 migrated_from_v1 标记")
+	r.check(legacy_loaded != null and legacy_loaded.can_enter_practice(),
+		"v1 迁移后必须可直接进练习")
 
 	# v2 但缺 ls_ready：结构合法，但复用门必须拒绝。
 	var no_marker: Dictionary = base.duplicate(true)

@@ -173,12 +173,23 @@ static func from_dict(data: Variant, out_errors: Array[ConfigError]) -> DevicePr
 	var profile := DeviceProfile.new()
 
 	var version: Variant = root.get("schema_version")
-	if not _is_number(version) or float(version) != float(SCHEMA_VERSION):
+	var migrating_from_v1 := false
+	if not _is_number(version):
 		_error(out_errors, "$.schema_version", &"unsupported_schema",
-			"schema_version 必须是 %d，收到 %s" % [SCHEMA_VERSION, JSON.stringify(version)],
-			"改成 %d；未知版本必须整份丢弃，不做猜测迁移。" % SCHEMA_VERSION)
-	else:
+			"schema_version 必须是数字，收到 %s" % JSON.stringify(version),
+			"改成 1 或 %d；未知版本必须整份丢弃，不做猜测迁移。" % SCHEMA_VERSION)
+	elif float(version) == 1.0:
+		# v1 → v2 迁移：Phase 4 的档案已经确认过 RS 与校准，只是没有 LS。
+		# 用已确认的 Xbox 标准左摇杆对 (0,1) 补齐，并打 ls_ready / migrated_from_v1，
+		# 让用户不必重走一遍设置页。设置页仍可随时改（B 清空 / 诊断页 Y 清除）。
+		migrating_from_v1 = true
 		profile.schema_version = SCHEMA_VERSION
+	elif float(version) == float(SCHEMA_VERSION):
+		profile.schema_version = SCHEMA_VERSION
+	else:
+		_error(out_errors, "$.schema_version", &"unsupported_schema",
+			"schema_version 必须是 1 或 %d，收到 %s" % [SCHEMA_VERSION, JSON.stringify(version)],
+			"改成 1 或 %d；未知版本必须整份丢弃，不做猜测迁移。" % SCHEMA_VERSION)
 
 	profile.key = _read_text(root, "key", "$.key", false, out_errors)
 	profile.profile_id = _read_text(root, "profile_id", "$.profile_id", false, out_errors)
@@ -215,6 +226,32 @@ static func from_dict(data: Variant, out_errors: Array[ConfigError]) -> DevicePr
 	profile.layout_confirmed = _read_bool(root, "layout_confirmed", out_errors)
 	profile.button_index_ok = _read_bool(root, "button_index_ok", out_errors)
 	profile.probed_at_iso = _read_text(root, "probed_at_iso", "$.probed_at_iso", true, out_errors)
+
+	# v1 → v2：用已确认的 Xbox 标准左摇杆对 (0,1) 补齐，并打上迁移标记。
+	# 这不是「静默猜一个新设备」——v1 档案里的 RS 与布局都是用户在设置页确认过的；
+	# 这里只补上 Phase 4 没采集的 LS，且迁移事实写在 quality 里可审计。
+	if migrating_from_v1 and out_errors.size() == before:
+		if profile.axes == null or not profile.axes.has_rs():
+			_error(out_errors, "$.axes", &"schema_v1_missing_rs",
+				"v1 档案缺少右摇杆轴对，无法自动迁移",
+				"在诊断页按 Y 清除档案，重新走一次设置页。")
+		else:
+			profile.axes.ls_x_index = 0
+			profile.axes.ls_y_index = 1
+			profile.axes.ls_x_sign = 1
+			profile.axes.ls_y_sign = 1
+			if profile.calibration != null:
+				profile.calibration.ls_center_x = profile.calibration.center_x
+				profile.calibration.ls_center_y = profile.calibration.center_y
+				profile.calibration.ls_scale_x = profile.calibration.scale_x
+				profile.calibration.ls_scale_y = profile.calibration.scale_y
+			profile.quality["ls_ready"] = true
+			profile.quality["migrated_from_v1"] = true
+			if not profile.quality.has("range_ready"):
+				# 04-11 之前的档案没有 range_ready。能走到 v1→v2 迁移说明 RS 已经
+				# 被用户确认过；补一个显式标记，避免把人再次挡在设置页。
+				profile.quality["range_ready"] = true
+				profile.quality["range_ready_assumed"] = true
 
 	if out_errors.size() > before:
 		return null

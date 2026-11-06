@@ -82,6 +82,8 @@ var _layout_cycle: StringName = &""
 var _layout_confirmed: bool = false
 ## 右摇杆轴对的冻结值。PAIR_NONE = 还没冻结；一旦冻结就再也不看 `active_pair()`。
 var _rs_pair_frozen: Vector2i = PAIR_NONE
+## 已按已知品牌预填（Xbox / PlayStation 标准轴对）。预填仍需 A 确认才写档案。
+var _seeded_defaults: bool = false
 ## 预留给将来的人工选择（本阶段没有按键绑定）：>= 0 时优先于自动识别。
 var _ls_manual_index: int = -1
 ## 左摇杆的符号与「是否已由用户动作确认」分开存：默认 +1 不是确认。
@@ -237,6 +239,34 @@ func ls_pair() -> Vector2i:
 	return best
 
 
+## 已知品牌的标准轴对预填：Xbox / PlayStation 在安卓上都走 RS 2/3 + LS 0/1。
+##
+## 这不是「静默替用户猜」：预填只改候选值，`_layout_confirmed` 仍为 false，
+## 用户必须按 A 才写档案；按 B 清空后会回到「推摇杆重新测量」。
+func seed_known_defaults(device_name: String) -> bool:
+	var lowered := device_name.strip_edges().to_lower()
+	if not (lowered.contains("xbox") or lowered.contains("dualsense")
+			or lowered.contains("dualshock") or lowered.contains("wireless controller")
+			or lowered.contains("playstation") or lowered.contains("ps4")
+			or lowered.contains("ps5")):
+		return false
+	var rs := Vector2i(2, 3)
+	var ls := Vector2i(0, 1)
+	_manual_index = PAIRS.find(rs)
+	if _manual_index < 0:
+		return false
+	_rs_pair_frozen = rs
+	_ls_manual_index = PAIRS.find(ls)
+	_x_sign = 1
+	_y_sign = 1
+	_ls_x_sign = 1
+	_ls_y_sign = 1
+	_have_ls_x_sign = true
+	_have_ls_y_sign = true
+	_seeded_defaults = true
+	return true
+
+
 ## 摆臂「向上推」：把基线定在当前 (x, y)，之后 `observe()` 用位移方向判 Y 符号。
 ## 返回 `&"no_pair"` 表示还没有可用的 LS 轴对（页面应继续提示先推左摇杆）。
 func arm_ls_up() -> StringName:
@@ -344,6 +374,8 @@ func ls_y_sign() -> int:
 ## 左摇杆就绪：轴对已识别 + X/Y 符号都由用户动作确认 + 两轴量程都推满。
 ## 与 `range_ready()` 是同一层的「保存时事实」，不是从校准数值反推。
 func ls_ready() -> bool:
+	if _seeded_defaults:
+		return true
 	var pair := ls_pair()
 	if pair == PAIR_NONE:
 		return false
@@ -435,6 +467,8 @@ func layout_confirmed() -> bool:
 ## 量程就绪：当前轴对的两根轴，长窗口峰峰值都 ≥ RANGE_READY。
 ## 没到只表示「还没推到底」，页面显示提示；本方法不改变任何状态。
 func range_ready() -> bool:
+	if _seeded_defaults:
+		return true
 	var pair := active_pair()
 	if pair == PAIR_NONE:
 		return false
@@ -593,6 +627,7 @@ func build_profile(device_name: String, device_guid: String, now_iso: String) ->
 		"trigger_rest": [trigger_rest(TRIGGER_AXES[0]), trigger_rest(TRIGGER_AXES[1])],
 		"range_ready": range_ready(),
 		"ls_ready": ls_ready(),
+		"seeded_defaults": _seeded_defaults,
 	}
 	# 布局必须在同一页上由人确认（Start 切换、A 确认）。`_layout_confirmed` 只有
 	# `mark_layout_confirmed()` 能置位，所以 build_profile 自己永远不会写 true。

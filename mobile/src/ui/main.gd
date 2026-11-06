@@ -378,11 +378,27 @@ func _try_reuse_profile() -> void:
 	_reuse_checked = true
 	var key := DeviceProfile.make_key(_sampler.device_guid(), _sampler.device_name())
 	var profile := _profile_store.find(key)
-	if not _profile_usable(profile):
-		# 不可用就保持 null：无档案 = 无输入，不降级、不猜。
+	if _profile_usable(profile):
+		_profile = profile
+		_enter_practice(profile.layout)
 		return
-	_profile = profile
-	_enter_practice(profile.layout)
+	# 没有可用档案：按已知品牌的标准映射自动建档，直接进练习。
+	# 这是桌面版的行为（手柄映射固定，不做引导式输入设置）；设置页仍可从
+	# 练习屏按住 B 1 秒进入，用于换手柄或手工修正。
+	var device_name := _sampler.device_name()
+	if device_name.strip_edges().is_empty():
+		return
+	var auto_setup := InputSetup.new()
+	if not auto_setup.seed_known_defaults(device_name):
+		return
+	auto_setup.mark_layout_confirmed()
+	var auto_profile := auto_setup.build_profile(device_name, _sampler.device_guid(),
+		Time.get_datetime_string_from_system())
+	if auto_profile == null:
+		return
+	_profile_store.upsert(auto_profile)
+	_profile = auto_profile
+	_enter_practice(auto_profile.layout)
 
 
 func _profile_usable(profile: DeviceProfile) -> bool:
