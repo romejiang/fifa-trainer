@@ -104,6 +104,7 @@ for script in \
     "res://src/ui/input_setup_screen.gd" \
     "res://src/ui/onboarding_screen.gd" \
     "res://src/ui/diagnostics_overlay.gd" \
+    "res://src/ui/home_screen.gd" \
     "res://src/ui/practice_screen.gd"; do
     if [ -f "$repo_root/mobile/${script#res://}" ]; then
         check_script "$script"

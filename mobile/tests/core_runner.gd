@@ -53,6 +53,7 @@ const SUITES := {
 	"gesture_detector": preload("res://tests/unit/test_gesture_detector.gd"),
 	"gesture_engine": preload("res://tests/unit/test_gesture_engine.gd"),
 	"green_slice": preload("res://tests/unit/test_green_slice.gd"),
+	"home_screen": preload("res://tests/unit/test_home_screen.gd"),
 	"input_log": preload("res://tests/unit/test_input_log.gd"),
 	"input_setup": preload("res://tests/unit/test_input_setup.gd"),
 	"measured": preload("res://tests/unit/test_measured.gd"),
