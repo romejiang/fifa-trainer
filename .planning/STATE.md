@@ -2,18 +2,18 @@
 gsd_state_version: "1.0"
 current_phase: 5
 current_phase_name: 全动作判定对等性 — 三类检测器 + 引擎仲裁 + 抽稀矩阵
-current_plan: 7
+current_plan: 8
 status: executing
-stopped_at: Completed 05-06-PLAN.md
-last_updated: "2026-11-05T22:58:20.113Z"
+stopped_at: Completed 05-08-PLAN.md
+last_updated: "2026-11-06T10:30:07.000Z"
 last_activity: 2026-11-06
-last_activity_desc: Phase 5 plan 06 complete — 左摇杆三件套 + RS 冻结 + schema v2/ls_ready 迁移门
-state_head: 47fbbaa344dee8440b7250f0da830a29afc18d7b
+last_activity_desc: Phase 5 plan 08 complete — 竖屏 HomeScreen + 首启自动建档 + 重建 APK
+state_head: f78d77b1409cb1d7b0b5bf50c4ea5e58569684c2
 progress:
   total_phases: 10
   completed_phases: 4
   total_plans: 34
-  completed_plans: 32
+  completed_plans: 33
   percent: 40
 ---
 
@@ -28,12 +28,12 @@ See: .planning/PROJECT.md (updated 2026-11-04)
 
 ## Current Position
 
-Current Plan: 7
-Total Plans in Phase: 7
+Current Plan: 8
+Total Plans in Phase: 8
 Phase: 5 (全动作判定对等性 — 三类检测器 + 引擎仲裁 + 抽稀矩阵) — EXECUTING
-Plan: 7 of 7
-Status: Ready to execute
-Last activity: 2026-11-06 — 05-06 完成：LS 三件套、D5-1 冻结、schema v2 + ls_ready（44,867 断言 / 0 失败）
+Plan: 8 of 8
+Status: 05-08 已执行；待 Phase 5 验证与真机 UAT
+Last activity: 2026-11-06 — 05-08 完成：竖屏主界面、首启自动建档、24 套件 / 44,994 断言、APK 27,150,559 B
 
 Progress: [████░░░░░░] 40%
 
@@ -95,6 +95,7 @@ Progress: [████░░░░░░] 40%
 | Phase 5 P04 | 39min | 3 tasks | 12 files |
 | Phase 5 P05 | 37min | 3 tasks | 8 files |
 | Phase 5 P6 | 26min | 3 tasks | 12 files |
+| Phase 5 P08 | 15min | 3 tasks | 12 files |
 
 ## Accumulated Context
 
@@ -303,6 +304,10 @@ Recent decisions affecting current work:
 - [Phase 5]: det_arc_rearm_124 的 250 Hz 实测是 [too_short@204, too_short@208]，不是计划文字的 [too_short, too_fast]；白名单理由按夹具实测书写
 - [Phase 5]: DECIMATION 共 252 条 = 3 × (55 + 29)；夹具放 mobile/tests/fixtures/，唯一消费者是 Godot；下限 240 在 grep 与套件里是同一个数字
 - [Phase 5]: 05-06：RS 轴对在第一次推满量程时冻结，ls_pair() 排除冻结对；左右摇杆各自的符号只由已知方向的位移确认，横向位移返回 sideways；schema v2 + ls_ready 让 v1 档案整份失效
+- [Phase 5]: 05-08：首屏改为竖屏 HomeScreen，输入设置页默认不可见、只由主界面按住 B 1 秒进入；无档案时 `seed_known_defaults()` 自动建档直接进练习
+- [Phase 5]: 05-08：英雄卡取聚焦动作的 `ActiveSkill.last_outcome`；最近尝试用内部类 `AttemptLog` 以单调 `seq` 去重并只留 8 条；十字键只改显示不改判定
+- [Phase 5]: 05-08：Y 清除档案后自动按标准映射重建（不把用户丢回设置页）；断连回主界面显示「手柄未连接」
+- [Phase 5]: 05-08：`HomeScreen.setup(runtime, layout, buffer)` 保持三参；设备行用布局 + 连接状态生成，摇杆卡显示轴 0/1、2/3 原始值（不新增第二份归一化）
 
 ### Pending Todos
 
@@ -310,6 +315,7 @@ None yet.
 
 ### Blockers/Concerns
 
+- **05-08 的新包待真机验收（闸门 C，H1–H13）**：`mobile/build/fifa-trainer.apk`（27,150,559 B，证书 `e1841a17…32e046`）已由 `gate-b.sh` 验证签名 / 16 KB 对齐 / 仅 arm64 / 配置在包内。真机必须确认：首启直达竖屏主界面（无输入设置）、顶部区与英雄卡排版、5 行熟练度 / 8 条最近尝试、十字键切换聚焦、B 按住 1 秒进设置、断连显示「手柄未连接」。在此之前不得宣布 Phase 5 主界面通过。
 - **Phase 4 真机清单 D0 失败（04-07 Task 2，checkpoint:human-verify / blocking-human）— 尝试一（旧包 27,012,856 B）**：手机 Motorola XT2175-2 / Android 12（`ZY22F5FXX9`），D0 在探针重试循环失败：`两轴同时动了：margin 0.001 < 0.25`（20:15:38）/ `上与右落在同一根轴（2/2）`（20:15:46）/ `上下没有互为反号：上 (轴 2, 符号 -1)、下 (轴 3, 符号 1)`（20:18:22）；20:15:50 出现停止屏「没有收到摇杆事件（events_motion = 1931）」。D1–D6 未执行；成功标准 2/3/4/5 均不得勾选。
 - **Phase 4 真机清单 D0 仍然失败 — 尝试二（新包 27,046,027 B，04-08 重建）**：干净卸载后安装成功（`versionName=0.1.0`，`lastUpdateTime=2026-11-05 21:19:05`，证书 `e1841a17…32e046` 不变），D0 卡在探针第 1/4 步「上」：`PAD_AXIS i=4/i=5` 在 21:22:32.677 报 `v=0.000`，21:22:54.846 变成 `v=-1.000`（真实静止值）；静止基线按 0 记 → 每窗口 `margin 0.000 < 0.25` → 57 行 `PROBE_REJECT code=ambiguous_axes key=up soft=1`。用户按 B 重来、重新推右摇杆均无效，要求「换一种检测方式或跳过」。D1–D6 未执行；成功标准 2/3/4/5 仍未闭合。**04-09 已修**：整条探针链被单页输入设置替换，`trigger_rest = min`，扳机跳变不再参与轴对识别；新包 27,067,065 B（证书不变），待 04-07 用新包重走。
 - **04-11 交付后的待办（04-07，最新包）**：先 `adb uninstall com.fifaskill.trainer` → `adb install -r mobile/build/fifa-trainer.apk`（**27,079,510 B**，证书 `e1841a17…32e046` 不变，`gate-b.sh` 全绿）。D0 按 `ACCEPTANCE.md` §6「D0 操作说明（04-11）」的 11 步走：X/Y **不应**改变符号（改十字键）、量程未满按 A 应停在设置页、布局行必须 `布局：Xbox（按 Start 切换，按 A 确认）`、覆盖层按 Y 应删档回设置页。`INPUT_SETUP` 每秒一行现在带 `layout=` / `confirmed=`。成功标准 2/3/4/5 仍未勾选。
@@ -341,6 +347,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-11-05T22:58:19.936Z
-Stopped at: Completed 05-06-PLAN.md
+Last session: 2026-11-06T10:30:07.000Z
+Stopped at: Completed 05-08-PLAN.md
 Resume file: None
