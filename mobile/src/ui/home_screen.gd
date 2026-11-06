@@ -142,6 +142,12 @@ func setup(p_runtime: GestureEngine, p_layout: StringName, p_buffer: PadStateBuf
 	_buffer = p_buffer
 	_elapsed = 0.0
 	_focused = 0
+	# 默认聚焦绿色搓射（tap 动作），与设计稿的英雄卡一致。
+	if _runtime != null:
+		for index in _runtime.active_skills().size():
+			if _runtime.active_skills()[index].skill.kind == &"taps":
+				_focused = index
+				break
 	_last_timer_text = ""
 	# 让第一次 `_process` 立刻刷新，而不是先空等 0.1 秒。
 	_accum = REFRESH_SECONDS
