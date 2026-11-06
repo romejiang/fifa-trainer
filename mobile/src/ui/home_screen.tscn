@@ -116,6 +116,7 @@ theme_override_font_sizes/font_size = 15
 text = "训练中"
 
 [node name="Title" type="Label" parent="Scroll/Margin/Root/Header/HeadMain"]
+visible = false
 unique_name_in_owner = true
 layout_mode = 2
 theme_override_colors/font_color = Color(0.113725, 0.113725, 0.121569, 1)
@@ -136,6 +137,7 @@ text = "00:00"
 horizontal_alignment = 2
 
 [node name="TimerLabel" type="Label" parent="Scroll/Margin/Root/Header/TimerBlock"]
+visible = false
 layout_mode = 2
 theme_override_colors/font_color = Color(0.556863, 0.556863, 0.576471, 1)
 theme_override_font_sizes/font_size = 13
@@ -143,6 +145,7 @@ text = "练习时长"
 horizontal_alignment = 2
 
 [node name="Device" type="Label" parent="Scroll/Margin/Root"]
+visible = false
 unique_name_in_owner = true
 layout_mode = 2
 theme_override_colors/font_color = Color(0.431373, 0.431373, 0.45098, 1)
@@ -187,9 +190,11 @@ theme_override_font_sizes/font_size = 13
 text = "Green Finesse"
 text_overrun_behavior = 3
 
-[node name="HeroState" type="Label" parent="Scroll/Margin/Root/Hero/HeroBox/HeroTop/HeroId/HeroMeta"]
+[node name="HeroState" type="Label" parent="Scroll/Margin/Root/Hero/HeroBox"]
 unique_name_in_owner = true
 layout_mode = 2
+autowrap_mode = 2
+size_flags_horizontal = 3
 theme_override_colors/font_color = Color(0.0235294, 0.419608, 0.164706, 1)
 theme_override_font_sizes/font_size = 13
 text = "还没有成功"
@@ -205,6 +210,7 @@ horizontal_alignment = 2
 
 [node name="HeroTip" type="Label" parent="Scroll/Margin/Root/Hero/HeroBox"]
 unique_name_in_owner = true
+visible = false
 layout_mode = 2
 theme_override_colors/font_color = Color(0.172549, 0.172549, 0.180392, 1)
 theme_override_font_sizes/font_size = 13
@@ -246,6 +252,48 @@ unique_name_in_owner = true
 layout_mode = 2
 theme_override_constants/separation = 0
 
+[node name="PadHead" type="HBoxContainer" parent="Scroll/Margin/Root"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="PadTitle" type="Label" parent="Scroll/Margin/Root/PadHead"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(0.431373, 0.431373, 0.45098, 1)
+theme_override_font_sizes/font_size = 17
+text = "手柄状态"
+
+[node name="PadHint" type="Label" parent="Scroll/Margin/Root/PadHead"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.556863, 0.556863, 0.576471, 1)
+theme_override_font_sizes/font_size = 13
+text = "按住 B 1 秒进入输入设置"
+
+[node name="Pad" type="PanelContainer" parent="Scroll/Margin/Root"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_pad")
+
+[node name="PadRow" type="HBoxContainer" parent="Scroll/Margin/Root/Pad"]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="PadText" type="Label" parent="Scroll/Margin/Root/Pad/PadRow"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.431373, 0.431373, 0.45098, 1)
+theme_override_font_sizes/font_size = 15
+text = "手柄未连接"
+autowrap_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 4
+
+[node name="Stick" type="Control" parent="Scroll/Margin/Root/Pad/PadRow"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(64, 64)
+layout_mode = 2
+script = ExtResource("2_stick")
+
 [node name="AttemptsHead" type="HBoxContainer" parent="Scroll/Margin/Root"]
 layout_mode = 2
 theme_override_constants/separation = 8
@@ -284,51 +332,3 @@ theme_override_constants/separation = 0
 custom_minimum_size = Vector2(0, 4)
 layout_mode = 2
 size_flags_vertical = 3
-
-[node name="PadHead" type="HBoxContainer" parent="Scroll/Margin/Root"]
-layout_mode = 2
-theme_override_constants/separation = 8
-
-[node name="PadTitle" type="Label" parent="Scroll/Margin/Root/PadHead"]
-layout_mode = 2
-size_flags_horizontal = 3
-theme_override_colors/font_color = Color(0.431373, 0.431373, 0.45098, 1)
-theme_override_font_sizes/font_size = 17
-text = "手柄状态"
-
-[node name="PadHint" type="Label" parent="Scroll/Margin/Root/PadHead"]
-layout_mode = 2
-theme_override_colors/font_color = Color(0.556863, 0.556863, 0.576471, 1)
-theme_override_font_sizes/font_size = 13
-text = "按住 B 1 秒进入输入设置"
-
-[node name="Pad" type="PanelContainer" parent="Scroll/Margin/Root"]
-unique_name_in_owner = true
-layout_mode = 2
-theme_override_styles/panel = SubResource("StyleBoxFlat_pad")
-
-[node name="PadRow" type="HBoxContainer" parent="Scroll/Margin/Root/Pad"]
-layout_mode = 2
-theme_override_constants/separation = 12
-
-[node name="PadText" type="Label" parent="Scroll/Margin/Root/Pad/PadRow"]
-unique_name_in_owner = true
-layout_mode = 2
-theme_override_colors/font_color = Color(0.431373, 0.431373, 0.45098, 1)
-theme_override_font_sizes/font_size = 15
-text = "手柄未连接"
-autowrap_mode = 2
-size_flags_horizontal = 3
-size_flags_vertical = 4
-
-[node name="LsStick" type="Control" parent="Scroll/Margin/Root/Pad/PadRow"]
-unique_name_in_owner = true
-custom_minimum_size = Vector2(52, 52)
-layout_mode = 2
-script = ExtResource("2_stick")
-
-[node name="RsStick" type="Control" parent="Scroll/Margin/Root/Pad/PadRow"]
-unique_name_in_owner = true
-custom_minimum_size = Vector2(52, 52)
-layout_mode = 2
-script = ExtResource("2_stick")

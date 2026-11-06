@@ -102,6 +102,7 @@ func run(r) -> void:
 		r.complete()
 		return
 	_check_counter_contracts(r, cases)
+	_check_focus_mode(r, cases, configs)
 	for case in cases:
 		_check_case(r, case, configs)
 	print("GESTURE_RUNTIME cases=%d mismatches=%d" % [cases.size(), _mismatches])
@@ -193,6 +194,59 @@ func _build_configs(r, data: Dictionary, cases: Array) -> Dictionary:
 
 ## 三条「反向对照」的机械落点：合成全局冷却必须吞掉命中，出厂冷却必须吞不掉；
 ## 10 连击必须正好完成一组。它们比较的是**期望值**，防止生成器把三条写成同一种形状。
+## 单练模式：非聚焦动作只 observe/abandon，不能产出判定。
+##
+## 用黄金夹具里的 `rt_green_ok` 轨迹做双向对照：聚焦绿色搓射必须仍有判定，
+## 聚焦别的动作时同一条轨迹必须一条判定都没有 —— 后者防止「置灰只是 UI 效果」。
+func _check_focus_mode(r, cases: Array, configs: Dictionary) -> void:
+	var green_case := {}
+	for case in cases:
+		if str(case.get("id", "")) == "rt_green_ok":
+			green_case = case
+			break
+	if green_case.is_empty():
+		_fail(r, "缺少 rt_green_ok，无法验证单练模式")
+		return
+	var config_key := str(green_case.get("config", "shipped"))
+	if not configs.has(config_key):
+		return
+	var config: AppConfig = configs[config_key]
+	var green_name := ""
+	var other_name := ""
+	for active in GestureEngine.new(config, true).active_skills():
+		if active.skill.kind == &"taps" and green_name.is_empty():
+			green_name = active.skill.name
+		elif active.skill.name != green_name and other_name.is_empty():
+			other_name = active.skill.name
+	r.check(not green_name.is_empty(), "出厂配置必须有一个 taps 动作供单练验证")
+	if green_name.is_empty():
+		return
+	var focused := GestureEngine.new(config, true)
+	focused.set_focused_skill(StringName(green_name))
+	var focused_outcomes := _replay(focused, green_case)
+	r.check(not focused_outcomes.is_empty(), "单练绿色搓射时同一轨迹必须仍有判定")
+	for outcome in focused_outcomes:
+		_eq_str(r, outcome.skill_name, green_name, "单练模式下 Outcome 只能来自聚焦动作")
+	var other := GestureEngine.new(config, true)
+	other.set_focused_skill(StringName(other_name))
+	var other_outcomes := _replay(other, green_case)
+	r.check(other_outcomes.is_empty(),
+		"单练 %s 时绿色搓射轨迹不得产生判定（实际 %d 条）"
+		% [other_name, other_outcomes.size()])
+	if not other_outcomes.is_empty():
+		_mismatches += 1
+
+
+func _replay(engine: GestureEngine, case: Dictionary) -> Array[Outcome]:
+	var collected: Array[Outcome] = []
+	var ls_points: Array = case.get("ls", [[0, 0.0, 0.9]])
+	for entry in case.get("frames", []):
+		var t_ms := int(entry[0])
+		engine.tick(_make_frame(entry, ls_points, t_ms))
+		collected.append_array(engine.pop_outcomes())
+	return collected
+
+
 func _check_counter_contracts(r, cases: Array) -> void:
 	for case in cases:
 		var case_id := str(case.get("id", ""))

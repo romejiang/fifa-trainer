@@ -21,7 +21,7 @@ extends Control
 
 ## 10 Hz：够读清摇杆与计数，也不会让文本整形占满一帧。
 const REFRESH_SECONDS := 0.1
-## 最近的尝试只保留最近 8 条（设计稿的「保留 8 / 50 条」）。
+## 最近的尝试只保留最近 50 条（设计稿的「保留 N / 50 条」）。
 const ATTEMPT_LIMIT := 50
 ## 熟练度进度条的目标次数（设计稿的 10 次目标）。
 const SKILL_TARGET := 10
@@ -57,8 +57,7 @@ const COLOR_ROW_FOCUS := Color("#F3F8FF")
 @onready var _pad: PanelContainer = %Pad
 @onready var _pad_text: Label = %PadText
 @onready var _attempts_hint: Label = %AttemptsHint
-@onready var _ls_stick: StickIndicator = %LsStick
-@onready var _rs_stick: StickIndicator = %RsStick
+@onready var _stick: StickIndicator = %Stick
 
 var _runtime: GestureEngine = null
 var _buffer: PadStateBuffer = null
@@ -83,7 +82,7 @@ var _skill_bars: Array[ProgressBar] = []
 var _skill_styles: Array[StyleBoxFlat] = []
 var _skill_focus_styles: Array[StyleBoxFlat] = []
 
-# 最近尝试的固定 8 行。空列表时显示一行占位文案。
+# 最近尝试的固定 50 行。空列表时显示一行占位文案。
 var _attempt_rows: Array[PanelContainer] = []
 var _attempt_times: Array[Label] = []
 var _attempt_names: Array[Label] = []
@@ -248,6 +247,10 @@ func _set_focus(value: int) -> void:
 	if value == _focused:
 		return
 	_focused = value
+	if _runtime != null:
+		var active := _runtime.active_skills()
+		if value >= 0 and value < active.size():
+			_runtime.set_focused_skill(active[value].skill.name)
 	_apply_skill_focus()
 	_refresh_hero()
 
@@ -287,14 +290,14 @@ func _refresh_hero() -> void:
 	var parts := split_name(skill.name)
 	_hero_name.text = parts[0]
 	_hero_en.text = parts[1]
-	_hero_state.text = hero_state_text(outcome)
+	var state := hero_state_text(outcome)
+	if outcome != null:
+		var detail := outcome.detail if outcome.ok else outcome.message
+		if not detail.is_empty():
+			state += " · " + detail
+	_hero_state.text = state
 	_hero_state.add_theme_color_override("font_color", _hero_state_color(outcome))
 	_hero_ms.text = hero_ms_text(outcome)
-	_hero_tip.text = hero_tip_text(outcome)
-	if outcome == null:
-		_hero_tip.add_theme_color_override("font_color", COLOR_TEXT_2)
-	else:
-		_hero_tip.add_theme_color_override("font_color", COLOR_GREEN_DEEP if outcome.ok else COLOR_FAILURE)
 	_hero_hint.text = hint_for(skill, _layout)
 
 
@@ -307,8 +310,11 @@ func _refresh_skills() -> void:
 	for index in active.size():
 		var item: ActiveSkill = active[index]
 		var parts := split_name(item.skill.name)
+		var focused := index == _focused
 		_skill_names[index].text = parts[0]
 		_skill_ratios[index].text = skill_ratio_text(item.hits, item.attempts)
+		_skill_names[index].add_theme_color_override("font_color", COLOR_TEXT if focused else COLOR_TEXT_3)
+		_skill_ratios[index].add_theme_color_override("font_color", COLOR_TEXT if focused else COLOR_TEXT_3)
 		_skill_bars[index].value = float(progress_value(item.hits))
 		var outcome: Outcome = item.last_outcome
 		if outcome == null:
@@ -346,11 +352,10 @@ func _refresh_pad() -> void:
 	var connected := _buffer != null and _buffer.device >= 0
 	var ls := Vector2.ZERO
 	var rs := Vector2.ZERO
-	if _buffer != null:
+	if connected and _buffer != null:
 		ls = Vector2(_buffer.axis_value(0), _buffer.axis_value(1))
 		rs = Vector2(_buffer.axis_value(2), _buffer.axis_value(3))
-	_ls_stick.set_value(ls)
-	_rs_stick.set_value(rs)
+	_stick.set_values(ls, rs)
 	_pad_text.text = pad_text(connected, ls, rs)
 
 
@@ -418,11 +423,15 @@ func _build_skill_rows() -> void:
 
 func _apply_skill_focus() -> void:
 	for index in _skill_rows.size():
-		var style := _skill_focus_styles[index] if index == _focused else _skill_styles[index]
+		var focused := index == _focused
+		var style := _skill_focus_styles[index] if focused else _skill_styles[index]
 		_skill_rows[index].add_theme_stylebox_override("panel", style)
+		if index < _skill_bars.size():
+			_skill_bars[index].add_theme_stylebox_override("fill",
+				_bar_style(Color("#00B84D") if focused else Color("#D9D9DE")))
 
 
-## 最近尝试的 8 行固定节点；空列表的占位文案也在这里建。
+## 最近尝试的 50 行固定节点；空列表的占位文案也在这里建。
 func _build_attempt_rows() -> void:
 	if not _attempt_rows.is_empty():
 		return

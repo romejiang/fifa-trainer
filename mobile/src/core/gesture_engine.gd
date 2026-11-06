@@ -76,6 +76,8 @@ var _idle_since: float = 0.0
 var _idle_cleared: bool = false
 var _outcomes: Array[Outcome] = []
 var _seq: int = 0
+## 单练模式：非空时只推进这一条动作，其余只做 observe/abandon。
+var focused_skill: StringName = &""
 
 
 ## `p_layout_confirmed` 默认 false：宁可什么都不判，也不要在轴映射未确认时给结论。
@@ -141,9 +143,26 @@ var groups_done: int:
 ## 唯一动作的名字；零个或多个动作时为空串（多动作的状态行由 Phase 6 定义）。
 var skill_name: String:
 	get:
+		if focused_skill != &"":
+			return String(focused_skill)
 		if _skills.size() == 1:
 			return _skills[0].skill.name
 		return ""
+
+
+## 单练：只推进这一条动作。空串 = 全部启用（测试与旧行为）。
+func set_focused_skill(name: StringName) -> void:
+	if focused_skill == name:
+		return
+	focused_skill = name
+	# 切换单练目标时静默清掉其余动作的半截进度，避免旧手势在新目标上误判。
+	for active in _skills:
+		if not _is_focused(active):
+			active.detector.abandon()
+
+
+func _is_focused(active: ActiveSkill) -> bool:
+	return focused_skill == &"" or active.skill.name == String(focused_skill)
 
 
 ## 一帧。分支顺序见类文档，不许重排。
@@ -182,6 +201,8 @@ func tick(frame: Frame) -> void:
 	# 4. 按住某个动作的修饰键时，只判定需要这个键的动作（engine.py:291-301）。
 	var held_required: Array[String] = []
 	for active in _skills:
+		if not _is_focused(active):
+			continue
 		for button_name in active.skill.required_buttons:
 			if frame.buttons.has(button_name) and not held_required.has(button_name):
 				held_required.append(button_name)
@@ -200,6 +221,11 @@ func tick(frame: Frame) -> void:
 		_idle_cleared = false
 
 	for active in _skills:
+		# 单练模式：非聚焦动作只更新外部按键状态并静默清空进度。
+		if not _is_focused(active):
+			active.detector.observe(frame)
+			active.detector.abandon()
+			continue
 		# a) 按住了别的动作的修饰键 -> 静默丢弃半截进度，不能过一会儿报「没做完」。
 		if not held_required.is_empty() and not _requires_any(active.skill, held_required):
 			active.detector.observe(frame)
@@ -282,6 +308,8 @@ func _drain_failures(now: float) -> void:
 		var failure := active.detector.pop_failure()
 		if failure == null:
 			continue
+		if not _is_focused(active):
+			continue
 		if owner != null:
 			continue
 		owner = active
@@ -331,6 +359,10 @@ func pop_outcomes() -> Array[Outcome]:
 func status() -> String:
 	if not layout_confirmed:
 		return "未确认布局"
+	if focused_skill != &"":
+		for active in _skills:
+			if active.skill.name == String(focused_skill):
+				return active.detector.status()
 	if _skills.size() == 1:
 		return _skills[0].detector.status()
 	return display_title
