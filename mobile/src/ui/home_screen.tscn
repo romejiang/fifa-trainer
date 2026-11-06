@@ -1,0 +1,297 @@
+[gd_scene load_steps=6 format=3]
+
+[ext_resource type="Script" path="res://src/ui/home_screen.gd" id="1_home"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_card"]
+bg_color = Color(1, 1, 1, 1)
+corner_radius_top_left = 14
+corner_radius_top_right = 14
+corner_radius_bottom_right = 14
+corner_radius_bottom_left = 14
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_hero"]
+content_margin_left = 14.0
+content_margin_top = 12.0
+content_margin_right = 14.0
+content_margin_bottom = 12.0
+bg_color = Color(1, 1, 1, 1)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.886275, 0.984314, 0.92549, 1)
+corner_radius_top_left = 14
+corner_radius_top_right = 14
+corner_radius_bottom_right = 14
+corner_radius_bottom_left = 14
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_pill"]
+content_margin_left = 10.0
+content_margin_top = 3.0
+content_margin_right = 10.0
+content_margin_bottom = 3.0
+bg_color = Color(0.886275, 0.984314, 0.92549, 1)
+corner_radius_top_left = 10
+corner_radius_top_right = 10
+corner_radius_bottom_right = 10
+corner_radius_bottom_left = 10
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_pad"]
+content_margin_left = 14.0
+content_margin_top = 12.0
+content_margin_right = 14.0
+content_margin_bottom = 12.0
+bg_color = Color(1, 1, 1, 1)
+corner_radius_top_left = 14
+corner_radius_top_right = 14
+corner_radius_bottom_right = 14
+corner_radius_bottom_left = 14
+
+[node name="HomeScreen" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_home")
+
+[node name="Bg" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.94902, 0.94902, 0.968627, 1)
+
+[node name="Margin" type="MarginContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/margin_left = 16
+theme_override_constants/margin_top = 16
+theme_override_constants/margin_right = 16
+theme_override_constants/margin_bottom = 16
+
+[node name="Root" type="VBoxContainer" parent="Margin"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="Header" type="HBoxContainer" parent="Margin/Root"]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="HeadMain" type="VBoxContainer" parent="Margin/Root/Header"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 6
+
+[node name="Status" type="PanelContainer" parent="Margin/Root/Header/HeadMain"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 0
+theme_override_styles/panel = SubResource("StyleBoxFlat_pill")
+
+[node name="StatusText" type="Label" parent="Margin/Root/Header/HeadMain/Status"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.0235294, 0.419608, 0.164706, 1)
+theme_override_font_sizes/font_size = 15
+text = "训练中"
+
+[node name="Title" type="Label" parent="Margin/Root/Header/HeadMain"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.113725, 0.113725, 0.121569, 1)
+theme_override_font_sizes/font_size = 28
+text = "花式练习"
+
+[node name="TimerBlock" type="VBoxContainer" parent="Margin/Root/Header"]
+layout_mode = 2
+size_flags_horizontal = 8
+theme_override_constants/separation = 2
+
+[node name="Timer" type="Label" parent="Margin/Root/Header/TimerBlock"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.113725, 0.113725, 0.121569, 1)
+theme_override_font_sizes/font_size = 28
+text = "00:00"
+horizontal_alignment = 2
+
+[node name="TimerLabel" type="Label" parent="Margin/Root/Header/TimerBlock"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.556863, 0.556863, 0.576471, 1)
+theme_override_font_sizes/font_size = 13
+text = "练习时长"
+horizontal_alignment = 2
+
+[node name="Device" type="Label" parent="Margin/Root"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.431373, 0.431373, 0.45098, 1)
+theme_override_font_sizes/font_size = 13
+text = "手柄未连接 · 打开电源后自动连接"
+
+[node name="Hero" type="PanelContainer" parent="Margin/Root"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_hero")
+
+[node name="HeroBox" type="VBoxContainer" parent="Margin/Root/Hero"]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="HeroTop" type="HBoxContainer" parent="Margin/Root/Hero/HeroBox"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="HeroId" type="VBoxContainer" parent="Margin/Root/Hero/HeroBox/HeroTop"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 2
+
+[node name="HeroName" type="Label" parent="Margin/Root/Hero/HeroBox/HeroTop/HeroId"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.113725, 0.113725, 0.121569, 1)
+theme_override_font_sizes/font_size = 24
+text = "绿色搓射"
+text_overrun_behavior = 3
+
+[node name="HeroMeta" type="HBoxContainer" parent="Margin/Root/Hero/HeroBox/HeroTop/HeroId"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="HeroEn" type="Label" parent="Margin/Root/Hero/HeroBox/HeroTop/HeroId/HeroMeta"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.556863, 0.556863, 0.576471, 1)
+theme_override_font_sizes/font_size = 13
+text = "Green Finesse"
+text_overrun_behavior = 3
+
+[node name="HeroState" type="Label" parent="Margin/Root/Hero/HeroBox/HeroTop/HeroId/HeroMeta"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.0235294, 0.419608, 0.164706, 1)
+theme_override_font_sizes/font_size = 15
+text = "还没有成功"
+
+[node name="HeroMs" type="Label" parent="Margin/Root/Hero/HeroBox/HeroTop"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 8
+theme_override_colors/font_color = Color(0.113725, 0.113725, 0.121569, 1)
+theme_override_font_sizes/font_size = 32
+text = "—"
+horizontal_alignment = 2
+
+[node name="HeroTip" type="Label" parent="Margin/Root/Hero/HeroBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.172549, 0.172549, 0.180392, 1)
+theme_override_font_sizes/font_size = 15
+text = "做对一个动作后，这里会显示识别结果。"
+autowrap_mode = 2
+
+[node name="HeroHint" type="Label" parent="Margin/Root/Hero/HeroBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.760784, 0.254902, 0.0470588, 1)
+theme_override_font_sizes/font_size = 13
+text = "十字键上下切换动作"
+autowrap_mode = 2
+
+[node name="SkillsHead" type="HBoxContainer" parent="Margin/Root"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="SkillsTitle" type="Label" parent="Margin/Root/SkillsHead"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(0.431373, 0.431373, 0.45098, 1)
+theme_override_font_sizes/font_size = 17
+text = "动作熟练度"
+
+[node name="SkillsHint" type="Label" parent="Margin/Root/SkillsHead"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.556863, 0.556863, 0.576471, 1)
+theme_override_font_sizes/font_size = 13
+text = "十字键切换"
+
+[node name="SkillsCard" type="PanelContainer" parent="Margin/Root"]
+layout_mode = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_card")
+
+[node name="Skills" type="VBoxContainer" parent="Margin/Root/SkillsCard"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_constants/separation = 0
+
+[node name="AttemptsHead" type="HBoxContainer" parent="Margin/Root"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="AttemptsTitle" type="Label" parent="Margin/Root/AttemptsHead"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(0.431373, 0.431373, 0.45098, 1)
+theme_override_font_sizes/font_size = 17
+text = "最近的尝试"
+
+[node name="AttemptsHint" type="Label" parent="Margin/Root/AttemptsHead"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.556863, 0.556863, 0.576471, 1)
+theme_override_font_sizes/font_size = 13
+text = "保留 8 / 50 条"
+
+[node name="AttemptsCard" type="PanelContainer" parent="Margin/Root"]
+layout_mode = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_card")
+
+[node name="Attempts" type="VBoxContainer" parent="Margin/Root/AttemptsCard"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_constants/separation = 0
+
+[node name="Spacer" type="Control" parent="Margin/Root"]
+custom_minimum_size = Vector2(0, 4)
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="PadHead" type="HBoxContainer" parent="Margin/Root"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="PadTitle" type="Label" parent="Margin/Root/PadHead"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(0.431373, 0.431373, 0.45098, 1)
+theme_override_font_sizes/font_size = 17
+text = "手柄状态"
+
+[node name="PadHint" type="Label" parent="Margin/Root/PadHead"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.556863, 0.556863, 0.576471, 1)
+theme_override_font_sizes/font_size = 13
+text = "按住 B 1 秒进入输入设置"
+
+[node name="Pad" type="PanelContainer" parent="Margin/Root"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_pad")
+
+[node name="PadText" type="Label" parent="Margin/Root/Pad"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.431373, 0.431373, 0.45098, 1)
+theme_override_font_sizes/font_size = 15
+text = "手柄未连接"
+autowrap_mode = 2

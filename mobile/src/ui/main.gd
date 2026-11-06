@@ -12,21 +12,21 @@ extends Control
 ## 这里仍然是**唯一**的接线处（零 autoload）：
 ##   * `PadSampler` 是唯一碰引擎输入单例的节点；
 ##   * 按钮边沿只有一个消费者（`_flush_button_edges`），按当前可见的屏分派；
-##   * `GestureEngine.tick()` 只在练习屏可见时推进 —— 输入设置页零 Outcome 的机械保证
-##     （运行时另有 `layout_confirmed` 硬门，两层都在）；
+##   * `GestureEngine.tick()` 只在主界面可见且已进入练习时推进 —— 输入设置页零
+##     Outcome 的机械保证（运行时另有 `layout_confirmed` 硬门，两层都在）；
 ##   * raw 轴 → `Frame` 的唯一换算入口是 `FrameBuilder`：本文件**不准**出现第二份
 ##     「减中点除量程」，也不准绕过它直接做校准归一化（T-05-23）。
 ##
-## 复用：启动时若本设备（guid 优先）已有档案、且 `DeviceProfile.can_enter_practice()`
-## 为真（rs 映射齐全 + 校准合理 + 布局已确认 + `quality.range_ready` 标记）→ 直接进练习；
-## 否则显示输入设置页。04-09 / 04-10 在量程没推满时保存的「默认校准」档案没有这个标记，
-## 因此会被丢弃、设置页重新出现 —— 这是 04-11 的第二个真机缺陷修法。
+## 首启（2026-11-06 起）：不再显示输入设置页。本设备（guid 优先）已有自洽档案 →
+## 直接进练习；没有档案 → 按已知品牌的标准映射（RS 2/3、LS 0/1、扳机 4/5）自动建档
+## 并直接进练习。竖屏主界面（`home_screen.tscn`）是**首屏**；输入设置页只从主界面
+## 按住 B 1 秒进入，用于换手柄或手工修正。
 ##
 ## 时间单位：`Frame.now` 是**秒**（`Time.get_ticks_usec()` 除以一百万），与
 ## 检测器的 `* 1000.0` 换算一致。`PadSampler` 的
 ## `_now_ms()` 是**事件时间戳**，单位毫秒；两者不能混用，也不要在本文件里换算。
 
-const PRACTICE_SCENE := preload("res://src/ui/practice_screen.tscn")
+const HOME_SCENE := preload("res://src/ui/home_screen.tscn")
 const INPUT_SETUP_SCENE := preload("res://src/ui/input_setup_screen.tscn")
 const DIAGNOSTICS_SCENE := preload("res://src/ui/diagnostics_overlay.tscn")
 ## 诊断覆盖层的组合键：LB + RB 同时按住 0.8 秒。
@@ -48,6 +48,7 @@ const BACK_HOLD_SECONDS := 1.0
 @onready var _config_error: Label = %ConfigError
 ## 04-09 之前的首启屏。保留节点与脚本，但不参与任何路径；`_ready` 里第一件事就是隐藏。
 @onready var _onboarding: Control = %Onboarding
+## 竖屏主界面的容器。首屏内容由 `home_screen.tscn` 填满，不再有占位 Label。
 @onready var _practice_container: Control = %Practice
 
 ## 多动作引擎：全部启用技能由**一个**实例驱动（D-11）。本文件不区分「当前练哪个动作」，
@@ -102,13 +103,14 @@ func _ready() -> void:
 	_runtime = GestureEngine.new(_config, false)
 	_profile_store = ProfileStore.new()
 	_sampler = PadSampler.new()
-	# 顺序即正确性：先建三块屏，再 connect，最后 add_child。
+	# 顺序即正确性：先建主界面与设置页，再 connect，最后 add_child。
 	#   * `add_child(_sampler)` 会让 `PadSampler._ready()` 立刻 emit 设备列表；
-	#     回调里可能直接进入练习（复用档案），所以练习屏必须先存在。
-	#   * 设置屏必须在 `add_child(_sampler)` 之前建好，回调里要能安全地隐藏它。
+	#     回调里可能直接进入练习（复用 / 自动建档），所以主界面必须先存在。
+	#   * 设置页排在主界面之后：同一个父节点下后加的子节点画在上面，B 键打开
+	#     设置页时它才会盖住主界面。
 	#   * 诊断覆盖层最后建，画在最上面。
+	_build_home_screen()
 	_build_input_setup()
-	_build_practice_screen()
 	_build_diagnostics()
 	_sampler.device_list_changed.connect(_on_device_list_changed)
 	add_child(_sampler)
@@ -136,13 +138,14 @@ func _process(delta: float) -> void:
 		_diagnostics.call("tick", delta)
 		return
 	_flush_button_edges()
-	# 练习屏返回：按住 B 一秒。读的是当前按住状态，不是边沿 —— 松开即清零。
-	if _in_practice:
+	# 主界面按住 B 一秒 = 回输入设置页。读的是当前按住状态，不是边沿 —— 松开即清零。
+	# 主界面在未连接 / 未建档时也可见，所以这里不再要求 `_in_practice`。
+	if _practice != null and _practice.visible:
 		if bool(_sampler.buffer.pressed_dict().has("B")):
 			_back_hold += delta
 			if _back_hold >= BACK_HOLD_SECONDS:
 				_back_hold = 0.0
-				_leave_practice()
+				_leave_practice(true)
 				return
 		else:
 			_back_hold = 0.0
@@ -173,21 +176,24 @@ func _raw_axes() -> PackedFloat32Array:
 
 ## 实例化一页式输入设置。**必须排在 `add_child(_sampler)` 之前**：采样节点 `_ready`
 ## 会 emit 设备列表，回调里会碰设置屏。
+##
+## 默认**不可见**：首启是竖屏主界面，设置页只从主界面按住 B 1 秒进入（2026-11-06
+## 的「不再要求输入设置」）。
 func _build_input_setup() -> void:
 	_setup = INPUT_SETUP_SCENE.instantiate()
 	add_child(_setup)
-	# 首启就是这一页：默认可见。只有「复用档案 / 保存成功」才会隐藏它。
-	_setup.visible = true
+	_setup.visible = false
 	_setup.connect("profile_saved", _on_profile_saved)
 	_setup.call("setup", _sampler, _profile_store)
 
 
-## 实例化练习屏进 `%Practice` 容器。**这里不调 `setup`**：进入练习的第一步才注入。
-## 04-05 的占位 Label 必须真正 `queue_free()`：它没有任何数据源。
-func _build_practice_screen() -> void:
-	_practice = PRACTICE_SCENE.instantiate()
+## 实例化竖屏主界面进 `%Practice` 容器。**这里不调 `setup`**：进入练习的第一步才注入。
+func _build_home_screen() -> void:
+	_practice = HOME_SCENE.instantiate()
 	_practice_container.add_child(_practice)
-	_practice.visible = false
+	# 首屏就是主界面：未连接时显示「等待手柄」而不是把用户丢进输入设置。
+	_practice.visible = true
+	_practice_container.visible = true
 	var placeholder := _practice_container.get_node_or_null("Placeholder")
 	if placeholder != null:
 		placeholder.queue_free()
@@ -259,20 +265,17 @@ func _flush_diagnostics_edges() -> void:
 	_seen_edges = total
 
 
-## 覆盖层按 Y 清除档案之后的唯一后续动作：关覆盖层、退出练习、回到设置页。
-##
-## 不清 `_profile_store` 实例（它只是路径句柄），但把 `_reuse_checked` 置为真：
-## 文件已经删了，即使下次设备列表变化也不需要再试一次复用 —— 用户此刻应该在
-## 设置页上重新推摇杆，而不是被自动带回练习。
+## 覆盖层按 Y 清除档案之后的唯一后续动作：关覆盖层、回到主界面，然后按标准映射
+## 重新自动建档。输入设置页不再作为这条路径的落点 —— 2026-11-06 起它只从主界面
+## 按住 B 1 秒进入；用户要重探手柄时走那一条，不会在被清档案后突然被丢进设置页。
 func _on_profile_cleared() -> void:
 	_diagnostics.visible = false
 	_layout_was_confirmed = false
-	_leave_practice()
-	if _setup != null:
-		_setup.visible = true
-		_setup.call("reset_stats")
-	_reuse_checked = true
+	_leave_practice(false)
+	_profile = null
+	_reuse_checked = false
 	_seen_edges = _sampler.buffer.button_edges().size()
+	_try_reuse_profile()
 
 
 ## 1 Hz 诊断日志：D5 / D6 的抄录来源（adb logcat -s godot:I）。
@@ -298,14 +301,15 @@ func _log_diagnostics(delta: float) -> void:
 			axis, buffer.axis_value(axis), span.x, span.y,
 		])
 	print("PAD_DEV name=%s guid=%s" % [_sampler.device_name(), _sampler.device_guid()])
-	if not _in_practice and _setup != null:
+	if _setup != null and _setup.visible:
 		# 输入设置页的「认了哪一对、符号是什么、量程到没到」——没有 run-as 时
 		# 这一行就是可核对的原文（04-07 的 D1 通道）。
 		print("INPUT_SETUP %s" % String(_setup.call("debug_line")))
 
 
-## 唯一的按钮边沿消费者。练习中不消费任何边沿：tap 手势走 `pressed_dict()`，
-## 两次解释同一次按下会让「按住 RB 连按两下 X」多出一条边沿。
+## 唯一的按钮边沿消费者。练习中把边沿转给主界面（只解释十字键，其余无动作）；
+## 未进入练习且设置页可见时转给设置页。tap 手势走 `pressed_dict()`，主界面对
+## 非十字键回 `false`，两次解释同一次按下不会多出一条判定。
 func _flush_button_edges() -> void:
 	var edges: Array = _sampler.buffer.button_edges()
 	var total := edges.size()
@@ -317,7 +321,10 @@ func _flush_button_edges() -> void:
 			continue
 		if _chord_hold > 0.0 and DIAGNOSTICS_CHORD_BUTTONS.has(int(edge["index"])):
 			continue
-		if _in_practice or _setup == null:
+		if _in_practice:
+			_practice.call("handle_button", int(edge["index"]))
+			continue
+		if _setup == null or not _setup.visible:
 			continue
 		_setup.call("handle_button", int(edge["index"]))
 	_seen_edges = total
@@ -335,15 +342,16 @@ func _on_profile_saved(layout: StringName) -> void:
 
 
 ## 进入练习。布局为空时按 Xbox 兜底：设置页总会写一个非空布局，走到这里说明
-## 档案来自更早的版本 —— 空布局会让练习屏进入「请返回引导重选」的死角。
+## 档案来自更早的版本 —— 空布局会让主界面进入「请返回引导重选」的死角。
 func _enter_practice(layout: StringName) -> void:
-	if _practice == null or _setup == null:
+	if _practice == null:
 		return
 	var effective := layout
 	if effective == &"":
 		effective = DeviceProfile.LAYOUT_XBOX
 	_in_practice = true
-	# 成功标准 4 的机械落点：只有走到这里（设置页按 A / 复用已存在档案）才置为已确认。
+	# 成功标准 4 的机械落点：只有走到这里（设置页按 A / 复用已存在档案 / 自动建档）
+	# 才置为已确认。
 	_runtime.set_layout_confirmed(true)
 	_practice.setup(_runtime, effective, _sampler.buffer)
 	_practice.visible = true
@@ -354,16 +362,20 @@ func _enter_practice(layout: StringName) -> void:
 	_seen_edges = _sampler.buffer.button_edges().size()
 
 
-## 回到设置页（断连 / 换手柄）。运行时静默清场：断连不是一次尝试。
-func _leave_practice() -> void:
-	if _setup == null or _practice == null:
+## 回到主界面；`show_setup=true` 时改显示输入设置页（按住 B 1 秒 / 换手柄重探）。
+## 运行时静默清场：断连与切页都不是一次尝试。
+func _leave_practice(show_setup := false) -> void:
+	if _practice == null:
 		return
 	_in_practice = false
 	_back_hold = 0.0
 	_runtime.set_layout_confirmed(false)
-	_practice.visible = false
-	_practice_container.visible = false
-	_setup.visible = true
+	_practice.visible = not show_setup
+	_practice_container.visible = not show_setup
+	if _setup != null:
+		_setup.visible = show_setup
+		if show_setup:
+			_setup.call("reset_stats")
 	_seen_edges = _sampler.buffer.button_edges().size()
 
 
