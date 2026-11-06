@@ -11,7 +11,8 @@
 base_font = ExtResource("1_sc")
 fallbacks = Array[Font]([ExtResource("2_sym")])
 ; 子集字体是可变字体，fvar 的默认实例是 wght=100（Thin）；28 px 正文在 1 m 外
-; 笔画偏细。这里显式选 400（Regular），不重生成子集、不改字形覆盖（按码点断言）。
+; 笔画偏细。这里显式选 700（Bold），不重生成子集、不改字形覆盖（按码点断言）。
+variation_embolden = 0.55
 variation_opentype = {
-&"wght": 400
+&"wght": 700
 }

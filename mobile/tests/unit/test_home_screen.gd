@@ -202,15 +202,15 @@ func _check_source_structure(r) -> void:
 		"main.gd 必须把十字键边沿转给 HomeScreen")
 
 
-## 9. 竖屏基准：orientation=1、720x1280。
+## 9. 竖屏基准：orientation=1、393x852（与 design/mobile.html 的逻辑尺寸一致）。
 func _check_portrait(r) -> void:
 	var text := _read_source(PROJECT_PATH)
 	r.check(text.contains("window/handheld/orientation=1"),
 		"project.godot 必须是竖屏（orientation=1）")
-	r.check(text.contains("window/size/viewport_width=720"),
-		"project.godot 基准宽度必须是 720")
-	r.check(text.contains("window/size/viewport_height=1280"),
-		"project.godot 基准高度必须是 1280")
+	r.check(text.contains("window/size/viewport_width=393"),
+		"project.godot 基准宽度必须是 393")
+	r.check(text.contains("window/size/viewport_height=852"),
+		"project.godot 基准高度必须是 852")
 
 
 ## 构造一个 Outcome：套件只关心 UI 读取的字段。

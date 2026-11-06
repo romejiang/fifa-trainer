@@ -125,6 +125,14 @@ func _ready() -> void:
 	# 场景里的静态文案不能停在「训练中」，否则首启无手柄会自相矛盾。
 	_refresh_header()
 	_refresh_pad()
+	_refresh_attempts()
+	# 标题与分节标题再重一档：子集字体的 700 在 2x 屏上还不够粗，800 才接近设计稿。
+	var bold: Font = load("res://assets/fonts/AppFontBold.tres")
+	if bold != null:
+		_title.add_theme_font_override("font", bold)
+		_hero_name.add_theme_font_override("font", bold)
+		%SkillsTitle.add_theme_font_override("font", bold)
+		%AttemptsTitle.add_theme_font_override("font", bold)
 
 
 ## 依赖唯一入口。组合根进入练习时调用；本屏不读设备、不推进判定。
@@ -318,13 +326,13 @@ func _build_skill_rows() -> void:
 		name_label.add_theme_color_override("font_color", COLOR_TEXT)
 		name_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 		var bar := ProgressBar.new()
-		bar.custom_minimum_size = Vector2(0, 8)
+		bar.custom_minimum_size = Vector2(0, 6)
 		bar.max_value = float(SKILL_TARGET)
 		bar.show_percentage = false
 		bar.add_theme_stylebox_override("background", _bar_style(Color("#E7ECE9")))
 		bar.add_theme_stylebox_override("fill", _bar_style(Color("#00B84D")))
 		var side := VBoxContainer.new()
-		side.custom_minimum_size = Vector2(72, 0)
+		side.custom_minimum_size = Vector2(64, 0)
 		side.add_theme_constant_override("separation", 1)
 		var ratio := Label.new()
 		ratio.add_theme_font_size_override("font_size", 15)
@@ -403,8 +411,8 @@ func _row_style(focused: bool, first: bool, last: bool) -> StyleBoxFlat:
 	style.bg_color = COLOR_ROW_FOCUS if focused else Color(0, 0, 0, 0)
 	style.content_margin_left = 12.0
 	style.content_margin_right = 12.0
-	style.content_margin_top = 7.0
-	style.content_margin_bottom = 7.0
+	style.content_margin_top = 5.0
+	style.content_margin_bottom = 5.0
 	if not first:
 		style.border_width_top = 1
 		style.border_color = Color("#ECECF0")
@@ -415,8 +423,8 @@ func _attempt_style(last: bool) -> StyleBoxFlat:
 	var style := StyleBoxFlat.new()
 	style.content_margin_left = 12.0
 	style.content_margin_right = 12.0
-	style.content_margin_top = 4.0
-	style.content_margin_bottom = 4.0
+	style.content_margin_top = 3.0
+	style.content_margin_bottom = 3.0
 	if not last:
 		style.border_width_bottom = 1
 		style.border_color = Color("#ECECF0")

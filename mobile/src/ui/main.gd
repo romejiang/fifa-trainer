@@ -195,6 +195,9 @@ func _build_home_screen() -> void:
 	# 首屏就是主界面：未连接时显示「等待手柄」而不是把用户丢进输入设置。
 	_practice.visible = true
 	_practice_container.visible = true
+	# 首屏就把 5 个动作的行建出来（0/0），不要让用户在等待手柄时看到空列表。
+	# 进入练习时 `_enter_practice` 会再调一次 setup，注入最终布局。
+	_practice.setup(_runtime, DeviceProfile.LAYOUT_XBOX, _sampler.buffer)
 	var placeholder := _practice_container.get_node_or_null("Placeholder")
 	if placeholder != null:
 		placeholder.queue_free()
