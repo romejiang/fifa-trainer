@@ -187,7 +187,8 @@ func _build_input_setup() -> void:
 	_setup.call("setup", _sampler, _profile_store)
 
 
-## 实例化竖屏主界面进 `%Practice` 容器。**这里不调 `setup`**：进入练习的第一步才注入。
+## 实例化竖屏主界面 `HomeScreen` 进 `%Practice` 容器。**这里不调 `setup`**：
+## 进入练习的第一步才注入。
 func _build_home_screen() -> void:
 	_practice = HOME_SCENE.instantiate()
 	_practice_container.add_child(_practice)
