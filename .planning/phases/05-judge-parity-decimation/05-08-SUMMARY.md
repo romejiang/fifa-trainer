@@ -20,9 +20,9 @@ provides:
 affects: [06-practice-loop, 07-feedback-loop, 09-device-acceptance]
 
 actuals:
-  tokens: 15927
+  tokens: 16141
   tasks: 3
-  commits: 3
+  commits: 6
 
 tech-stack:
   added: []
@@ -118,7 +118,7 @@ coverage:
         status: pass
     human_judgment: false
 
-duration: 15min
+duration: 24min
 completed: 2026-11-06
 status: complete
 ---
@@ -129,7 +129,7 @@ status: complete
 
 ## Performance
 
-- **Duration:** 15 min
+- **Duration:** 24 min
 - **Started:** 2026-11-06T10:15:02Z
 - **Completed:** 2026-11-06T10:30:07Z
 - **Tasks:** 3
@@ -149,8 +149,9 @@ status: complete
 1. **Task 1: 竖屏 HomeScreen 骨架 + 自动建档首启** - `31b31d1` (feat)
 2. **Task 2: 英雄卡 / 熟练度 / 最近尝试 / 手柄状态** - `55d573d` (feat)
 3. **Task 3: 无头格式套件 + 字体登记 + 重建 APK** - `f78d77b` (test)
+4. **Follow-up fix: 未建档手柄的连接状态** - `4ac92f7` (fix)
 
-**Plan metadata:** （本提交）docs(05-08): complete 竖屏主界面 plan
+**Plan metadata:** `4e61375` + 本次更新（docs: complete 竖屏主界面 plan）
 
 ## Files Created/Modified
 
@@ -184,21 +185,29 @@ status: complete
 - **Verification:** `test_home_screen` 的 `_check_source_structure` 通过，24 套件全绿。
 - **Committed in:** `f78d77b`（Task 3 提交）
 
+**2. [Rule 1 - Bug] 未建档手柄被误报为「手柄未连接」**
+- **Found during:** 收尾复核（首启无档案 / 未识别品牌路径）
+- **Issue:** `HomeScreen` 的 `_buffer` 只在 `setup()` 里注入；认不出的手柄不会自动建档，`setup()` 永远不调用，顶部设备行与底部摇杆卡停在场景静态文案「未连接」；无手柄首启时状态 pill 还会停在「训练中」。
+- **Fix:** `_ready()` 先刷新设备行/状态 pill；`main.gd` 在设备已绑定但未进入练习时用空布局调用 `setup()`（`layout_confirmed` 仍为假，零判定），让主界面拿到真实 `buffer`。
+- **Files modified:** `mobile/src/ui/home_screen.gd`, `mobile/src/ui/main.gd`
+- **Verification:** `test-core.sh` 24 套件 / 44,994 断言全绿；`make_font_subset.py --check` 仍为 1074 字符（无新增字形）。
+- **Committed in:** `4ac92f7`
+
 ### Plan/环境差异（非代码缺陷）
 
-**2. project.godot 竖屏与自动建档已在计划执行前落地**
+**3. project.godot 竖屏与自动建档已在计划执行前落地**
 - 计划 Task 1 列出的 `orientation=1` / 720×1280 与 `seed_known_defaults()` 自动建档已由前置提交 `06b2cdf` 完成；本计划只补主界面并保持这两条路径，未重复改动 `project.godot` 的竖屏段。验收命令中的两条 grep 均通过。
 
-**3. practice_screen.gd/tscn 保留但不再实例化**
+**4. practice_screen.gd/tscn 保留但不再实例化**
 - 计划允许「可保留但不再实例化」。为避免无意义改动，这两个文件保持原样；`gate-a.sh` 仍对 `practice_screen.gd` 做语法检查，旧的 `practice_wiring` 套件继续通过。
 
-**4. 设备名未进主界面（设计稿示例为具体型号）**
+**5. 设备名未进主界面（设计稿示例为具体型号）**
 - 受 `HomeScreen.setup(runtime, layout, buffer)` 三参接口约束，主界面拿不到 `PadSampler.device_name()`；设备行改用布局 + 连接状态。功能不受影响，真机验收表按实际显示判定。
 
 ---
 
-**Total deviations:** 1 auto-fixed（Rule 1）+ 3 计划/环境差异
-**Impact on plan:** 无范围蔓延；唯一下调的是设备行文案的具体程度，判定与统计路径未变。
+**Total deviations:** 2 auto-fixed（Rule 1）+ 3 计划/环境差异
+**Impact on plan:** 无范围蔓延；两次修复都是连接状态/源码结构断言的正确性问题，判定与统计路径未变。
 
 ## Issues Encountered
 
@@ -221,7 +230,7 @@ None - 无外部服务配置。真机验收（ACCEPTANCE 第 7 节 H1–H13）�
 ## Self-Check: PASSED
 
 - 文件存在：`mobile/src/ui/home_screen.gd` / `home_screen.tscn` / `mobile/tests/unit/test_home_screen.gd`
-- 提交存在：`31b31d1`、`55d573d`、`f78d77b` 均在 HEAD 祖先链上
+- 提交存在：`31b31d1`、`55d573d`、`f78d77b`、`4ac92f7`、`4e61375` 均在 HEAD 祖先链上
 - 闸门：`test-core.sh` 24 套件 / 44,994 断言 / `TESTS_DONE failures=0`；`gate-a.sh` `GLYPH_OK chars=1074`；`gate-b.sh` 证书 `e1841a17…32e046`；`check_desktop.sh` 302/302
 
 ---
