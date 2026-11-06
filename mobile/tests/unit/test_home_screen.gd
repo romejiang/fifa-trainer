@@ -6,7 +6,7 @@ extends RefCounted
 ##   1. 英雄卡文案：成功 / 失败 / 无判定三种状态下，状态词、毫秒位与提示行是否
 ##      只取 `Outcome` 的字段，而不是在本屏重拼原因；
 ##   2. 动作熟练度：`成功 / 尝试` 与 `hits / 10` 进度条的值是否正确（含上限）；
-##   3. 最近尝试：最多 8 条、新结果在前、同一 `seq` 只进一次；
+##   3. 最近尝试：最多 50 条、新结果在前、同一 `seq` 只进一次；
 ##   4. 交互与接线的源码结构：十字键焦点不回绕、`pop_outcomes()` 只有一个 drain
 ##      点、日志写在刷新显示之前、`main.gd` 不再 drain、首启不再显示输入设置页。
 ##
@@ -106,23 +106,23 @@ func _check_skill_rows(r) -> void:
 		"LB 在 PlayStation 布局必须写成 L1")
 
 
-## 4. 最近尝试：8 条上限、新结果在前、同 seq 去重、clear 归零。
+## 4. 最近尝试：50 条上限、新结果在前、同 seq 去重、clear 归零。
 func _check_attempts(r) -> void:
 	var log = HOME_SCRIPT.AttemptLog.new()
 	var pushed := 0
-	for index in 10:
+	for index in 60:
 		if log.push(_outcome(index + 1, true, "动作%d" % (index + 1), float(100 + index), "", ""), "02:20:%02d" % index):
 			pushed += 1
-	r.check(pushed == 10, "10 条全新结果必须全部被接收（实际 %d）" % pushed)
-	r.check(log.rows.size() == 8,
-		"最近尝试必须只保留 8 条（实际 %d）" % log.rows.size())
-	r.check(String(log.rows[0]["skill"]) == "动作10",
+	r.check(pushed == 60, "60 条全新结果必须全部被接收（实际 %d）" % pushed)
+	r.check(log.rows.size() == 50,
+		"最近尝试必须只保留 50 条（实际 %d）" % log.rows.size())
+	r.check(String(log.rows[0]["skill"]) == "动作60",
 		"最新一条必须在最前（实际 %s）" % String(log.rows[0]["skill"]))
-	r.check(String(log.rows[7]["skill"]) == "动作3",
-		"第 8 条必须是最旧保留的那条（实际 %s）" % String(log.rows[7]["skill"]))
-	r.check(not log.push(_outcome(10, true, "重复", 1.0, "", ""), "02:20:59"),
+	r.check(String(log.rows[49]["skill"]) == "动作11",
+		"第 50 条必须是最旧保留的那条（实际 %s）" % String(log.rows[49]["skill"]))
+	r.check(not log.push(_outcome(60, true, "重复", 1.0, "", ""), "02:20:59"),
 		"同一 seq 必须被拒绝")
-	r.check(log.rows.size() == 8, "同 seq 被拒后条数不得变化")
+	r.check(log.rows.size() == 50, "同 seq 被拒后条数不得变化")
 	r.check(not log.push(_outcome(5, true, "更旧", 1.0, "", ""), "02:21:00"),
 		"更小的 seq 必须被拒绝（序号单调）")
 	log.clear()

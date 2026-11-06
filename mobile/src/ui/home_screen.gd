@@ -22,7 +22,7 @@ extends Control
 ## 10 Hz：够读清摇杆与计数，也不会让文本整形占满一帧。
 const REFRESH_SECONDS := 0.1
 ## 最近的尝试只保留最近 8 条（设计稿的「保留 8 / 50 条」）。
-const ATTEMPT_LIMIT := 8
+const ATTEMPT_LIMIT := 50
 ## 熟练度进度条的目标次数（设计稿的 10 次目标）。
 const SKILL_TARGET := 10
 ## 摇杆低于这个幅度算「回中」；与引擎的 IDLE_STICK 同值，便于人读。
@@ -56,6 +56,9 @@ const COLOR_ROW_FOCUS := Color("#F3F8FF")
 @onready var _attempts: VBoxContainer = %Attempts
 @onready var _pad: PanelContainer = %Pad
 @onready var _pad_text: Label = %PadText
+@onready var _attempts_hint: Label = %AttemptsHint
+@onready var _ls_stick: StickIndicator = %LsStick
+@onready var _rs_stick: StickIndicator = %RsStick
 
 var _runtime: GestureEngine = null
 var _buffer: PadStateBuffer = null
@@ -85,6 +88,7 @@ var _attempt_rows: Array[PanelContainer] = []
 var _attempt_times: Array[Label] = []
 var _attempt_names: Array[Label] = []
 var _attempt_ms: Array[Label] = []
+var _attempt_reasons: Array[Label] = []
 var _attempt_empty: Label = null
 
 
@@ -93,7 +97,7 @@ var _attempt_empty: Label = null
 class AttemptLog:
 	extends RefCounted
 
-	const LIMIT := 8
+	const LIMIT := 50
 
 	var rows: Array[Dictionary] = []
 	var shown_seq: int = 0
@@ -109,6 +113,7 @@ class AttemptLog:
 			"ms": outcome.elapsed_ms,
 			"ok": outcome.ok,
 			"code": outcome.code,
+			"message": outcome.message,
 		})
 		while rows.size() > LIMIT:
 			rows.pop_back()
@@ -133,6 +138,39 @@ func _ready() -> void:
 		_hero_name.add_theme_font_override("font", bold)
 		%SkillsTitle.add_theme_font_override("font", bold)
 		%AttemptsTitle.add_theme_font_override("font", bold)
+	_configure_scrolling()
+
+
+## 卡片默认 `mouse_filter = STOP`，会吞掉拖拽事件，外层 ScrollContainer 就永远
+## 滚不动。把所有装饰性节点改成 IGNORE，只让内层「最近尝试」列表保留 STOP 自行滚动。
+func _configure_scrolling() -> void:
+	var scroll := get_node_or_null("Scroll")
+	if scroll == null:
+		return
+	var margin := scroll.get_node_or_null("Margin")
+	if margin == null:
+		return
+	_make_children_ignore(margin)
+
+
+func _make_children_ignore(node: Node) -> void:
+	for child in node.get_children():
+		if not (child is Control):
+			continue
+		if child.name == "AttemptsScroll":
+			child.mouse_filter = Control.MOUSE_FILTER_STOP
+			for sub in child.get_children():
+				_ignore_deep(sub)
+			continue
+		child.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_make_children_ignore(child)
+
+
+func _ignore_deep(node: Node) -> void:
+	if node is Control:
+		node.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	for child in node.get_children():
+		_ignore_deep(child)
 
 
 ## 依赖唯一入口。组合根进入练习时调用；本屏不读设备、不推进判定。
@@ -253,6 +291,10 @@ func _refresh_hero() -> void:
 	_hero_state.add_theme_color_override("font_color", _hero_state_color(outcome))
 	_hero_ms.text = hero_ms_text(outcome)
 	_hero_tip.text = hero_tip_text(outcome)
+	if outcome == null:
+		_hero_tip.add_theme_color_override("font_color", COLOR_TEXT_2)
+	else:
+		_hero_tip.add_theme_color_override("font_color", COLOR_GREEN_DEEP if outcome.ok else COLOR_FAILURE)
 	_hero_hint.text = hint_for(skill, _layout)
 
 
@@ -286,10 +328,17 @@ func _refresh_attempts() -> void:
 		_attempt_rows[index].visible = index < count
 	for index in count:
 		var entry: Dictionary = _log.rows[index]
+		var ok := bool(entry.get("ok", false))
 		_attempt_times[index].text = String(entry.get("time", ""))
 		_attempt_names[index].text = split_name(String(entry.get("skill", "")))[0]
 		_attempt_ms[index].text = "%d ms" % int(round(float(entry.get("ms", 0.0))))
+		_attempt_names[index].add_theme_color_override("font_color", COLOR_GREEN_DEEP if ok else COLOR_FAILURE)
+		_attempt_ms[index].add_theme_color_override("font_color", COLOR_GREEN_DEEP if ok else COLOR_FAILURE)
+		var reason := String(entry.get("message", ""))
+		_attempt_reasons[index].text = reason
+		_attempt_reasons[index].visible = not ok and not reason.is_empty()
 	_attempt_empty.visible = count == 0
+	_attempts_hint.text = "保留 %d / %d 条" % [count, ATTEMPT_LIMIT]
 
 
 ## 底部手柄状态卡：左/右摇杆当前原始值与连接状态。
@@ -300,6 +349,8 @@ func _refresh_pad() -> void:
 	if _buffer != null:
 		ls = Vector2(_buffer.axis_value(0), _buffer.axis_value(1))
 		rs = Vector2(_buffer.axis_value(2), _buffer.axis_value(3))
+	_ls_stick.set_value(ls)
+	_rs_stick.set_value(rs)
 	_pad_text.text = pad_text(connected, ls, rs)
 
 
@@ -326,13 +377,13 @@ func _build_skill_rows() -> void:
 		box.add_theme_constant_override("separation", 10)
 		var main := VBoxContainer.new()
 		main.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		main.add_theme_constant_override("separation", 5)
+		main.add_theme_constant_override("separation", 1)
 		var name_label := Label.new()
 		name_label.add_theme_font_size_override("font_size", 15)
 		name_label.add_theme_color_override("font_color", COLOR_TEXT)
 		name_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 		var bar := ProgressBar.new()
-		bar.custom_minimum_size = Vector2(0, 6)
+		bar.custom_minimum_size = Vector2(0, 4)
 		bar.max_value = float(SKILL_TARGET)
 		bar.show_percentage = false
 		bar.add_theme_stylebox_override("background", _bar_style(Color("#E7ECE9")))
@@ -341,11 +392,11 @@ func _build_skill_rows() -> void:
 		side.custom_minimum_size = Vector2(64, 0)
 		side.add_theme_constant_override("separation", 1)
 		var ratio := Label.new()
-		ratio.add_theme_font_size_override("font_size", 15)
+		ratio.add_theme_font_size_override("font_size", 13)
 		ratio.add_theme_color_override("font_color", COLOR_TEXT)
 		ratio.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 		var recent := Label.new()
-		recent.add_theme_font_size_override("font_size", 13)
+		recent.add_theme_font_size_override("font_size", 12)
 		recent.add_theme_color_override("font_color", COLOR_TEXT_3)
 		recent.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 		main.add_child(name_label)
@@ -380,18 +431,20 @@ func _build_attempt_rows() -> void:
 	_attempt_empty.add_theme_color_override("font_color", COLOR_TEXT_3)
 	_attempt_empty.text = "暂无尝试记录，做对一个动作后会出现在这里。"
 	_attempt_empty.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_attempt_empty.custom_minimum_size = Vector2(0, 56)
+	_attempt_empty.custom_minimum_size = Vector2(0, 40)
 	_attempt_empty.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	_attempts.add_child(_attempt_empty)
 	for index in ATTEMPT_LIMIT:
 		var panel := PanelContainer.new()
 		panel.add_theme_stylebox_override("panel", _attempt_style(index == ATTEMPT_LIMIT - 1))
+		var box := VBoxContainer.new()
+		box.add_theme_constant_override("separation", 0)
 		var row := HBoxContainer.new()
-		row.add_theme_constant_override("separation", 10)
+		row.add_theme_constant_override("separation", 8)
 		var stamp := Label.new()
 		stamp.add_theme_font_size_override("font_size", 13)
 		stamp.add_theme_color_override("font_color", COLOR_TEXT_3)
-		stamp.custom_minimum_size = Vector2(84, 0)
+		stamp.custom_minimum_size = Vector2(72, 0)
 		var name_label := Label.new()
 		name_label.add_theme_font_size_override("font_size", 15)
 		name_label.add_theme_color_override("font_color", COLOR_TEXT)
@@ -401,15 +454,23 @@ func _build_attempt_rows() -> void:
 		ms.add_theme_font_size_override("font_size", 15)
 		ms.add_theme_color_override("font_color", COLOR_TEXT)
 		ms.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+		var reason := Label.new()
+		reason.add_theme_font_size_override("font_size", 12)
+		reason.add_theme_color_override("font_color", COLOR_FAILURE)
+		reason.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+		reason.visible = false
 		row.add_child(stamp)
 		row.add_child(name_label)
 		row.add_child(ms)
-		panel.add_child(row)
+		box.add_child(row)
+		box.add_child(reason)
+		panel.add_child(box)
 		_attempts.add_child(panel)
 		_attempt_rows.append(panel)
 		_attempt_times.append(stamp)
 		_attempt_names.append(name_label)
 		_attempt_ms.append(ms)
+		_attempt_reasons.append(reason)
 
 
 func _row_style(focused: bool, first: bool, last: bool) -> StyleBoxFlat:
@@ -417,8 +478,8 @@ func _row_style(focused: bool, first: bool, last: bool) -> StyleBoxFlat:
 	style.bg_color = COLOR_ROW_FOCUS if focused else Color(0, 0, 0, 0)
 	style.content_margin_left = 12.0
 	style.content_margin_right = 12.0
-	style.content_margin_top = 5.0
-	style.content_margin_bottom = 5.0
+	style.content_margin_top = 2.0
+	style.content_margin_bottom = 2.0
 	if not first:
 		style.border_width_top = 1
 		style.border_color = Color("#ECECF0")
@@ -429,8 +490,8 @@ func _attempt_style(last: bool) -> StyleBoxFlat:
 	var style := StyleBoxFlat.new()
 	style.content_margin_left = 12.0
 	style.content_margin_right = 12.0
-	style.content_margin_top = 3.0
-	style.content_margin_bottom = 3.0
+	style.content_margin_top = 2.0
+	style.content_margin_bottom = 2.0
 	if not last:
 		style.border_width_bottom = 1
 		style.border_color = Color("#ECECF0")
