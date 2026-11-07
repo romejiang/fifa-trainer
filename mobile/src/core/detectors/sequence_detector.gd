@@ -21,6 +21,10 @@ extends Detector
 ##
 ## 方向基准：序列一旦开始，`last_base` 就固定为起手时的左摇杆朝向；中途左摇杆
 ## 怎么动都不再改变判定基准，避免动作中途「换了参照系」。
+##
+## `measured` 只由本类在产生 `Hit` / `Failure` 的那一刻构造（`_measured()`）：每一步的
+## 实际保持时长与**完成时刻**都来自判定现场的累积量（`_step_t` 是纯增量字段，不进
+## 任何判定分支）。UI 不得二次计算，也不得从文案里抠数字。
 
 
 ## 已校验的方向步骤。
@@ -66,6 +70,12 @@ var _step_lo: Array = []
 var _step_hi: Array = []
 var _step_sum: Array[float] = []
 var _step_n: Array[int] = []
+## 每一步**完成**的时刻（毫秒口径的时间轴值）；元素是 `null` 或 `float`。
+## 纯增量字段：只在 `index += 1` 的同一处写入、只在构造 `measured` 时读取，
+## **不得出现在任何判定条件里**（T-05-15）。`_have_step_t` 与它成对表示
+## 「有没有写过」，与仓库的 `_have_*` 纪律一致。
+var _step_t: Array = []
+var _have_step_t: bool = false
 var _facing: float = 0.0
 var _buttons: Dictionary = {}
 var _required: Array[String] = []
@@ -142,11 +152,14 @@ func _reset_metrics() -> void:
 	_step_hi = []
 	_step_sum = []
 	_step_n = []
+	_step_t = []
 	for _i in range(count):
 		_step_lo.append(null)
 		_step_hi.append(null)
 		_step_sum.append(0.0)
 		_step_n.append(0)
+		_step_t.append(null)
+	_have_step_t = false
 
 
 func _note_angle(step_index: int, angle: float) -> void:
@@ -190,6 +203,40 @@ func _summary(hold_ms: float) -> String:
 	return "相对朝向 %s" % joined
 
 
+## 构造本次判定的结构化度量（JUDGE-05，RESEARCH §D.5 的 Sequence 字段表）。
+##
+## 只在产生 `Hit` / `Failure` 的那一刻调用；数值全部来自 `_step_lo/_hi/_sum/_n`、
+## `_step_t` 与调用方给出的保持时长，这里不重算判定。
+##
+## `hold_ms` 只对 `hold_index` 那一步有意义：成功路径传已经取出的 `fired_hold_ms`，
+## 失败路径传 `_best_hold_ms`；其余步骤写 0 —— 与参考实现 `_summary()` 只保留最后
+## 一步保持时长的口径一致（detectors.py:559-568）。
+func _measured(elapsed_ms: float, hold_ms: float, hold_index: int) -> Dictionary:
+	var base := last_base if relative else 0.0
+	var steps_data: Array = []
+	for step_index in range(steps.size()):
+		var count: int = _step_n[step_index]
+		var average: Variant = null
+		if count > 0:
+			average = float(_step_sum[step_index]) / float(count)
+		steps_data.append({
+			"label": steps[step_index].label(),
+			"required_hold_ms": steps[step_index].hold_ms,
+			"actual_hold_ms": hold_ms if step_index == hold_index else 0.0,
+			"t_done_ms": _step_t[step_index],
+			"angle_lo_deg": _step_lo[step_index],
+			"angle_hi_deg": _step_hi[step_index],
+			"angle_avg_deg": average,
+		})
+	return {
+		"kind": "sequence",
+		"elapsed_ms": elapsed_ms,
+		"base_deg": base,
+		"tolerance_deg": tolerance,
+		"steps": steps_data,
+	}
+
+
 func _clear_progress() -> void:
 	index = 0
 	_have_t0 = false
@@ -218,18 +265,23 @@ func _abandon_failure(now: float, timed_out := false) -> Failure:
 	if not _have_t0:
 		return null
 	var elapsed_ms := (now - t0) * 1000.0
-	var step: Step = steps[mini(index, steps.size() - 1)]
+	var current := mini(index, steps.size() - 1)
+	var step: Step = steps[current]
+	# 失败路径的保持时长就是 `_best_hold_ms`；它只可能属于当前这一步。
+	var measured := _measured(elapsed_ms, _best_hold_ms, current)
 	if timed_out:
 		return Failure.new(
 			&"too_slow",
 			"太慢了：用了 %.0fms（上限 %.0fms）" % [elapsed_ms, max_ms],
 			elapsed_ms,
+			measured,
 		)
 	if step.hold_ms > 0.0 and _best_hold_ms > 0.0:
 		return Failure.new(
 			&"hold_short",
 			"保持不够：只保持了 %.0fms（需要 %.0fms）" % [_best_hold_ms, step.hold_ms],
 			elapsed_ms,
+			measured,
 		)
 	if index > 0:
 		var done := PackedStringArray()
@@ -240,6 +292,7 @@ func _abandon_failure(now: float, timed_out := false) -> Failure:
 			"没做完：只做到第 %d/%d 步（%s → 还差 %s）"
 				% [index, steps.size(), " → ".join(done), step.label()],
 			elapsed_ms,
+			measured,
 		)
 	return null
 
@@ -381,12 +434,19 @@ func update(frame: Frame) -> Hit:
 				&"too_fast",
 				"太快了：整个动作只用了 %.0fms（至少 %.0fms）" % [elapsed_ms, min_ms],
 				elapsed_ms,
+				_measured(elapsed_ms, _best_hold_ms, index),
 			))
 			_abort()
 			return null
 
 	index += 1
 	neutral = false
+	# 记录**完成**这一步的时刻。纯增量：只有 measured.steps[].t_done_ms 读它，
+	# 任何判定分支都不读（T-05-15）。写在 `index += 1` 的同一处，语义是「刚完成
+	# 的是上一索引那一步」。`Frame.now` 是秒，而字段对外承诺毫秒（`t_done_ms`），
+	# 换算只在这里做一次 —— 存秒会让下游每个消费者都可能漏乘 1000。
+	_step_t[index - 1] = now * 1000.0
+	_have_step_t = true
 	# 保持时长要在清零前取出来，否则成功摘要里永远是 0ms。
 	var fired_hold_ms := _best_hold_ms if step.hold_ms > 0.0 else 0.0
 	_have_hold_since = false
@@ -398,6 +458,8 @@ func update(frame: Frame) -> Hit:
 		var elapsed_ms := (now - t0) * 1000.0
 		var detail := _describe()
 		var summary := _summary(fired_hold_ms)
+		# 必须赶在 `_reset_metrics()` 之前构造：保持时长与完成时刻都在那里被清空。
+		var measured := _measured(elapsed_ms, fired_hold_ms, steps.size() - 1)
 		index = 0
 		_have_t0 = false
 		t0 = 0.0
@@ -406,7 +468,7 @@ func update(frame: Frame) -> Hit:
 		_have_release_since = false
 		_release_since = 0.0
 		_reset_metrics()
-		return Hit.new(elapsed_ms, detail, summary)
+		return Hit.new(elapsed_ms, detail, summary, measured)
 	return null
 
 

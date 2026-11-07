@@ -329,8 +329,9 @@ func _check_group_rollover(r, skill: Skill, config: AppConfig) -> void:
 		"默认组容量必须等于 GROUP_SIZE")
 
 
-## `relative_to_ls` 的技能在本阶段没有左摇杆基准：运行时整个禁用，任意输入零判定。
-## 这条护栏必须是**构造期**决定的，不能靠调用方记得不喂帧。
+## `relative_to_ls` 的技能在本阶段没有左摇杆基准：任意输入零判定。
+## 运行期由 `ls_ok` 决定；旧用例的帧不带 LS（`ls_mag` 默认 0），行为不变。
+## 护栏不能靠调用方记得不喂帧。
 func _check_relative_skill_disabled(r, skill: Skill, config: AppConfig) -> void:
 	var relative := Skill.new()
 	relative.name = skill.name

@@ -77,6 +77,15 @@ if ! python3 "$repo_root/tools/gen_gesture_golden.py" --check; then
     exit 1
 fi
 
+# 抽稀夹具（JUDGE-07）同理：它必须是从 250 Hz 源夹具重新推导的生成物。
+# `--check` 同时跑生成器的五条自断言（时间戳子集 / 按钮沿 / 双向白名单 / 条数），
+# 任何一条不成立都说明夹具被手改或生成器坏了，必须在 Godot 之前判红。
+echo "▸ 校验抽稀夹具未漂移（120 / 90 / 60 Hz）…"
+if ! python3 "$repo_root/tools/decimate_trace.py" --check; then
+    echo "  运行 python3 tools/decimate_trace.py 重新生成抽稀夹具后再试。" >&2
+    exit 1
+fi
+
 # 轴枚举常量的零出现断言（INPUT-02）。纯文本、毫秒级、零 Godot 依赖 —— 放在导入
 # 之前，反例自测才能在几秒内变红，而不必跑完整个 Godot 套件。
 # 注意：这条断言**扫描注释**，所以源码里解释这条规则时必须用中文，不能把常量名写进
@@ -186,13 +195,42 @@ fi
 echo "✓ tap 运行时回放：$(grep -E '^TAP_GOLDEN_RUNTIME ' "$tmp/tests.log")"
 
 # 手势回放的正向哨兵：与 tap 分开，tap 的 18 条用例不能替手势语料作证。
-# 没有这一行，等于「夹具没被读过」也能绿；mismatches 必须为 0，且 cases 至少 35
+# 没有这一行，等于「夹具没被读过」也能绿；mismatches 必须为 0，且 cases 至少 52
 # （真空绿的反面）。阈值与套件 _check_scale 的下限是同一个数字。
-if ! grep -qE '^GESTURE_GOLDEN cases=(3[5-9]|[4-9][0-9]|[1-9][0-9]{2,}) mismatches=0$' "$tmp/tests.log"; then
+if ! grep -qE '^GESTURE_GOLDEN cases=(5[2-9]|[6-9][0-9]|[1-9][0-9]{2,}) mismatches=0$' "$tmp/tests.log"; then
     echo "✗ 没有 GESTURE_GOLDEN cases=N mismatches=0（夹具未回放或跨语言判定有差异）" >&2
     grep -E '^GESTURE_GOLDEN ' "$tmp/tests.log" >&2 || true
     exit 1
 fi
 echo "✓ 手势回放：$(grep -E '^GESTURE_GOLDEN ' "$tmp/tests.log")"
 
-echo "✓ 核心闸门通过：配置一致、边界干净、黄金未漂移、tap 回放一致、运行时判定一致、核心套件全绿"
+# 引擎回放的正向哨兵：与检测器回放分开，55 条检测器用例不能替 29 条引擎用例作证。
+# 阈值与套件 `_check_scale` 的下限是同一个数字（29）；mismatches 必须为 0。
+if ! grep -qE '^GESTURE_RUNTIME cases=(29|[3-9][0-9]|[1-9][0-9]{2,}) mismatches=0$' "$tmp/tests.log"; then
+    echo "✗ 没有 GESTURE_RUNTIME cases=N mismatches=0（引擎期望未回放或跨语言判定有差异）" >&2
+    grep -E '^GESTURE_RUNTIME ' "$tmp/tests.log" >&2 || true
+    exit 1
+fi
+echo "✓ 引擎回放：$(grep -E '^GESTURE_RUNTIME ' "$tmp/tests.log")"
+
+# 结构化度量（JUDGE-05）的正向哨兵：桌面参考不产出 measured，因此它没有跨语言
+# oracle —— 只能由已知轨迹的独立断言证明。阈值 12 与套件 `_cases` 的下限是同一个
+# 数字：手删任何一组，套件自己先红，这里再兜一层「哨兵缺失 / mismatches 非 0」。
+if ! grep -qE '^MEASURED cases=(1[2-9]|[2-9][0-9]|[1-9][0-9]{2,}) mismatches=0$' "$tmp/tests.log"; then
+    echo "✗ 没有 MEASURED cases=N（≥12）mismatches=0（结构化度量未被独立断言，或字段算错）" >&2
+    grep -E '^MEASURED ' "$tmp/tests.log" >&2 || true
+    exit 1
+fi
+echo "✓ 结构化度量：$(grep -E '^MEASURED ' "$tmp/tests.log")"
+
+# 抽稀矩阵（JUDGE-07）的正向哨兵：三档速率（120 / 90 / 60）必须全部回放，
+# cases 下限 240 与套件 `_check_scale` 的 MIN_CASES 是同一个数字；mismatches
+# 必须为 0。没有这一行，等于「抽稀夹具没被读过」也能绿。
+if ! grep -qE '^DECIMATION rates=3 cases=(2[4-9][0-9]|[3-9][0-9]{2}|[1-9][0-9]{3,}) mismatches=0$' "$tmp/tests.log"; then
+    echo "✗ 没有 DECIMATION rates=3 cases=N（≥240）mismatches=0（抽稀语料未回放或跨采样率判定有差异）" >&2
+    grep -E '^DECIMATION ' "$tmp/tests.log" >&2 || true
+    exit 1
+fi
+echo "✓ 抽稀矩阵：$(grep -E '^DECIMATION ' "$tmp/tests.log")"
+
+echo "✓ 核心闸门通过：配置一致、边界干净、黄金未漂移、tap 回放一致、运行时判定一致、结构化度量一致、核心套件全绿"

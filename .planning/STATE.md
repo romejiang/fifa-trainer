@@ -2,19 +2,19 @@
 gsd_state_version: "1.0"
 current_phase: 5
 current_phase_name: 全动作判定对等性 — 三类检测器 + 引擎仲裁 + 抽稀矩阵
-current_plan: 2
+current_plan: 8
 status: executing
-stopped_at: Completed 05-02-PLAN.md
-last_updated: "2026-11-06T02:30:00.000Z"
-last_activity: "2026-11-06 — 完成 quick task 261105-wi7（桌面版 UI 亮色改版）；05-02 变体配置完成"
-state_head: 9d8dca9767b923b3f62ce068cb4f0e9489464efa
+stopped_at: Completed 05-08-PLAN.md
+last_updated: "2026-11-06T10:37:45.000Z"
+last_activity: "2026-11-06 — 05-08 完成；另完成 quick task 261105-wi7（桌面版 UI 亮色改版）"
+state_head: 4ac92f7
 progress:
   total_phases: 10
   completed_phases: 4
   total_plans: 34
-  completed_plans: 27
+  completed_plans: 33
   percent: 40
-last_activity_desc: Phase 5 plan 02 complete — 6 条变体配置与 relative/absolute 反向对照；quick task 261105-wi7 完成桌面版 UI 亮色改版（高 DPI / 系统字体 / 照片 / 摇杆）
+last_activity_desc: Phase 5 plan 08 complete — 竖屏 HomeScreen + 首启自动建档 + 重建 APK；quick task 261105-wi7 完成桌面版 UI 亮色改版（高 DPI / 系统字体 / 照片 / 摇杆）
 ---
 
 # Project State
@@ -28,21 +28,21 @@ See: .planning/PROJECT.md (updated 2026-11-04)
 
 ## Current Position
 
-Current Plan: 2
-Total Plans in Phase: 7
+Current Plan: 8
+Total Plans in Phase: 8
 Phase: 5 (全动作判定对等性 — 三类检测器 + 引擎仲裁 + 抽稀矩阵) — EXECUTING
-Plan: 2 of 7
-Status: Executing Phase 5
-Last activity: 2026-11-06 — 05-02 完成：6 条变体配置与 relative/absolute 反向对照；随后完成 quick task 261105-wi7（桌面版亮色 UI）
+Plan: 8 of 8
+Status: 05-08 已执行；待 Phase 5 验证与真机 UAT
+Last activity: 2026-11-06 — 05-08 完成：竖屏主界面、首启自动建档、24 套件 / 44,994 断言、APK 27,150,559 B；另完成 quick task 261105-wi7（桌面版亮色 UI）
 
 Progress: [████░░░░░░] 40%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 27
+- Total plans completed: 32
 - Average duration: — min
-- Total execution time: 1.2 hours
+- Total execution time: 2.8 hours
 
 **By Phase:**
 
@@ -52,6 +52,7 @@ Progress: [████░░░░░░] 40%
 | 2 | 5 | - | - |
 | 3 | 6 | - | - |
 | 4 | 11 | - | - |
+| 5 | 4 | - | - |
 
 **Recent Trend:**
 - Last 5 plans: —
@@ -89,6 +90,12 @@ Progress: [████░░░░░░] 40%
 | Phase 4 P10 | 13min | 2 tasks | 9 files |
 | Phase 4 P11 | 18min | 2 tasks | 16 files |
 | Phase 5 P01 | 14min | 3 tasks | 16 files |
+| Phase 5 P02 | 13min | 3 tasks | 4 files |
+| Phase 5 P03 | 43min | 3 tasks | 12 files |
+| Phase 5 P04 | 39min | 3 tasks | 12 files |
+| Phase 5 P05 | 37min | 3 tasks | 8 files |
+| Phase 5 P6 | 26min | 3 tasks | 12 files |
+| Phase 5 P08 | 24min | 3 tasks | 12 files |
 
 ## Accumulated Context
 
@@ -225,6 +232,11 @@ Recent decisions affecting current work:
 - [Phase 5]: `direction_name()` 的数字回落分支在参考实现里不可达（八向间隔 45°，最近卡点恒 ≤ 22.5°）；保留为死分支以维持逐行对等，`30°` 的真实结果是「前右」
 - [Phase 5]: `_assert_not_rounding_cliff` 在 `update()` 之前预演会被 `%.0f` 格式化的 `swept` / `end_rel`；踩单车语料因此选 0.72°/帧（500ms），避开 4.5° 刀口
 - [Phase 5]: 失败码只写数学可达的配置：油炸丸子不写 `too_fast`；`overshoot` / `wrong_direction` 出厂配置不可达，留给变体配置用例
+- [Phase 5]: 边界用例的刀口必须放在最后一帧：参考实现「进入终点窗口就成功」，中途满足会提前命中，测到的是窗口入口而不是边界
+- [Phase 5]: 时长边界从检测器 `t0`（推过 enter 的那一帧）起算；夹具 `end_ms` = 边界时长 + 100ms 起手延迟
+- [Phase 5]: 逆时针 sweep 必须写负的 `angle_to`（线性插值 + `norm_deg`）；写 325 会变成顺时针 271°，这是生成器层面最先暴露的坑
+- [Phase 5]: 变体只改一个维度：顶层 `relative_to_ls` 或 `params` 的单个键；反向对照两条用例引用同一个 `segments` 常量与同一份 `ls`
+- [Phase 5]: 变异验证用临时目录 `cp` 还原，不用 `git checkout --`；变异 3 的字面目标 `reset()` 在 arc 回放路径不可达，实际机制是回中分支的 rearm 赋值
 - [Phase 4]: 复用门只比较实测的四个 index+sign；`calibration.center/scale` 与探针 `rest` 不参与，同名不同映射必须 `can_reuse() == false`
 - [Phase 4]: `DeviceProfile.from_dict` 任一字段非法 → null + ConfigError，整份丢弃绝不部分恢复；`profile_id` 固定 "primary" 但字段与序列化必须存在
 - [Phase 4]: `suggest_layout` 认不出设备名返回空，调用方必须让用户二选一；绝不预选 Xbox
@@ -279,12 +291,31 @@ Recent decisions affecting current work:
 - [Phase 4]: 04-11：默认 `scale=1.0 / center=0` 与「真的推到 ±1.0」在数值上不可区分，所以不能靠校准数值识别默认校准 —— 只能靠保存时量程是否真的推满
 - [Phase 4]: 04-11：诊断覆盖层按 Y 调 `ProfileStore.clear()`（只删 `user://profiles/controllers.json`、不存在视为成功、`res://` 返回 ERR_UNAUTHORIZED）并发信号回设置页；覆盖层从「只读」变为「正常渲染只读，唯一例外是 Y 清除」
 
+- [Phase 5]: TapRuntime 只做「一个技能 → 单技能 AppConfig」的参数翻译，tick/_record/status 全部继承 GestureEngine；Phase 4 的 19 套件 / 2044 条断言零改动全绿，是机制替换不改变行为的机械证明
+- [Phase 5]: 手势锁的 ±4ms 在 4ms 网格 + 「解锁帧必须回中」下不可直接表示：右摇杆 ≥ RELEASE_STICK 会清零计时，实测边界是 148ms（永不解锁）对 156ms（解锁帧之后再推）
+- [Phase 5]: `rt_lock_hold_no_recenter` 在拆掉 `_gesture_locked` 后仍绿（ArcDetector 自己的 armed=false 已挡住第二段弧）；锁的具名红色见证改用 `rt_lock_release_150_minus_4`
+- [Phase 5]: `_drain_failures` 必须遍历全部技能取走 pending、只记配置顺序第一个 owner；`rt_failure_owner_config_order` 用同帧的马赛 wrong_start + 磕球 too_slow 钉死没有 break
+- [Phase 5]: `measured` 只能随 Hit / Failure 一起产出；删除 Phase 4 的 `ArcDetector.measured()` 事后快照入口（键表与 RESEARCH §D.5 不一致，且一次判定只能有一份度量）
+- [Phase 5]: `distance_deg` 用圆周距离（`Geometry.angle_diff`，与 `_end_ok` 同尺）；测试选 50°/90° 让 `angle_diff` 与 `abs(end_rel - nearest)` 同为 40，组 6 仍按同源等式断言
+- [Phase 5]: 出厂弧线的终点窗覆盖扫掠中段，200° 成功与 wrong_end 不可达；组 1~6 改用同形状合成弧（只改终点目标/容差/上限），检测器代码零分叉
+- [Phase 5]: `_step_t` 存毫秒（`now * 1000.0`），字段名承诺 `t_done_ms`；它只出现在赋值与 measured 构造里，不进任何判定分支
+- [Phase 5]: 抽稀边界距离用精确有理数比较（|t_i*hz - k*1000|）：浮点 k*1000/hz 会把 450ms 算成 450.00000000000006，破坏「并列取更早」
+- [Phase 5]: 抽稀实测 34 条边界带漂移（不是计划预期的 1 条）；全部按 D-05 登记进双向白名单，不网格化、不加第四条选样规则、不改任何阈值
+- [Phase 5]: det_arc_rearm_124 的 250 Hz 实测是 [too_short@204, too_short@208]，不是计划文字的 [too_short, too_fast]；白名单理由按夹具实测书写
+- [Phase 5]: DECIMATION 共 252 条 = 3 × (55 + 29)；夹具放 mobile/tests/fixtures/，唯一消费者是 Godot；下限 240 在 grep 与套件里是同一个数字
+- [Phase 5]: 05-06：RS 轴对在第一次推满量程时冻结，ls_pair() 排除冻结对；左右摇杆各自的符号只由已知方向的位移确认，横向位移返回 sideways；schema v2 + ls_ready 让 v1 档案整份失效
+- [Phase 5]: 05-08：首屏改为竖屏 HomeScreen，输入设置页默认不可见、只由主界面按住 B 1 秒进入；无档案时 `seed_known_defaults()` 自动建档直接进练习
+- [Phase 5]: 05-08：英雄卡取聚焦动作的 `ActiveSkill.last_outcome`；最近尝试用内部类 `AttemptLog` 以单调 `seq` 去重并只留 8 条；十字键只改显示不改判定
+- [Phase 5]: 05-08：Y 清除档案后自动按标准映射重建（不把用户丢回设置页）；断连回主界面显示「手柄未连接」
+- [Phase 5]: 05-08：`HomeScreen.setup(runtime, layout, buffer)` 保持三参；设备行用布局 + 连接状态生成，摇杆卡显示轴 0/1、2/3 原始值（不新增第二份归一化）
+
 ### Pending Todos
 
 None yet.
 
 ### Blockers/Concerns
 
+- **05-08 的新包待真机验收（闸门 C，H1–H13）**：`mobile/build/fifa-trainer.apk`（27,150,559 B，证书 `e1841a17…32e046`）已由 `gate-b.sh` 验证签名 / 16 KB 对齐 / 仅 arm64 / 配置在包内。真机必须确认：首启直达竖屏主界面（无输入设置）、顶部区与英雄卡排版、5 行熟练度 / 8 条最近尝试、十字键切换聚焦、B 按住 1 秒进设置、断连显示「手柄未连接」。在此之前不得宣布 Phase 5 主界面通过。
 - **Phase 4 真机清单 D0 失败（04-07 Task 2，checkpoint:human-verify / blocking-human）— 尝试一（旧包 27,012,856 B）**：手机 Motorola XT2175-2 / Android 12（`ZY22F5FXX9`），D0 在探针重试循环失败：`两轴同时动了：margin 0.001 < 0.25`（20:15:38）/ `上与右落在同一根轴（2/2）`（20:15:46）/ `上下没有互为反号：上 (轴 2, 符号 -1)、下 (轴 3, 符号 1)`（20:18:22）；20:15:50 出现停止屏「没有收到摇杆事件（events_motion = 1931）」。D1–D6 未执行；成功标准 2/3/4/5 均不得勾选。
 - **Phase 4 真机清单 D0 仍然失败 — 尝试二（新包 27,046,027 B，04-08 重建）**：干净卸载后安装成功（`versionName=0.1.0`，`lastUpdateTime=2026-11-05 21:19:05`，证书 `e1841a17…32e046` 不变），D0 卡在探针第 1/4 步「上」：`PAD_AXIS i=4/i=5` 在 21:22:32.677 报 `v=0.000`，21:22:54.846 变成 `v=-1.000`（真实静止值）；静止基线按 0 记 → 每窗口 `margin 0.000 < 0.25` → 57 行 `PROBE_REJECT code=ambiguous_axes key=up soft=1`。用户按 B 重来、重新推右摇杆均无效，要求「换一种检测方式或跳过」。D1–D6 未执行；成功标准 2/3/4/5 仍未闭合。**04-09 已修**：整条探针链被单页输入设置替换，`trigger_rest = min`，扳机跳变不再参与轴对识别；新包 27,067,065 B（证书不变），待 04-07 用新包重走。
 - **04-11 交付后的待办（04-07，最新包）**：先 `adb uninstall com.fifaskill.trainer` → `adb install -r mobile/build/fifa-trainer.apk`（**27,079,510 B**，证书 `e1841a17…32e046` 不变，`gate-b.sh` 全绿）。D0 按 `ACCEPTANCE.md` §6「D0 操作说明（04-11）」的 11 步走：X/Y **不应**改变符号（改十字键）、量程未满按 A 应停在设置页、布局行必须 `布局：Xbox（按 Start 切换，按 A 确认）`、覆盖层按 Y 应删档回设置页。`INPUT_SETUP` 每秒一行现在带 `layout=` / `confirmed=`。成功标准 2/3/4/5 仍未勾选。
@@ -322,6 +353,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-11-05T18:20:00.000Z
-Stopped at: Completed 05-01-PLAN.md
+Last session: 2026-11-06T10:30:07.000Z
+Stopped at: Completed 05-08-PLAN.md
 Resume file: None

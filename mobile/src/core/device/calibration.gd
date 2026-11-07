@@ -30,6 +30,14 @@ var center_y: float = 0.0
 var scale_x: float = 1.0
 var scale_y: float = 1.0
 
+## 左摇杆独立校准：左右两只摇杆的磨损、中点偏移与接线可以完全独立，共用一份
+## 校准会让「右摇杆准、左摇杆偏」的手柄永远无法同时对齐。顺序与 RS 完全一致：
+## 先减中点 → 再除量程 → 最后乘符号（见 `normalize`）。
+var ls_center_x: float = 0.0
+var ls_center_y: float = 0.0
+var ls_scale_x: float = 1.0
+var ls_scale_y: float = 1.0
+
 
 ## raw → 归一化。三步顺序写死：先减中点、再除量程、最后乘符号。
 ##
@@ -166,10 +174,17 @@ func to_dict() -> Dictionary:
 		"center_y": center_y,
 		"scale_x": scale_x,
 		"scale_y": scale_y,
+		"ls_center_x": ls_center_x,
+		"ls_center_y": ls_center_y,
+		"ls_scale_x": ls_scale_x,
+		"ls_scale_y": ls_scale_y,
 	}
 
 
-## 四项必须是有限数值，且两个量程都大于 0；任一非法 → 记一条 ConfigError 并返回 null。
+## 八项必须是有限数值，且四个量程都大于 0；任一非法 → 记一条 ConfigError 并返回 null。
+##
+## LS 四字段**不做「可选、缺失落默认」**：默认校准在数值上与真校准不可区分，
+## 04-11 的真机缺陷就是它被当成「这台手柄已经校准过」。缺字段只能整份重探。
 static func from_dict(data: Variant, out_errors: Array[ConfigError]) -> Calibration:
 	var before := out_errors.size()
 	if typeof(data) != TYPE_DICTIONARY:
@@ -183,6 +198,10 @@ static func from_dict(data: Variant, out_errors: Array[ConfigError]) -> Calibrat
 	calibration.center_y = _read_finite(root, "center_y", out_errors)
 	calibration.scale_x = _read_positive(root, "scale_x", out_errors)
 	calibration.scale_y = _read_positive(root, "scale_y", out_errors)
+	calibration.ls_center_x = _read_finite(root, "ls_center_x", out_errors)
+	calibration.ls_center_y = _read_finite(root, "ls_center_y", out_errors)
+	calibration.ls_scale_x = _read_positive(root, "ls_scale_x", out_errors)
+	calibration.ls_scale_y = _read_positive(root, "ls_scale_y", out_errors)
 	if out_errors.size() > before:
 		return null
 	return calibration

@@ -1,0 +1,12 @@
+[gd_resource type="FontVariation" format=3]
+
+[ext_resource type="FontFile" path="res://assets/fonts/NotoSansSC-Subset.ttf" id="1_sc"]
+[ext_resource type="FontFile" path="res://assets/fonts/NotoSansSymbols2-Subset.ttf" id="2_sym"]
+
+[resource]
+base_font = ExtResource("1_sc")
+fallbacks = Array[Font]([ExtResource("2_sym")])
+variation_embolden = 0.95
+variation_opentype = {
+&"wght": 800
+}

@@ -103,43 +103,52 @@ layout_mode = 0
 offset_left = 48.0
 offset_top = 436.0
 offset_right = 1252.0
-offset_bottom = 476.0
+offset_bottom = 470.0
 theme_override_font_sizes/font_size = 28
 
 [node name="Range" type="Label" parent="."]
 unique_name_in_owner = true
 layout_mode = 0
 offset_left = 48.0
-offset_top = 480.0
+offset_top = 472.0
 offset_right = 1252.0
-offset_bottom = 516.0
+offset_bottom = 506.0
 theme_override_font_sizes/font_size = 28
 
 [node name="Center" type="Label" parent="."]
 unique_name_in_owner = true
 layout_mode = 0
 offset_left = 48.0
-offset_top = 518.0
+offset_top = 508.0
 offset_right = 1252.0
-offset_bottom = 554.0
+offset_bottom = 542.0
 theme_override_font_sizes/font_size = 28
 
 [node name="Trigger" type="Label" parent="."]
 unique_name_in_owner = true
 layout_mode = 0
 offset_left = 48.0
-offset_top = 556.0
+offset_top = 544.0
 offset_right = 1252.0
-offset_bottom = 592.0
+offset_bottom = 578.0
+theme_override_font_sizes/font_size = 28
+
+[node name="Ls" type="Label" parent="."]
+unique_name_in_owner = true
+layout_mode = 0
+offset_left = 48.0
+offset_top = 580.0
+offset_right = 1252.0
+offset_bottom = 614.0
 theme_override_font_sizes/font_size = 28
 
 [node name="Help" type="Label" parent="."]
 unique_name_in_owner = true
 layout_mode = 0
 offset_left = 48.0
-offset_top = 600.0
+offset_top = 618.0
 offset_right = 1252.0
-offset_bottom = 662.0
+offset_bottom = 680.0
 autowrap_mode = 2
 theme_override_font_sizes/font_size = 28
 
@@ -147,7 +156,7 @@ theme_override_font_sizes/font_size = 28
 unique_name_in_owner = true
 layout_mode = 0
 offset_left = 48.0
-offset_top = 666.0
+offset_top = 684.0
 offset_right = 1252.0
-offset_bottom = 708.0
+offset_bottom = 718.0
 theme_override_font_sizes/font_size = 22

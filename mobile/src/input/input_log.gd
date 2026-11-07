@@ -8,6 +8,12 @@ extends RefCounted
 ## 变化写成一行带毫秒时间戳的文本：
 ##   t=<ms> dev=<d> btn=<i> name=<canonical> down=<0|1>
 ##   t=<ms> dev=<d> axis=<i> v=<x.xxx>
+## Phase 5 追加第三种行（判定结果，D5-2/D5-3 的唯一证据通道）：
+##   t=<ms> OUTCOME skill=<name> ok=<0|1> code=<code> elapsed=<ms> seq=<n> measured=<k=v;k=v>
+## `measured` 是给人看的扁平视图（不是可逆序列化）：数值 `%.1f`、字符串原样、
+## 嵌套字典用点号前缀（`fail.code=wrong_end`）、数组用下标（`steps.0.angle_lo_deg`）。
+## `measured` 为空时整段省略，不写出 `measured=` 这样的空尾。
+## 可逆的持久化格式属于 Phase 8，不在这里发明第二种 JSON 布局。
 ## 测试者按完任意组合后，`adb exec-out cat <LOG_PATH>` 就能回放整段事件序列。
 ##
 ## 为什么是绝对路径 /storage/emulated/0/Android/data/<包名>/files：release 包不可
@@ -55,6 +61,57 @@ static func button(t_ms: int, device: int, index: int, name: String, down: bool)
 ## 轴值。调用方负责节流判据（`axis_should_log`）；本函数不做任何跳过。
 static func axis(t_ms: int, device: int, index: int, value: float) -> void:
 	_emit(format_axis(t_ms, device, index, value))
+
+
+## 判定结果。走既有 `_emit()`，因此自动获得 logcat 镜像、2 MB 轮转与一次失败短路
+## （T-05-26：写日志失败不能拖慢判定）。
+static func outcome(t_ms: int, skill: String, ok: bool, code: StringName,
+		elapsed_ms: float, seq: int, measured: Dictionary) -> void:
+	_emit(format_outcome(t_ms, skill, ok, code, elapsed_ms, seq, measured))
+
+
+## 纯函数：`OUTCOME` 行的唯一格式真源，套件逐字断言。
+##
+## `elapsed` 取整（`%.0f`）：真机时间戳是毫秒，小数位只是浮点余数；`measured` 的
+## 数值保留一位小数，因为扫掠角 / 距离需要它。
+static func format_outcome(t_ms: int, skill: String, ok: bool, code: StringName,
+		elapsed_ms: float, seq: int, measured: Dictionary) -> String:
+	var line := "t=%d OUTCOME skill=%s ok=%d code=%s elapsed=%.0f seq=%d" % [
+		t_ms, skill, 1 if ok else 0, str(code), elapsed_ms, seq]
+	var parts: Array[String] = []
+	_flatten_measured(measured, "", parts)
+	if parts.is_empty():
+		return line
+	var measured_text := ""
+	for index in parts.size():
+		if index > 0:
+			measured_text += ";"
+		measured_text += parts[index]
+	return line + " measured=" + measured_text
+
+
+## `measured` 的扁平化：嵌套字典用 `父.子`、数组用 `父.下标`、数值 `%.1f`。
+## 只给人和脚本读，不保证可逆 —— Phase 8 的持久化格式另起一套。
+static func _flatten_measured(measured: Dictionary, prefix: String,
+		out: Array[String]) -> void:
+	for key in measured.keys():
+		var name := String(key) if prefix.is_empty() else prefix + "." + String(key)
+		_append_measured(name, measured[key], out)
+
+
+static func _append_measured(name: String, value: Variant, out: Array[String]) -> void:
+	if typeof(value) == TYPE_DICTIONARY:
+		_flatten_measured(value, name, out)
+		return
+	if typeof(value) == TYPE_ARRAY:
+		var items: Array = value
+		for index in items.size():
+			_append_measured("%s.%d" % [name, index], items[index], out)
+		return
+	if typeof(value) == TYPE_INT or typeof(value) == TYPE_FLOAT:
+		out.append("%s=%.1f" % [name, float(value)])
+		return
+	out.append("%s=%s" % [name, str(value)])
 
 
 ## 纯函数：日志行的唯一格式真源，套件逐字断言。

@@ -17,9 +17,11 @@ func run(r) -> void:
 	_check_probe_rejections(r)
 	_check_evaluate_feeds_cross(r)
 	_check_calibration(r)
+	_check_calibration_ls(r)
 	_check_normalize_order(r)
 	_check_deadzone(r)
 	_check_profile_schema(r)
+	_check_ls_migration(r)
 	_check_reuse_gate(r)
 	_check_angle_seam(r)
 	_check_suggest_layout(r)
@@ -204,6 +206,92 @@ func _check_calibration(r) -> void:
 	r.eq_float(float(wild_warnings.size()), 2.0, 1e-12, "两个轴各一条 clamp warning")
 
 
+## 左摇杆校准与右摇杆同构（D-06）。
+##
+## 三件事必须机械成立：四个 LS 字段能逐位往返、缺任一字段必须整份拒绝（绝不落
+## 默认值 —— 那正是 04-11 修掉的「默认校准看起来像真校准」）、`snapshot_ls()` 与
+## `snapshot_rs()` 在同一组 raw/center/scale/sign 下给出同一个向量与同一个角度。
+func _check_calibration_ls(r) -> void:
+	var calibration := Calibration.new()
+	calibration.center_x = 0.02
+	calibration.center_y = -0.03
+	calibration.scale_x = 0.98
+	calibration.scale_y = 0.96
+	calibration.ls_center_x = 0.02
+	calibration.ls_center_y = -0.03
+	calibration.ls_scale_x = 0.98
+	calibration.ls_scale_y = 0.96
+
+	var data := calibration.to_dict()
+	for key in ["ls_center_x", "ls_center_y", "ls_scale_x", "ls_scale_y"]:
+		r.check(data.has(key), "Calibration.to_dict 必须含 %s" % key)
+
+	var errors: Array[ConfigError] = []
+	var loaded := Calibration.from_dict(data, errors)
+	r.check(loaded != null and errors.is_empty(), "带 LS 字段的校准必须能往返")
+	if loaded != null:
+		r.eq_float(loaded.ls_center_x, 0.02, 0.0, "ls_center_x 逐位往返")
+		r.eq_float(loaded.ls_center_y, -0.03, 0.0, "ls_center_y 逐位往返")
+		r.eq_float(loaded.ls_scale_x, 0.98, 0.0, "ls_scale_x 逐位往返")
+		r.eq_float(loaded.ls_scale_y, 0.96, 0.0, "ls_scale_y 逐位往返")
+
+	var missing: Dictionary = data.duplicate(true)
+	missing.erase("ls_scale_x")
+	var missing_errors: Array[ConfigError] = []
+	r.check(Calibration.from_dict(missing, missing_errors) == null,
+		"缺 ls_scale_x 的校准必须返回 null（LS 字段不给默认值兜底）")
+
+	var raw := PackedFloat32Array()
+	raw.resize(AXIS_COUNT)
+	raw[0] = 0.62
+	raw[1] = -0.48
+	raw[2] = 0.62
+	raw[3] = -0.48
+	var mapping := AxisMapping.new()
+	mapping.rs_x_index = 2
+	mapping.rs_y_index = 3
+	mapping.rs_x_sign = 1
+	mapping.rs_y_sign = 1
+	mapping.ls_x_index = 0
+	mapping.ls_y_index = 1
+	mapping.ls_x_sign = 1
+	mapping.ls_y_sign = 1
+	var rs := AxisMapping.snapshot_rs(raw, mapping, calibration, 0.08)
+	var ls := AxisMapping.snapshot_ls(raw, mapping, calibration, 0.08)
+	r.check(ls.distance_to(rs) < 1e-9,
+		"snapshot_ls 与 snapshot_rs 必须给出同一个向量（差 %.12f）" % ls.distance_to(rs))
+	r.eq_float(Geometry.angle_diff(Geometry.angle_of(ls.x, ls.y),
+		Geometry.angle_of(rs.x, rs.y)), 0.0, 1e-9,
+		"snapshot_ls 与 snapshot_rs 的角度差必须 < 1e-9")
+
+	var flipped := AxisMapping.new()
+	flipped.rs_x_index = 2
+	flipped.rs_y_index = 3
+	flipped.rs_x_sign = -1
+	flipped.rs_y_sign = 1
+	flipped.ls_x_index = 0
+	flipped.ls_y_index = 1
+	flipped.ls_x_sign = -1
+	flipped.ls_y_sign = 1
+	var rs_flipped := AxisMapping.snapshot_rs(raw, flipped, calibration, 0.08)
+	var ls_flipped := AxisMapping.snapshot_ls(raw, flipped, calibration, 0.08)
+	r.eq_float(Geometry.angle_diff(Geometry.angle_of(ls_flipped.x, ls_flipped.y),
+		Geometry.angle_of(rs_flipped.x, rs_flipped.y)), 0.0, 1e-9,
+		"符号不同时两侧仍保持同构")
+
+	var unmapped := AxisMapping.new()
+	unmapped.rs_x_index = 2
+	unmapped.rs_y_index = 3
+	r.check(AxisMapping.snapshot_ls(raw, unmapped, calibration, 0.08) == Vector2.ZERO,
+		"没有 LS 映射时 snapshot_ls 返回 ZERO")
+
+	var out_of_range := AxisMapping.new()
+	out_of_range.ls_x_index = 99
+	out_of_range.ls_y_index = 1
+	r.check(AxisMapping.snapshot_ls(raw, out_of_range, calibration, 0.08) == Vector2.ZERO,
+		"LS 索引越界时 snapshot_ls 返回 ZERO")
+
+
 func _check_normalize_order(r) -> void:
 	r.eq_float(Calibration.normalize(0.02, 0.02, 1.0, 1), 0.0, 0.0,
 		"中点样本归一化后必须精确为 0")
@@ -253,8 +341,8 @@ func _check_profile_schema(r) -> void:
 	_expect_invalid(r, missing_version, "缺 schema_version")
 
 	var wrong_version: Dictionary = base.duplicate(true)
-	wrong_version["schema_version"] = 2
-	_expect_invalid(r, wrong_version, "schema_version = 2")
+	wrong_version["schema_version"] = 3
+	_expect_invalid(r, wrong_version, "schema_version = 3（当前合法值是 2）")
 
 	var empty_key: Dictionary = base.duplicate(true)
 	empty_key["key"] = ""
@@ -299,10 +387,94 @@ func _check_profile_schema(r) -> void:
 	var bad_axes := AxisMapping.from_dict({"rs_x": {"index": 8, "sign": 1}}, axes_errors)
 	r.check(bad_axes == null, "AxisMapping.from_dict 直接调用也返回 null")
 	var calibration_errors: Array[ConfigError] = []
+	# 四个 LS 字段必须一起给出，否则这条反例会因为「缺 LS 字段」返回 null，
+	# `scale_x = 0.0` 就**没有被真证**。
 	var bad_calibration := Calibration.from_dict(
-		{"center_x": 0.0, "center_y": 0.0, "scale_x": 0.0, "scale_y": 1.0},
+		{
+			"center_x": 0.0, "center_y": 0.0, "scale_x": 0.0, "scale_y": 1.0,
+			"ls_center_x": 0.0, "ls_center_y": 0.0, "ls_scale_x": 1.0, "ls_scale_y": 1.0,
+		},
 		calibration_errors)
 	r.check(bad_calibration == null, "Calibration.from_dict 直接调用也返回 null")
+	var scale_error_seen := false
+	for entry in calibration_errors:
+		if entry.code == &"invalid_scale" and entry.json_path == "$.calibration.scale_x":
+			scale_error_seen = true
+	r.check(scale_error_seen, "scale_x = 0.0 必须给出 invalid_scale（实测反例没被别的原因遮住）")
+
+
+## D-06 迁移门：v1 档案自动升级到 v2（补 Xbox 标准 LS 0/1 + ls_ready），
+## 版本 3 仍整份拒绝；v2 的四条拒绝面各有一条断言。
+func _check_ls_migration(r) -> void:
+	var base: Dictionary = _legal_profile().to_dict()
+	var errors: Array[ConfigError] = []
+	var fresh := DeviceProfile.from_dict(base.duplicate(true), errors)
+	r.check(fresh != null and errors.is_empty(), "v2 齐全档案必须能往返")
+	r.check(fresh != null and fresh.can_enter_practice(),
+		"v2 齐全 + ls_ready = true → 可进练习")
+
+	# 04-11 时期的真实形状：schema_version = 1、ls = -1、没有 ls_ready。
+	# 用户已经在 Phase 4 确认过 RS 与布局；迁移只补 LS，不再把人挡回设置页。
+	var legacy: Dictionary = base.duplicate(true)
+	legacy["schema_version"] = 1
+	legacy["axes"]["ls_x"]["index"] = -1
+	legacy["axes"]["ls_y"]["index"] = -1
+	legacy["quality"].erase("ls_ready")
+	var legacy_errors: Array[ConfigError] = []
+	var legacy_loaded := DeviceProfile.from_dict(legacy, legacy_errors)
+	r.check(legacy_loaded != null and legacy_errors.is_empty(),
+		"v1 档案必须自动迁移，不能整份拒绝（实际错误 %s）" % _error_codes(legacy_errors))
+	r.check(legacy_loaded != null and legacy_loaded.schema_version == DeviceProfile.SCHEMA_VERSION,
+		"v1 迁移后 schema_version 必须是当前常量")
+	r.check(legacy_loaded != null and legacy_loaded.axes.ls_x_index == 0
+		and legacy_loaded.axes.ls_y_index == 1,
+		"v1 迁移后 LS 必须是 (0,1)")
+	r.check(legacy_loaded != null and legacy_loaded.quality.get("migrated_from_v1") == true,
+		"v1 迁移必须在 quality 里留下 migrated_from_v1 标记")
+	r.check(legacy_loaded != null and legacy_loaded.can_enter_practice(),
+		"v1 迁移后必须可直接进练习")
+
+	# v2 但缺 ls_ready：结构合法，但复用门必须拒绝。
+	var no_marker: Dictionary = base.duplicate(true)
+	no_marker["quality"].erase("ls_ready")
+	var no_marker_errors: Array[ConfigError] = []
+	var no_marker_profile := DeviceProfile.from_dict(no_marker, no_marker_errors)
+	r.check(no_marker_profile != null and no_marker_errors.is_empty(),
+		"缺 ls_ready 的 v2 档案仍能解析（门在 can_enter_practice，不在 from_dict）")
+	r.check(no_marker_profile != null and not no_marker_profile.can_enter_practice(),
+		"v2 缺 quality.ls_ready → 不能进练习")
+
+	# 自相矛盾：ls = -1 但 ls_ready = true，必须由 has_ls() 拦截。
+	var contradictory: Dictionary = base.duplicate(true)
+	contradictory["axes"]["ls_x"]["index"] = -1
+	contradictory["axes"]["ls_y"]["index"] = -1
+	var contradictory_errors: Array[ConfigError] = []
+	var contradictory_profile := DeviceProfile.from_dict(contradictory, contradictory_errors)
+	r.check(contradictory_profile != null and contradictory_errors.is_empty(),
+		"ls = -1 在解析层是合法形状（旧档案能被加载）")
+	r.check(contradictory_profile != null and not contradictory_profile.can_enter_practice(),
+		"ls = -1 但 ls_ready = true（自相矛盾）→ has_ls() 必须拦截")
+
+	# 缺 range_ready 仍然拒绝：LS 门不是替代品，两条标记都要在。
+	var no_range: Dictionary = base.duplicate(true)
+	no_range["quality"].erase("range_ready")
+	var no_range_profile := DeviceProfile.from_dict(no_range, errors)
+	r.check(no_range_profile != null and not no_range_profile.can_enter_practice(),
+		"缺 quality.range_ready → 仍拒绝（两道标记缺一不可）")
+
+
+func _has_error_code(errors: Array[ConfigError], code: StringName) -> bool:
+	for entry in errors:
+		if entry.code == code:
+			return true
+	return false
+
+
+func _error_codes(errors: Array[ConfigError]) -> String:
+	var codes := PackedStringArray()
+	for entry in errors:
+		codes.append(String(entry.code))
+	return ",".join(codes) if not codes.is_empty() else "<empty>"
 
 
 func _check_reuse_gate(r) -> void:
@@ -347,6 +519,17 @@ func _check_reuse_gate(r) -> void:
 	var unconfirmed := _legal_profile()
 	unconfirmed.layout_confirmed = false
 	r.check(not unconfirmed.can_enter_practice(), "布局未确认 → 拒绝")
+
+	# D-06 的两条 LS 拒绝面：缺标记 + 自相矛盾（ls = -1 但 ls_ready = true）。
+	var no_ls_marker := _legal_profile()
+	no_ls_marker.quality.erase("ls_ready")
+	r.check(not no_ls_marker.can_enter_practice(), "缺 quality.ls_ready → 拒绝")
+
+	var contradictory := _legal_profile()
+	contradictory.axes.ls_x_index = -1
+	contradictory.axes.ls_y_index = -1
+	r.check(not contradictory.can_enter_practice(),
+		"ls = -1 但 ls_ready = true（自相矛盾）→ 拒绝")
 
 	# 复用门的范围：只比四项 index+sign，校准数值不参与（但必须落在合理区间）。
 	var recalibrated := _legal_profile()
@@ -493,7 +676,15 @@ func _legal_profile() -> DeviceProfile:
 	profile.calibration.center_y = -0.003
 	profile.calibration.scale_x = 0.98
 	profile.calibration.scale_y = 0.97
-	profile.quality = {"range_ready": true, "up": {"samples": 31, "margin": 0.72, "separation": 6.1}}
+	profile.calibration.ls_center_x = 0.002
+	profile.calibration.ls_center_y = -0.001
+	profile.calibration.ls_scale_x = 0.99
+	profile.calibration.ls_scale_y = 0.95
+	profile.quality = {
+		"range_ready": true,
+		"ls_ready": true,
+		"up": {"samples": 31, "margin": 0.72, "separation": 6.1},
+	}
 	profile.layout = DeviceProfile.LAYOUT_XBOX
 	profile.layout_confirmed = true
 	profile.button_index_ok = true
@@ -509,7 +700,8 @@ func _assert_profile_round_trip(r) -> void:
 	r.check(errors.is_empty(), "合法档案不应产生 ConfigError（实际 %d 条）" % errors.size())
 	if loaded == null:
 		return
-	r.check(loaded.schema_version == 1, "schema_version 往返为 1")
+	r.check(loaded.schema_version == DeviceProfile.SCHEMA_VERSION,
+		"schema_version 往返为当前常量（实际 %d）" % loaded.schema_version)
 	r.check(loaded.key == source.key, "key 往返一致（实际 %s）" % loaded.key)
 	r.check(loaded.profile_id == "primary", "profile_id 默认 primary 且被序列化")
 	r.check(loaded.device_name == source.device_name, "device_name 往返一致")
@@ -522,6 +714,8 @@ func _assert_profile_round_trip(r) -> void:
 		and loaded.axes.ls_y_index == 1, "axes.ls_* 往返一致")
 	r.check(loaded.calibration != null and loaded.calibration.scale_y > 0.96,
 		"calibration 往返一致")
+	r.check(loaded.calibration != null and loaded.calibration.ls_scale_y > 0.94,
+		"calibration.ls_* 往返一致")
 	r.check(loaded.quality.has("up"), "quality 原样保留（内容不做 schema 校验）")
 	r.check(loaded.layout == DeviceProfile.LAYOUT_XBOX, "layout 往返一致")
 	r.check(loaded.layout_confirmed == true, "layout_confirmed 往返一致")

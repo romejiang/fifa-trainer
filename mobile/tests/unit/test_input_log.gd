@@ -14,6 +14,7 @@ const TEST_PATH := TEST_DIR + "/input_log.txt"
 
 func run(r) -> void:
 	_check_format(r)
+	_check_outcome_format(r)
 	_check_append_and_session(r)
 	_check_throttle_boundaries(r)
 	_check_constants(r)
@@ -41,6 +42,32 @@ func _check_format(r) -> void:
 	r.check(InputLog.format_axis(1236, 0, 7, 0.0)
 			== "t=1236 dev=0 axis=7 v=0.000",
 		"零值必须写成 0.000，不能省略小数位")
+
+
+## `OUTCOME` 行是 D5-2/D5-3 的唯一证据通道：字段顺序、取整与 `measured` 的扁平
+## 规则都必须逐字稳定。数值统一 `%.1f`，嵌套字典用 `父.子`，数组用 `父.下标`；
+## **空 `measured` 时整段省略**，不写出空的 `measured=`（选定这一种并在此钉死）。
+func _check_outcome_format(r) -> void:
+	var flat := InputLog.format_outcome(1000, "马赛回旋 Roulette", true, &"ok", 500.0, 3,
+		{"swept_deg": 200.0, "elapsed_ms": 500.0})
+	r.check(flat == "t=1000 OUTCOME skill=马赛回旋 Roulette ok=1 code=ok elapsed=500 seq=3 measured=swept_deg=200.0;elapsed_ms=500.0",
+		"扁平 measured 必须逐字是 k=v;...（实际 %s）" % flat)
+
+	var nested := InputLog.format_outcome(2000, "马赛回旋 Roulette", false, &"wrong_end",
+		320.4, 4, {"fail": {"code": "wrong_end", "distance_deg": 96.0}})
+	r.check(nested == "t=2000 OUTCOME skill=马赛回旋 Roulette ok=0 code=wrong_end elapsed=320 seq=4 measured=fail.code=wrong_end;fail.distance_deg=96.0",
+		"嵌套 measured 必须展开成 父.子（实际 %s）" % nested)
+
+	var steps := InputLog.format_outcome(2500, "磕球过人 Heel-to-Heel", true, &"ok", 1.0, 5,
+		{"steps": [{"angle_lo_deg": 0.4}, {"angle_lo_deg": 180.0}]})
+	r.check(steps == "t=2500 OUTCOME skill=磕球过人 Heel-to-Heel ok=1 code=ok elapsed=1 seq=5 measured=steps.0.angle_lo_deg=0.4;steps.1.angle_lo_deg=180.0",
+		"数组 measured 必须展开成 父.下标.键（实际 %s）" % steps)
+
+	var empty := InputLog.format_outcome(3000, "X", true, &"ok", 1.0, 6, {})
+	r.check(empty == "t=3000 OUTCOME skill=X ok=1 code=ok elapsed=1 seq=6",
+		"空 measured 必须整段省略（实际 %s）" % empty)
+	r.check(not empty.ends_with("measured="),
+		"空 measured 不得留下空的 measured= 尾巴（实际 %s）" % empty)
 
 
 ## 端到端：会话头 + 两种事件真的落进文件、以换行分隔、时间戳递增。

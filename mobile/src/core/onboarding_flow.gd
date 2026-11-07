@@ -15,6 +15,9 @@ extends RefCounted
 ##   2. **未确认布局不得进入练习。** `can_enter_practice()` 要求布局确认、中点校准、
 ##      满量程校准、布局非空、状态为 practice 五条同时成立；`TapRuntime` 侧另有
 ##      独立的早退，两层都是机械保证。
+##   3. **产出的档案必须能进练习。** 本流程只探右摇杆、没有左摇杆探针（D-06），
+##      所以 `build_profile()` 末尾会用 `profile.can_enter_practice()` 自检：过不了
+##      就返回 null，绝不发一份「能加载但永远进不去练习」的档案。
 ##
 ## 校准屏只能通过 `mapping()` 拿到轴映射，再用 `AxisMapping.raw_rs()` 把 raw 转成
 ## Vector2；**绝不硬编码轴号**。索引与符号完全由四步探针产出，或在复用门通过后
@@ -469,6 +472,11 @@ func can_enter_practice() -> bool:
 
 ## 进入练习时构建档案。未完成流程 / 没有映射 / 布局为空时返回 null。
 ## `probed_at_iso` 留空：墙钟由 ProfileStore.upsert 填，core 不读时钟。
+##
+## **本流程没有左摇杆探针**（D-06）：它只采右摇杆四步、中点与量程，因此产出的档案
+## 必然缺 `quality.ls_ready`。与其发一份「能加载但永远进不去练习」的档案，不如不发：
+## 末尾的 `profile.can_enter_practice()` 自洽门会把它拒成 null。这道门由档案类自己
+## 判定 —— 将来若补上 LS 探针，它会自动放行，不靠调用方记得检查。
 func build_profile() -> DeviceProfile:
 	if not can_enter_practice():
 		return null
@@ -498,6 +506,10 @@ func build_profile() -> DeviceProfile:
 	profile.layout_confirmed = true
 	profile.button_index_ok = button_index_ok
 	profile.probed_at_iso = ""
+	# 自洽门：档案类说不能进练习，就不发（T-05-22b）。本流程没有 LS 探针，
+	# 所以这里在 05 阶段必然命中 —— 这是诚实化，不是故障。
+	if not profile.can_enter_practice():
+		return null
 	return profile
 
 

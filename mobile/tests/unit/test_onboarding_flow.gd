@@ -381,28 +381,21 @@ func _check_device_swap_clears_layout(r) -> void:
 		"换手柄必须回到 device_ready（实际 %s）" % flow.state)
 
 
-## build_profile：只有走完流程才产出，字段与流程记录一致；否则 null。
+## build_profile：只有走完流程才进入构造；但本流程没有 LS 探针，自洽门会让它返回 null。
+##
+## 档案字段本身的断言已迁到 `test_device_profile` 的 v2 往返用例 —— 这里只证明
+## 「流程能进练习」与「它不再产出进不去练习的档案」是两层独立的事实。
 func _check_build_profile(r) -> void:
 	var unfinished := _fresh()
 	r.check(unfinished.build_profile() == null, "未完成流程时 build_profile() 必须为 null")
 
 	var flow := _to_practice(_fresh())
-	var profile := flow.build_profile()
-	r.check(profile != null, "走完流程后 build_profile() 必须非 null")
-	if profile == null:
-		return
-	r.check(profile.layout_confirmed, "档案必须记录 layout_confirmed = true")
-	r.check(profile.profile_id == "primary", "profile_id 必须是 primary（INPUT-03 预留）")
-	r.check(profile.key == "guid:guid-a",
-		"档案 key 必须由 guid 生成（实际 %s）" % profile.key)
-	r.check(profile.axes != null and profile.axes.rs_x_index == 2,
-		"档案 axes.rs_x_index 必须等于「向右」那一步的轴")
-	r.check(profile.axes.rs_y_index == 3,
-		"档案 axes.rs_y_index 必须等于「向下」那一步的轴")
-	r.check(profile.quality.has("up"), "档案必须带上探针质量")
-	if profile.quality.has("up"):
-		r.check(profile.quality["up"]["samples"] == flow.quality["up"]["samples"],
-			"档案质量必须与流程记录一致")
+	r.check(flow.build_profile() == null,
+		"本流程无 LS 探针：自洽门拒绝，build_profile() 必须为 null")
+	r.check(flow.can_enter_practice(),
+		"流程门与档案门是两层：流程本身仍可进入练习")
+	r.check(flow.mapping() != null, "流程仍有可用的右摇杆映射")
+	r.check(flow.quality.has("up"), "探针质量仍记录在流程里")
 
 	var empty := _fresh("8BitDo Pro 2", "guid-8bitdo")
 	_to_layout(empty)
@@ -515,6 +508,10 @@ static func _reject(code: StringName, message: String) -> Dictionary:
 
 
 ## 一份完整档案：rs_x = (2, -1)、rs_y = (3, -1)，校准与质量都填满。
+##
+## 05 阶段 D-06 起，缺 LS 的档案会被 `can_enter_practice()` 拒绝；`offer_profile`
+## 会直接判「不是可复用档案」，本套件里那些依赖复用门命中的用例就会全红。所以这里
+## 显式补上真实的 LS 索引、符号、校准与 `ls_ready`（与输入设置页的新档案同形）。
 static func _profile() -> DeviceProfile:
 	var profile := DeviceProfile.new()
 	profile.key = "guid:guid-a"
@@ -526,13 +523,22 @@ static func _profile() -> DeviceProfile:
 	profile.axes.rs_x_sign = -1
 	profile.axes.rs_y_index = 3
 	profile.axes.rs_y_sign = -1
+	profile.axes.ls_x_index = 0
+	profile.axes.ls_x_sign = 1
+	profile.axes.ls_y_index = 1
+	profile.axes.ls_y_sign = 1
 	profile.calibration = Calibration.new()
 	profile.calibration.center_x = 0.01
 	profile.calibration.center_y = -0.02
 	profile.calibration.scale_x = 0.98
 	profile.calibration.scale_y = 0.97
+	profile.calibration.ls_center_x = 0.0
+	profile.calibration.ls_center_y = 0.0
+	profile.calibration.ls_scale_x = 0.99
+	profile.calibration.ls_scale_y = 0.96
 	profile.quality = {
 		"range_ready": true,
+		"ls_ready": true,
 		"up": {"samples": 30, "margin": 0.7, "separation": 6.0},
 		"right": {"samples": 28, "margin": 0.68, "separation": 5.4},
 	}

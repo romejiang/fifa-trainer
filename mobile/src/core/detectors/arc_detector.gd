@@ -24,6 +24,9 @@ extends Detector
 ## `wrong_start → wrong_direction → overshoot → stalled → too_slow → too_fast`。
 ## 它们都会 abort，所以顺序只影响报告哪条原因，不影响是否触发 —— 但「报哪条」
 ## 正是用户看到的反馈，不能重排。
+##
+## `measured` 只由本类在产生 `Hit` / `Failure` 的那一刻构造（`_measured()`），
+## 数值全部来自判定现场的局部量；UI 不得二次计算，也不得从文案里抠数字。
 
 ## 推过这个幅度才算起手。
 var enter: float = 0.80
@@ -85,15 +88,10 @@ var _release_since: float = 0.0
 var _path: Array = []
 var _last_path_t: float = -1e9
 var _claimed: bool = false
+## 实际转向（1 = 顺时针，-1 = 逆时针，0 = 还没转起来）。它同时用于
+## `wrong_direction` 判定与 `measured.direction_sign`；记录与判定必须分开：
+## 出厂配置里两个弧线动作都是「任意方向」，但 Phase 7 仍然需要知道实际转向。
 var _turn_sign: int = 0
-
-## `measured()` 的快照：在终结路径上由 `_capture_measured()` 写入，不重算。
-var _measured_elapsed_ms: float = 0.0
-var _measured_swept_deg: float = 0.0
-var _measured_end_angle: float = 0.0
-var _measured_end_rel: float = 0.0
-var _measured_samples: int = 0
-var _measured_direction_sign: int = 0
 
 
 ## 构造参数来自已校验的 Skill：默认值与迟滞关系逐字照抄参考实现。
@@ -175,8 +173,20 @@ func _release_failure(
 			&"too_short",
 			"转得不够：只转了 %.0f°（需要 %.0f°~%.0f°）" % [swept, min_angle, max_angle],
 			elapsed_ms,
+			_measured(swept, elapsed_ms, end_rel_value, {
+				"code": &"too_short",
+				"end_rel_deg": end_rel_value,
+				"nearest_target_deg": null,
+				"distance_deg": null,
+				"tolerance_deg": null,
+			}),
 		)
 	if not end_targets.is_empty() and not end_ok:
+		# 距离必须在格式化 message **之前**算好：文案与 measured.fail 必须同源，
+		# 不能一处用文案、一处重算（T-05-12）。最近目标按圆周距离挑
+		# （`Geometry.angle_diff`，与 `_end_ok` 用的是同一把尺）。
+		var nearest := _nearest_end_target(end_rel_value)
+		var distance := Geometry.angle_diff(end_rel_value, nearest)
 		var parts := PackedStringArray()
 		for target in end_targets:
 			parts.append("%.0f°" % target)
@@ -185,6 +195,13 @@ func _release_failure(
 			"终点不对：停在相对 %.0f°（应该回到 %s±%.0f°）"
 				% [end_rel_value, "/".join(parts), end_tolerance],
 			elapsed_ms,
+			_measured(swept, elapsed_ms, end_rel_value, {
+				"code": &"wrong_end",
+				"end_rel_deg": end_rel_value,
+				"nearest_target_deg": nearest,
+				"distance_deg": distance,
+				"tolerance_deg": end_tolerance,
+			}),
 		)
 	return null
 
@@ -199,14 +216,55 @@ func _end_ok(angle: float) -> bool:
 	return false
 
 
-## 终结时把 `%.0f` 会用到的实测值原样记下，供 `measured()` 读取。
-func _capture_measured(swept: float, elapsed_ms: float, end_rel_value: float) -> void:
-	_measured_elapsed_ms = elapsed_ms
-	_measured_swept_deg = swept
-	_measured_end_angle = last_angle
-	_measured_end_rel = end_rel_value
-	_measured_samples = samples
-	_measured_direction_sign = _turn_sign
+## 离 `angle` 最近的终点目标（圆周距离）。只用于 `measured.fail`，不参与判定；
+## 与 `_end_ok` 共用 `Geometry.angle_diff`，所以两者对「多近算近」永远一致。
+func _nearest_end_target(angle: float) -> float:
+	var nearest: float = end_targets[0]
+	var best := Geometry.angle_diff(angle, nearest)
+	for index in range(1, end_targets.size()):
+		var distance := Geometry.angle_diff(angle, end_targets[index])
+		if distance < best:
+			best = distance
+			nearest = end_targets[index]
+	return nearest
+
+
+## abort 分支没有「终点目标」可报：只写码与已经算好的耗时 / 扫掠，不硬造 target。
+func _abort_fail(code: StringName, elapsed_ms: float, swept: float) -> Dictionary:
+	return {"code": code, "elapsed_ms": elapsed_ms, "swept_deg": swept}
+
+
+## 构造本次判定的结构化度量（JUDGE-05，RESEARCH §D.5 的 Arc 字段表）。
+##
+## 只在产生 `Hit` / `Failure` 的那一刻调用；所有数值都来自调用方已算好的局部量
+## （与 `message` / `summary` 同源），这里**不重算**任何判定或阈值。
+## `fail` 只由失败路径传入；成功时整个键都不出现。
+func _measured(swept: float, elapsed_ms: float, end_rel_value: float,
+		fail: Dictionary = {}) -> Dictionary:
+	var data := {
+		"kind": "arc",
+		"start_angle_deg": start_angle,
+		"start_rel_deg": start_rel,
+		"end_angle_deg": last_angle,
+		"end_rel_deg": end_rel_value,
+		"swept_deg": swept,
+		"elapsed_ms": elapsed_ms,
+		"samples": samples,
+		"direction_sign": _turn_sign,
+		"target": {
+			"min_angle": min_angle,
+			"max_angle": max_angle,
+			"start_target": start_target if _have_start_target else null,
+			"start_tolerance": start_tolerance,
+			"end_targets": end_targets.duplicate(),
+			"end_tolerance": end_tolerance,
+			"min_ms": min_ms,
+			"max_ms": max_ms,
+		},
+	}
+	if not fail.is_empty():
+		data["fail"] = fail
+	return data
 
 
 ## 分支顺序即语义（detectors.py:240-412）：回中收尾 → 未武装 → 起手 → 累计 →
@@ -226,7 +284,6 @@ func update(frame: Frame) -> Hit:
 			end_rel = release_end_rel
 			var end_ok := _end_ok(release_end_rel)
 			var swept := absf(acc)
-			_capture_measured(swept, elapsed_ms, release_end_rel)
 			if swept >= report_min_angle:
 				var failure := _release_failure(swept, elapsed_ms, release_end_rel, end_ok)
 				if failure != null:
@@ -299,24 +356,29 @@ func update(frame: Frame) -> Hit:
 				"起点不对：从相对 %.0f° 起手（%s要求 %.0f°±%.0f°）"
 					% [start_rel, _name, start_target, start_tolerance],
 				elapsed_ms,
+				_measured(swept, elapsed_ms, Geometry.norm_deg(frame.rs_angle - base),
+					_abort_fail(&"wrong_start", elapsed_ms, swept)),
 			))
-		_capture_measured(swept, elapsed_ms, Geometry.norm_deg(frame.rs_angle - base))
 		_abort()
 		return null
 
 	# 转向符号要等真的转起来再锁定：刚推出去那一帧 acc 还是 0，
 	# 直接比较会把它误判成「转向反了」。
-	if direction != 0 and swept >= 5.0:
+	# **记录与判定分开**：即使配置是「任意方向」（出厂配置两个弧线都是），也要
+	# 记下实际转向 —— `measured.direction_sign` 是 Phase 7 的唯一数据源，不能
+	# 只对限定方向的动作为 0。`direction == 0` 时下面的比较分支仍不执行，判定不变。
+	if swept >= 5.0:
 		if _turn_sign == 0:
 			_turn_sign = 1 if acc > 0.0 else -1
-		if _turn_sign != direction:
+		if direction != 0 and _turn_sign != direction:
 			if _claimed:
 				_emit(Failure.new(
 					&"wrong_direction",
 					"转向反了：应该%s" % direction_label,
 					elapsed_ms,
+					_measured(swept, elapsed_ms, Geometry.norm_deg(frame.rs_angle - base),
+						_abort_fail(&"wrong_direction", elapsed_ms, swept)),
 				))
-			_capture_measured(swept, elapsed_ms, Geometry.norm_deg(frame.rs_angle - base))
 			_abort()
 			return null
 
@@ -326,8 +388,9 @@ func update(frame: Frame) -> Hit:
 				&"overshoot",
 				"转多了：累计 %.0f°（上限 %.0f°）" % [swept, max_angle],
 				elapsed_ms,
+				_measured(swept, elapsed_ms, Geometry.norm_deg(frame.rs_angle - base),
+					_abort_fail(&"overshoot", elapsed_ms, swept)),
 			))
-		_capture_measured(swept, elapsed_ms, Geometry.norm_deg(frame.rs_angle - base))
 		_abort()
 		return null
 
@@ -337,8 +400,9 @@ func update(frame: Frame) -> Hit:
 				&"stalled",
 				"中途停住了：超过 %.0fms 没转动" % idle_ms,
 				elapsed_ms,
+				_measured(swept, elapsed_ms, Geometry.norm_deg(frame.rs_angle - base),
+					_abort_fail(&"stalled", elapsed_ms, swept)),
 			))
-		_capture_measured(swept, elapsed_ms, Geometry.norm_deg(frame.rs_angle - base))
 		_abort()
 		return null
 
@@ -348,8 +412,9 @@ func update(frame: Frame) -> Hit:
 				&"too_slow",
 				"太慢了：用了 %.0fms（上限 %.0fms）" % [elapsed_ms, max_ms],
 				elapsed_ms,
+				_measured(swept, elapsed_ms, Geometry.norm_deg(frame.rs_angle - base),
+					_abort_fail(&"too_slow", elapsed_ms, swept)),
 			))
-		_capture_measured(swept, elapsed_ms, Geometry.norm_deg(frame.rs_angle - base))
 		_abort()
 		return null
 
@@ -366,21 +431,22 @@ func update(frame: Frame) -> Hit:
 					&"too_fast",
 					"太快了：%.0fms 就转到位了（至少 %.0fms）" % [elapsed_ms, min_ms],
 					elapsed_ms,
+					_measured(swept, elapsed_ms, end_rel,
+						_abort_fail(&"too_fast", elapsed_ms, swept)),
 				))
-			_capture_measured(swept, elapsed_ms, end_rel)
 			_abort()
 		return null
 
 	if not in_range or not end_ok:
-		_capture_measured(swept, elapsed_ms, end_rel)
 		return null
 
 	active = false
 	armed = false
-	_turn_sign = 0
-	_capture_measured(swept, elapsed_ms, end_rel)
 	var summary := "旋转 %.0f°（相对 %.0f°→%.0f°）" % [absf(acc), start_rel, end_rel]
-	return Hit.new(elapsed_ms, _describe(), summary)
+	# 先构造 measured 再清 `_turn_sign`：顺序反了 `direction_sign` 会永远是 0。
+	var measured := _measured(swept, elapsed_ms, end_rel)
+	_turn_sign = 0
+	return Hit.new(elapsed_ms, _describe(), summary, measured)
 
 
 func _describe() -> String:
@@ -402,33 +468,11 @@ func path_detail() -> String:
 
 
 ## 暴露轨迹给 Phase 7 的高亮面板；返回副本，调用方无法改内部状态。
+##
+## 判定结果的 `measured` 不在这里取：它随 `Hit` / `Failure` 一起产出，不提供
+## 「事后从检测器再读一次」的第二个入口（那会让每次判定的度量与结果脱钩）。
 func last_path() -> Array:
 	return _path.duplicate(true)
-
-
-## 最近一次尝试的实测参数：Phase 5 只负责构造，JUDGE-05 的展示在后续计划。
-## 数值全部来自 `_capture_measured()` 记下的局部量，与 `message` / `summary`
-## 里那个数字同源 —— 不在这里二次计算。
-func measured() -> Dictionary:
-	var target: Dictionary = {
-		"end_deg": end_targets.duplicate(),
-		"end_tolerance_deg": end_tolerance,
-	}
-	if _have_start_target:
-		target["start_deg"] = start_target
-		target["start_tolerance_deg"] = start_tolerance
-	return {
-		"kind": "arc",
-		"start_angle_deg": start_angle,
-		"start_rel_deg": start_rel,
-		"end_angle_deg": _measured_end_angle,
-		"end_rel_deg": _measured_end_rel,
-		"swept_deg": _measured_swept_deg,
-		"elapsed_ms": _measured_elapsed_ms,
-		"samples": _measured_samples,
-		"direction_sign": _measured_direction_sign,
-		"target": target,
-	}
 
 
 func reset() -> void:

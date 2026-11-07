@@ -16,14 +16,19 @@ config/custom_user_dir_name="FifaSkillTrainer"
 
 [display]
 
-; 横屏固定写出来防漂移（默认已是 0）：手机/平板架在手边时不需要转屏。
-window/handheld/orientation=0
+; 锁定竖屏（1 = portrait），不允许横屏。
+window/handheld/orientation=1
 ; 练习时屏幕不能熄；最终承诺在 Phase 7 的反馈闭环里收口。
 window/energy_saving/keep_screen_on=true
 ; 基准视口 1280x720，canvas_items 让 px 在不同 DPI 上语义稳定（RESEARCH §3）。
-window/size/viewport_width=1280
-window/size/viewport_height=720
+window/size/viewport_width=393
+window/size/viewport_height=852
 window/stretch/mode="canvas_items"
+; 铺满整块屏幕，不出现上下黑边/滚动；多出来的高度由根 VBox 的 Spacer 吸收。
+window/stretch/aspect="expand"
+window/size/mode=3
+; 安卓沉浸式：隐藏系统栏，真正全屏。
+window/handheld/immersive_mode=true
 
 [gui]
 

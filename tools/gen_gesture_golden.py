@@ -460,17 +460,19 @@ BOUNDARY_CASES = (
         ),
     },
     # 16. 保持 352ms（上邻点）→ ok。第 452ms 那一帧 held=352 >= 350。
+    #     成功之后 LB 松一帧再按回、摇杆**一直推着**：reset() 绝不能把
+    #     neutral 置回 true，否则这里会凭空多出第二条判定（D-10 变异验证）。
     {
         "id": "det_croqueta_hold_352",
         "kind": "detector",
         "skill": "油炸丸子 La Croqueta",
         "config": "shipped",
-        "end_ms": 560,
-        "buttons": ((0, ()), (4, ("LB",)), (456, ())),
+        "end_ms": 900,
+        "buttons": ((0, ()), (4, ("LB",)), (456, ()), (460, ("LB",))),
         "segments": (
             ("hold", 0, 96, 0.0, 0.0),
-            ("hold", 100, 452, 90.0, 0.9),
-            ("hold", 456, 560, 0.0, 0.0),
+            ("hold", 100, 896, 90.0, 0.9),
+            ("hold", 900, 900, 0.0, 0.0),
         ),
     },
     # 17. 容差 - 1°：目标偏 9°（<= tolerance_deg 10）→ 匹配 → ok。
@@ -607,6 +609,678 @@ VARIANT_CASES = (
             ("hold", 0, 96, 0.0, 0.0),
             ("hold", 100, 452, 180.0, 0.9),
             ("hold", 456, 560, 0.0, 0.0),
+        ),
+    },
+)
+
+
+# 20 条点名补充用例：失败码可达性、tap 窗口、踩单车终点容差的两支、
+# 马赛回旋的 overshoot 变体与「direction: any 不锁方向」。
+#
+# 每一条的目标结论都写进注释，但期望值一律由参考实现跑出；落不下来的条目
+# 按 Task 1 的「同族替换」规则处理（同族、同码、参考实现跑得出），绝不改阈值。
+EXTRA_CASES = (
+    # 1. 转 60° 后推住不动：motion 参考角停止刷新，超过 idle 250ms → stalled。
+    {
+        "id": "det_roulette_stalled",
+        "kind": "detector",
+        "skill": "马赛回旋 Roulette",
+        "config": "shipped",
+        "end_ms": 800,
+        "segments": (
+            ("hold", 0, 96, 0.0, 0.0),
+            ("sweep", 100, 200, 180.0, 240.0, 0.9),
+            ("hold", 304, 800, 240.0, 0.9),
+        ),
+    },
+    # 2. 踩单车 0→40° 后推住不动：同样只到 idle 就 stalled（swept 40 >= 5）。
+    {
+        "id": "det_stepover_stalled",
+        "kind": "detector",
+        "skill": "踩单车 Stepover",
+        "config": "shipped",
+        "end_ms": 800,
+        "segments": (
+            ("hold", 0, 96, 0.0, 0.0),
+            ("sweep", 100, 200, 0.0, 40.0, 0.9),
+            ("hold", 304, 800, 40.0, 0.9),
+        ),
+    },
+    # 3. 前 → 停：第一步完成后摇杆回中不再动，超过 idle 250ms 时
+    #    index=1 且不是超时 → incomplete。
+    {
+        "id": "det_heel_to_heel_incomplete",
+        "kind": "detector",
+        "skill": "磕球过人 Heel-to-Heel",
+        "config": "shipped",
+        "end_ms": 600,
+        "segments": (
+            ("hold", 0, 96, 0.0, 0.0),
+            ("hold", 100, 100, 0.0, 0.9),
+            ("hold", 104, 196, 90.0, 0.9),
+            ("hold", 200, 600, 0.0, 0.0),
+        ),
+    },
+    # 4. 每步都不闭合、但一直在动：从 90° 缓慢扫到 130°，既不是前（0±35）
+    #    也不是后（180±35），避开 idle 直到 (now-t0) > 600 → too_slow。
+    {
+        "id": "det_heel_to_heel_too_slow",
+        "kind": "detector",
+        "skill": "磕球过人 Heel-to-Heel",
+        "config": "shipped",
+        "end_ms": 800,
+        "segments": (
+            ("hold", 0, 96, 0.0, 0.0),
+            ("hold", 100, 100, 0.0, 0.9),
+            ("sweep", 104, 600, 90.0, 130.0, 0.9),
+            ("hold", 708, 800, 0.0, 0.0),
+        ),
+    },
+    # 5. 两下 X 间隔 396ms（< min 400）→ too_fast。
+    {
+        "id": "det_green_finesse_too_fast",
+        "kind": "detector",
+        "skill": "绿色搓射 Green Finesse",
+        "config": "shipped",
+        "end_ms": 600,
+        "buttons": (
+            (0, ()), (4, ("RB",)), (100, ("RB", "X")), (104, ("RB",)),
+            (496, ("RB", "X")), (500, ("RB",)),
+        ),
+        "segments": (("hold", 0, 600, 0.0, 0.0),),
+    },
+    # 6. 按下第一下 X 后中途松开 RB → reset 报 hold_short（elapsed 100ms）。
+    {
+        "id": "det_green_finesse_hold_short",
+        "kind": "detector",
+        "skill": "绿色搓射 Green Finesse",
+        "config": "shipped",
+        "end_ms": 400,
+        "buttons": (
+            (0, ()), (4, ("RB",)), (100, ("RB", "X")), (200, ("X",)),
+            (300, ()),
+        ),
+        "segments": (("hold", 0, 400, 0.0, 0.0),),
+    },
+    # 7. 间隔 596ms（最大 600 的下邻点）→ ok。
+    {
+        "id": "det_green_finesse_max_minus_4",
+        "kind": "detector",
+        "skill": "绿色搓射 Green Finesse",
+        "config": "shipped",
+        "end_ms": 800,
+        "buttons": (
+            (0, ()), (4, ("RB",)), (100, ("RB", "X")), (104, ("RB",)),
+            (696, ("RB", "X")), (700, ("RB",)),
+        ),
+        "segments": (("hold", 0, 800, 0.0, 0.0),),
+    },
+    # 8. 间隔 604ms（> 600，但仍在 grace 150 内）→ 第二下是 rising，
+    #    直接走 too_slow 分支，与 grace 无关。
+    {
+        "id": "det_green_finesse_max_plus_4",
+        "kind": "detector",
+        "skill": "绿色搓射 Green Finesse",
+        "config": "shipped",
+        "end_ms": 800,
+        "buttons": (
+            (0, ()), (4, ("RB",)), (100, ("RB", "X")), (104, ("RB",)),
+            (704, ("RB", "X")), (708, ("RB",)),
+        ),
+        "segments": (("hold", 0, 800, 0.0, 0.0),),
+    },
+    # 9. 间隔 404ms（最小 400 的上邻点）→ ok。
+    {
+        "id": "det_green_finesse_min_plus_4",
+        "kind": "detector",
+        "skill": "绿色搓射 Green Finesse",
+        "config": "shipped",
+        "end_ms": 700,
+        "buttons": (
+            (0, ()), (4, ("RB",)), (100, ("RB", "X")), (104, ("RB",)),
+            (504, ("RB", "X")), (508, ("RB",)),
+        ),
+        "segments": (("hold", 0, 700, 0.0, 0.0),),
+    },
+    # 10. 间隔 600ms（窗口右端）→ ok，证明右端是**包含**的。
+    {
+        "id": "det_green_finesse_max_exact_600",
+        "kind": "detector",
+        "skill": "绿色搓射 Green Finesse",
+        "config": "shipped",
+        "end_ms": 800,
+        "buttons": (
+            (0, ()), (4, ("RB",)), (100, ("RB", "X")), (104, ("RB",)),
+            (700, ("RB", "X")), (704, ("RB",)),
+        ),
+        "segments": (("hold", 0, 800, 0.0, 0.0),),
+    },
+    # 11. 一直没有第二下：超过 600+150=750 才报 too_slow；4ms 网格上第一个
+    #     大于 750 的间隔是 752ms。
+    {
+        "id": "det_green_finesse_grace_too_slow",
+        "kind": "detector",
+        "skill": "绿色搓射 Green Finesse",
+        "config": "shipped",
+        "end_ms": 900,
+        "buttons": (
+            (0, ()), (4, ("RB",)), (100, ("RB", "X")), (104, ("RB",)),
+        ),
+        "segments": (("hold", 0, 900, 0.0, 0.0),),
+    },
+    # 12. too_fast 之后必须真正松开 X 满 release_hold 120ms 才允许下一次：
+    #     500ms 松手后 60ms 就再按两下（560/590）→ 全部被忽略，只有 1 条判定。
+    {
+        "id": "det_green_finesse_release_hold",
+        "kind": "detector",
+        "skill": "绿色搓射 Green Finesse",
+        "config": "shipped",
+        "end_ms": 700,
+        "buttons": (
+            (0, ()), (4, ("RB",)), (100, ("RB", "X")), (104, ("RB",)),
+            (496, ("RB", "X")), (500, ("RB",)), (560, ("RB", "X")),
+            (564, ("RB",)), (588, ("RB", "X")), (592, ("RB",)), (700, ()),
+        ),
+        "segments": (("hold", 0, 700, 0.0, 0.0),),
+    },
+    # 13. 踩单车终点容差内：起手相对 318°（离 0° 为 42 <= 55），顺时针扫 78°
+    #     收在相对 36°（离 90° 差 54 <= 55），扫掠 78 在 [70,135]。
+    {
+        "id": "det_stepover_end_in_tol",
+        "kind": "detector",
+        "skill": "踩单车 Stepover",
+        "config": "shipped",
+        "end_ms": 500,
+        "segments": (
+            ("hold", 0, 96, 0.0, 0.0),
+            ("sweep", 100, 300, 318.0, 396.0, 0.9),
+            ("hold", 404, 500, 0.0, 0.0),
+        ),
+    },
+    # 14. 踩单车终点容差外：同样 318° 起手，扫 76° 收在 34°（离 90° 差 56 > 55，
+    #     也不在 270±55 的窗口）→ 松手 wrong_end。
+    {
+        "id": "det_stepover_end_out_tol",
+        "kind": "detector",
+        "skill": "踩单车 Stepover",
+        "config": "shipped",
+        "end_ms": 500,
+        "segments": (
+            ("hold", 0, 96, 0.0, 0.0),
+            ("sweep", 100, 300, 318.0, 394.0, 0.9),
+            ("hold", 404, 500, 0.0, 0.0),
+        ),
+    },
+    # 15. 踩单车终点走 end_angle:[90,270] 的第二支：54° 逆时针 89° 收在 325°，
+    #     325 = 270 + 55 正好是容差边界 → ok。逆时针用 -35（norm 后 325），
+    #     不能写 325 —— 线性插值 54→325 是顺时针 271°。
+    {
+        "id": "det_stepover_end_target_270",
+        "kind": "detector",
+        "skill": "踩单车 Stepover",
+        "config": "shipped",
+        "end_ms": 700,
+        "segments": (
+            ("hold", 0, 96, 0.0, 0.0),
+            ("sweep", 100, 500, 54.0, -35.0, 0.9),
+            ("hold", 604, 700, 0.0, 0.0),
+        ),
+    },
+    # 16. 马赛回旋从相对 100° 起手：离 180° 差 80，容差 65 外、claim 85 内
+    #     → wrong_start。
+    {
+        "id": "det_roulette_wrong_start_100",
+        "kind": "detector",
+        "skill": "马赛回旋 Roulette",
+        "config": "shipped",
+        "end_ms": 700,
+        "segments": (
+            ("hold", 0, 96, 0.0, 0.0),
+            ("sweep", 100, 500, 100.0, 300.0, 0.9),
+            ("hold", 604, 700, 0.0, 0.0),
+        ),
+    },
+    # 17. 从相对 90° 起手：离 180° 差 90 > 85，连 claim 都不成立 → 零判定。
+    {
+        "id": "det_roulette_start_outside_claim",
+        "kind": "detector",
+        "skill": "马赛回旋 Roulette",
+        "config": "shipped",
+        "end_ms": 700,
+        "segments": (
+            ("hold", 0, 96, 0.0, 0.0),
+            ("sweep", 100, 500, 90.0, 290.0, 0.9),
+            ("hold", 604, 700, 0.0, 0.0),
+        ),
+    },
+    # 18. 扫掠 68°（< min_angle 70，>= report_min_angle 24.5）→ too_short。
+    {
+        "id": "det_roulette_too_short_near_min",
+        "kind": "detector",
+        "skill": "马赛回旋 Roulette",
+        "config": "shipped",
+        "end_ms": 500,
+        "segments": (
+            ("hold", 0, 96, 0.0, 0.0),
+            ("sweep", 100, 300, 180.0, 248.0, 0.9),
+            ("hold", 404, 500, 0.0, 0.0),
+        ),
+    },
+    # 19. max_angle:120 变体下扫 150° → overshoot。起手 245°（离 180° 差 65，
+    #     正好在容差边界内），逆时针扫到 95°，全程不经过终点窗口。
+    {
+        "id": "det_roulette_overshoot",
+        "kind": "detector",
+        "skill": "马赛回旋 Roulette",
+        "config": "variant:roulette_max_angle_120",
+        "end_ms": 700,
+        "segments": (
+            ("hold", 0, 96, 0.0, 0.0),
+            ("sweep", 100, 500, 245.0, 95.0, 0.9),
+            ("hold", 604, 700, 0.0, 0.0),
+        ),
+    },
+    # 20. 同一段 200° 弧改成逆时针，出厂 direction:any 不锁方向 → ok。
+    #     -20 才是逆时针 200°；写 340 会被线性插值成顺时针 160°。
+    {
+        "id": "det_roulette_direction_any_ccw",
+        "kind": "detector",
+        "skill": "马赛回旋 Roulette",
+        "config": "shipped",
+        "end_ms": 700,
+        "segments": (
+            ("hold", 0, 96, 0.0, 0.0),
+            ("sweep", 100, 500, 180.0, -20.0, 0.9),
+            ("hold", 604, 700, 0.0, 0.0),
+        ),
+    },
+)
+
+
+# ---------------------------------------------------------------------------
+# 引擎层用例（夹具 2）：一次 tick 的仲裁语义
+# ---------------------------------------------------------------------------
+#
+# 与 detector 用例的区别：这里跑的是 `Engine._tick`，五个动作同时参与判定。
+# 手势锁、逐动作冷却、全局冷却、`_discard_other_claims`、held_required 互斥、
+# 失败归属与分组都只存在于这一层 —— 检测器套件无法替它们作证。
+#
+# `expect.outcomes` 与 `expect.counters` 全部由参考引擎跑出，禁止手写：
+# 「我觉得 150ms 后就该解锁」正是黄金夹具要消灭的东西。
+
+
+def _osc(start_ms: int, end_ms: int, a: float, b: float, mag: float) -> tuple:
+    """逐帧在 `a` / `b` 之间摆动：让检测器的「在动」计时器始终刷新。
+
+    sequence 的 stalled 判定看 `motion_min_delta_deg`；静止超过 `idle_timeout_ms`
+    会把半截进度判成 incomplete。需要「保持进度活着但不匹配任何一步」时用这个形状。
+    """
+    out = []
+    angle = a
+    for t_ms in range(start_ms, end_ms, STEP_MS):
+        angle = b if angle == a else a
+        out.append(("hold", t_ms, t_ms, angle, mag))
+    return tuple(out)
+
+
+def _runtime_from(source_id: str, new_id: str, **overrides) -> dict:
+    """复用一条 detector 用例的轨迹，只换 id / kind（必要时覆盖其它字段）。
+
+    引擎层与检测器层测的是同一条时间线；复制一份轨迹会让两层各自漂移。
+    """
+    table = {
+        case["id"]: case
+        for case in CASES + BOUNDARY_CASES + VARIANT_CASES + EXTRA_CASES
+    }
+    if source_id not in table:
+        raise SystemExit(f"✗ _runtime_from: 找不到源用例 {source_id!r}")
+    case = copy.deepcopy(table[source_id])
+    case["id"] = new_id
+    case["kind"] = "runtime"
+    case.update(overrides)
+    return case
+
+
+RUNTIME_CASES = (
+    # —— 单动作端到端 10 条：每个动作一条成功 + 一条失败 ——
+    # 同一时间线在引擎里还要穿过其它四个动作的竞争；期望由参考引擎跑出。
+    _runtime_from("det_roulette_ok", "rt_roulette_ok"),
+    _runtime_from("det_roulette_too_fast", "rt_roulette_too_fast"),
+    _runtime_from("det_stepover_ok", "rt_stepover_ok"),
+    _runtime_from("det_stepover_wrong_start", "rt_stepover_wrong_start"),
+    _runtime_from("det_heel_to_heel_ok", "rt_heel_ok"),
+    # 磕球过人的 too_slow：第 1 步（前）完成后回中，再在 90°/110° 之间摆动
+    # 避免 stalled，直到 elapsed 越过 max_duration 600ms（t0=100 → 604ms）。
+    {
+        "id": "rt_heel_too_slow",
+        "kind": "runtime",
+        "skill": "磕球过人 Heel-to-Heel",
+        "config": "shipped",
+        "end_ms": 800,
+        "segments": (
+            ("hold", 0, 96, 0.0, 0.0),
+            ("hold", 100, 196, 0.0, 0.9),
+            ("hold", 200, 296, 0.0, 0.0),
+        ) + _osc(300, 704, 90.0, 110.0, 0.9) + (
+            ("hold", 708, 800, 0.0, 0.0),
+        ),
+    },
+    _runtime_from("det_croqueta_ok", "rt_croqueta_ok"),
+    _runtime_from("det_croqueta_hold_short", "rt_croqueta_hold_short"),
+    _runtime_from("det_green_finesse_ok", "rt_green_ok"),
+    _runtime_from("det_green_finesse_too_fast", "rt_green_too_fast"),
+    # —— 双动作竞争 2 条 ——
+    # 0°→90° 同时是踩单车的终点与磕球第 1 步的起手；踩单车成功后
+    # `_discard_other_claims` 必须把磕球的半截进度清掉。尾段留到 1000ms：
+    # 若没有丢弃，磕球会在 ~850ms 的 idle 上补一条 incomplete。
+    {
+        "id": "rt_competition_stepover_wins",
+        "kind": "runtime",
+        "skill": "踩单车 Stepover",
+        "config": "shipped",
+        "end_ms": 1000,
+        "segments": (
+            ("hold", 0, 96, 0.0, 0.0),
+            ("sweep", 100, 500, 0.0, 90.0, 0.9),
+            ("hold", 604, 1000, 0.0, 0.0),
+        ),
+    },
+    # 180°→380°：马赛回旋中途扫过 0°（磕球第 1 步的方向），但马赛在 352ms
+    # 就成功了，之后的帧全部被手势锁挡住 —— 只允许一条。
+    {
+        "id": "rt_competition_roulette_wins",
+        "kind": "runtime",
+        "skill": "马赛回旋 Roulette",
+        "config": "shipped",
+        "end_ms": 1000,
+        "segments": (
+            ("hold", 0, 96, 0.0, 0.0),
+            ("sweep", 100, 500, 180.0, 380.0, 0.9),
+            ("hold", 604, 1000, 0.0, 0.0),
+        ),
+    },
+    # —— 手势锁 3 条 ——
+    # 不回中：第一段弧成功后右摇杆始终 >= RELEASE_STICK，锁永远不解，
+    # 第二段弧一帧都看不到检测器 → 只有第一条判定。
+    {
+        "id": "rt_lock_hold_no_recenter",
+        "kind": "runtime",
+        "skill": "踩单车 Stepover",
+        "config": "shipped",
+        "end_ms": 1200,
+        "segments": (
+            ("hold", 0, 96, 0.0, 0.0),
+            ("sweep", 100, 500, 0.0, 90.0, 0.9),
+            ("hold", 604, 604, 0.0, 0.9),
+            ("sweep", 608, 500, 0.0, 90.0, 0.9),
+            ("hold", 1112, 1200, 0.0, 0.0),
+        ),
+    },
+    # 150ms 边界对：锁的计时从「命中后的第一帧回中」开始（492 命中 → 604 回中）。
+    # 604+150=754，4ms 网格上第一个解锁帧是 756；解锁帧本身必须回中，
+    # 因为右摇杆 >= RELEASE_STICK 会把计时清零（engine.py:284-285）。
+    # plus：756 解锁后再回中到 876 让检测器重新武装，880 起第二段 → 2 条。
+    {
+        "id": "rt_lock_release_150_plus_4",
+        "kind": "runtime",
+        "skill": "踩单车 Stepover",
+        "config": "shipped",
+        "end_ms": 1452,
+        "segments": (
+            ("hold", 0, 96, 0.0, 0.0),
+            ("sweep", 100, 500, 0.0, 90.0, 0.9),
+            ("hold", 604, 876, 0.0, 0.0),
+            ("sweep", 880, 500, 0.0, 90.0, 0.9),
+            ("hold", 1384, 1452, 0.0, 0.0),
+        ),
+    },
+    # minus：744（140ms）就推第二段。推着回中计时被清零，锁永不解开 → 1 条。
+    # 真实边界因此是 148ms（锁住）对 156ms（解锁帧之后），±4ms 在 4ms 网格上
+    # 会被「解锁帧必须回中」再吃掉一帧；这条差异写进 SUMMARY。
+    {
+        "id": "rt_lock_release_150_minus_4",
+        "kind": "runtime",
+        "skill": "踩单车 Stepover",
+        "config": "shipped",
+        "end_ms": 1300,
+        "segments": (
+            ("hold", 0, 96, 0.0, 0.0),
+            ("sweep", 100, 500, 0.0, 90.0, 0.9),
+            ("hold", 604, 740, 0.0, 0.0),
+            ("sweep", 744, 500, 0.0, 90.0, 0.9),
+            ("hold", 1248, 1300, 0.0, 0.0),
+        ),
+    },
+    # —— 逐动作冷却 3 条（出厂冷却下不可达，必须合成）——
+    # 第二发在首发后 780ms 命中；合成 cooldown_ms=900 时被**静默**吞掉：
+    # 不记 Outcome，也不加 suppressed（engine.py:348-349）。
+    {
+        "id": "rt_cooldown_stepover",
+        "kind": "runtime",
+        "skill": "踩单车 Stepover",
+        "config": "synthetic:stepover_cd_900",
+        "end_ms": 1452,
+        "segments": (
+            ("hold", 0, 96, 0.0, 0.0),
+            ("sweep", 100, 500, 0.0, 90.0, 0.9),
+            ("hold", 604, 880, 0.0, 0.0),
+            ("sweep", 884, 500, 0.0, 90.0, 0.9),
+            ("hold", 1388, 1452, 0.0, 0.0),
+        ),
+    },
+    {
+        "id": "rt_cooldown_roulette",
+        "kind": "runtime",
+        "skill": "马赛回旋 Roulette",
+        "config": "synthetic:roulette_cd_900",
+        "end_ms": 1452,
+        "segments": (
+            ("hold", 0, 96, 0.0, 0.0),
+            ("sweep", 100, 500, 180.0, 380.0, 0.9),
+            ("hold", 604, 880, 0.0, 0.0),
+            ("sweep", 884, 500, 180.0, 380.0, 0.9),
+            ("hold", 1388, 1452, 0.0, 0.0),
+        ),
+    },
+    # 绿色搓射：首发 548ms；第二对 X 在 996/1436ms，第二发在首发后 888ms
+    # （越过释放 120 + 锁 150，但小于合成 900）→ 静默吞掉。
+    {
+        "id": "rt_cooldown_green",
+        "kind": "runtime",
+        "skill": "绿色搓射 Green Finesse",
+        "config": "synthetic:green_cd_900",
+        "end_ms": 1500,
+        "buttons": (
+            (0, ()),
+            (4, ("RB",)),
+            (100, ("RB", "X")),
+            (104, ("RB",)),
+            (548, ("RB", "X")),
+            (552, ("RB",)),
+            (996, ("RB", "X")),
+            (1000, ("RB",)),
+            (1436, ("RB", "X")),
+            (1440, ("RB",)),
+        ),
+        "segments": (
+            ("hold", 0, 1500, 0.0, 0.0),
+        ),
+    },
+    # —— 全局冷却 2 条 ——
+    # 合成 global_cooldown_ms=1000：第二发在 780ms 被吞，suppressed += 1。
+    {
+        "id": "rt_global_cooldown_synthetic",
+        "kind": "runtime",
+        "skill": "踩单车 Stepover",
+        "config": "synthetic:global_1000",
+        "end_ms": 1452,
+        "segments": (
+            ("hold", 0, 96, 0.0, 0.0),
+            ("sweep", 100, 500, 0.0, 90.0, 0.9),
+            ("hold", 604, 880, 0.0, 0.0),
+            ("sweep", 884, 500, 0.0, 90.0, 0.9),
+            ("hold", 1388, 1452, 0.0, 0.0),
+        ),
+    },
+    # 出厂 global_cooldown_ms=60：同一轨迹第二发 780ms > 60，永远不该被吞。
+    # 这条是反向对照 —— 没有它，「全局冷却存在」与「全局冷却从没被验证」无法区分。
+    {
+        "id": "rt_global_cooldown_shipped_unreachable",
+        "kind": "runtime",
+        "skill": "踩单车 Stepover",
+        "config": "shipped",
+        "end_ms": 1452,
+        "segments": (
+            ("hold", 0, 96, 0.0, 0.0),
+            ("sweep", 100, 500, 0.0, 90.0, 0.9),
+            ("hold", 604, 880, 0.0, 0.0),
+            ("sweep", 884, 500, 0.0, 90.0, 0.9),
+            ("hold", 1388, 1452, 0.0, 0.0),
+        ),
+    },
+    # —— idle 重置 2 条 ——
+    # 磕球只完成第 1 步就回中：右摇杆静止满 idle_reset_ms 250ms，引擎对全部动作
+    # 调 on_idle()，sequence 把半截进度判成 incomplete（452ms，t0=100）。
+    {
+        "id": "rt_idle_reset_250",
+        "kind": "runtime",
+        "skill": "磕球过人 Heel-to-Heel",
+        "config": "shipped",
+        "end_ms": 600,
+        "segments": (
+            ("hold", 0, 96, 0.0, 0.0),
+            ("hold", 100, 196, 0.0, 0.9),
+            ("hold", 200, 600, 0.0, 0.0),
+        ),
+    },
+    # 反向对照：同一段第 1 步之后，摇杆始终在动（rs_mag=0.9），idle 永远不触发，
+    # 于是第 2 步（后）能接上 → ok。两条只差「摇杆静置 vs 持续移动」。
+    {
+        "id": "rt_idle_hold_no_reset",
+        "kind": "runtime",
+        "skill": "磕球过人 Heel-to-Heel",
+        "config": "shipped",
+        "end_ms": 600,
+        "segments": (
+            ("hold", 0, 96, 0.0, 0.0),
+            ("hold", 100, 196, 0.0, 0.9),
+            ("hold", 200, 296, 0.0, 0.0),
+        ) + _osc(300, 400, 90.0, 110.0, 0.9) + (
+            ("hold", 404, 448, 180.0, 0.9),
+            ("hold", 452, 600, 0.0, 0.0),
+        ),
+    },
+    # —— facing 2 条（反向对照）——
+    # 左摇杆回中：没有朝向基准，相对动作整段作废 → 零判定。
+    {
+        "id": "rt_facing_centered_zero_verdict",
+        "kind": "runtime",
+        "skill": "踩单车 Stepover",
+        "config": "shipped",
+        "end_ms": 700,
+        "ls": ((0, 0.0, 0.0),),
+        "segments": (
+            ("hold", 0, 96, 0.0, 0.0),
+            ("sweep", 100, 500, 0.0, 90.0, 0.9),
+            ("hold", 604, 700, 0.0, 0.0),
+        ),
+    },
+    # 同一轨迹、同一角度，只把 LS 推住 → 命中。两条只差 ls_mag 一个数。
+    {
+        "id": "rt_facing_held_hit",
+        "kind": "runtime",
+        "skill": "踩单车 Stepover",
+        "config": "shipped",
+        "end_ms": 700,
+        "ls": ((0, 0.0, 0.9),),
+        "segments": (
+            ("hold", 0, 96, 0.0, 0.0),
+            ("sweep", 100, 500, 0.0, 90.0, 0.9),
+            ("hold", 604, 700, 0.0, 0.0),
+        ),
+    },
+    # —— 修饰键互斥 2 条 ——
+    # 按住 LB 时，不需要 LB 的弧线 / 磕球全部 observe+abandon；这条 0°→70° 的弧
+    # 在没有互斥分支时会成功（swept=70、终点 70 在 90±55 内）→ 零判定才是正确结果。
+    {
+        "id": "rt_modifier_lb_abandons_arcs",
+        "kind": "runtime",
+        "skill": "踩单车 Stepover",
+        "config": "shipped",
+        "end_ms": 700,
+        "buttons": (
+            (0, ()),
+            (4, ("LB",)),
+        ),
+        "segments": (
+            ("hold", 0, 96, 0.0, 0.0),
+            ("sweep", 100, 500, 0.0, 70.0, 0.9),
+            ("hold", 604, 700, 0.0, 0.0),
+        ),
+    },
+    # 反向对照：同一个 LB 对油炸丸子不是互斥而是**必需**，照常命中。
+    _runtime_from("det_croqueta_ok", "rt_modifier_lb_keeps_croqueta"),
+    # —— 失败归属 2 条 ——
+    # 同一帧两条 pending：704ms 马赛回旋报 wrong_start（起手 100°）、磕球报 too_slow
+    # （t0=100，elapsed 604 > 600）。配置顺序决定马赛先到；磕球的 pending 必须被
+    # 取走并丢弃 —— 若 `_drain_failures` 用 break 或逐条记录，这里会多一条。
+    # 300-696ms 用 rs_mag=0.3 摆动：低于 arc 的 enter(0.72) 让它保持武装，
+    # 又高于 idle 的 0.20 且持续「在动」让磕球不被 stalled 清掉。
+    {
+        "id": "rt_failure_owner_config_order",
+        "kind": "runtime",
+        "skill": "马赛回旋 Roulette",
+        "config": "shipped",
+        "end_ms": 800,
+        "segments": (
+            ("hold", 0, 96, 0.0, 0.0),
+            ("hold", 100, 196, 0.0, 0.9),
+            ("hold", 200, 296, 0.0, 0.0),
+        ) + _osc(300, 700, 90.0, 110.0, 0.3) + (
+            ("hold", 700, 704, 100.0, 0.9),
+            ("hold", 708, 800, 0.0, 0.0),
+        ),
+    },
+    # 失败后必须清掉别人的进度：1352ms 绿色搓射报 too_slow 时，油炸丸子正保持到
+    # 152ms（350 需要）；`_discard_other_claims` 把它作废。摇杆一直推着不回中，
+    # 油炸丸子无法重新武装 —— 若不清场，它会在 1552ms 补一条 ok。
+    {
+        "id": "rt_failure_clears_others",
+        "kind": "runtime",
+        "skill": "绿色搓射 Green Finesse",
+        "config": "shipped",
+        "end_ms": 1600,
+        "buttons": (
+            (0, ()),
+            (4, ("RB",)),
+            (600, ("RB", "X")),
+            (604, ("RB",)),
+            (1196, ("RB", "LB")),
+            (1200, ("RB", "LB")),
+        ),
+        "segments": (
+            ("hold", 0, 1196, 0.0, 0.0),
+            ("hold", 1200, 1600, 90.0, 0.9),
+        ),
+    },
+    # —— 分组 1 条 ——
+    # 10 发绿色搓射，每发大 1000ms（第二发在首发后 1000ms，越过 450 冷却与 150 锁）；
+    # 第 10 发把 group_hits 归零、groups_done 置 1。
+    {
+        "id": "rt_group_ten_hits",
+        "kind": "runtime",
+        "skill": "绿色搓射 Green Finesse",
+        "config": "shipped",
+        "end_ms": 10000,
+        "buttons": tuple(sorted(
+            [(0, ()), (4, ("RB",))]
+            + [(k * 1000 + 100, ("RB", "X")) for k in range(10)]
+            + [(k * 1000 + 104, ("RB",)) for k in range(10)]
+            + [(k * 1000 + 548, ("RB", "X")) for k in range(10)]
+            + [(k * 1000 + 552, ("RB",)) for k in range(10)]
+        )),
+        "segments": (
+            ("hold", 0, 10000, 0.0, 0.0),
         ),
     },
 )
@@ -898,6 +1572,22 @@ def _runtime_outcomes(case_id: str, engine: _CollectingEngine) -> list:
     ]
 
 
+def _runtime_counters(engine: _CollectingEngine) -> dict:
+    """移动端 `GestureEngine` 的聚合计数：全部动作求和 + 引擎级 suppressed。
+
+    与 `gesture_engine.gd` 的公开字段逐项对应。多动作用例里求和才有意义：
+    单看某个 `ActiveSkill` 会漏掉竞争失败方的 attempts。
+    """
+    skills = engine.active_skills()
+    return {
+        "hits": sum(item.hits for item in skills),
+        "attempts": sum(item.attempts for item in skills),
+        "group_hits": sum(item.group_hits for item in skills),
+        "groups_done": sum(item.groups_done for item in skills),
+        "suppressed": engine.suppressed,
+    }
+
+
 # ---------------------------------------------------------------------------
 # 配置注册表
 # ---------------------------------------------------------------------------
@@ -925,6 +1615,36 @@ def variant(base: dict, skill_name: str, *,
             break
     else:
         raise SystemExit(f"✗ variant: 配置里找不到动作 {skill_name!r}")
+    parse_config(data, CONFIG_REL)
+    return data
+
+
+def synthetic_global(base: dict, global_cooldown_ms: int) -> dict:
+    """深拷贝整份配置，只改 `global_cooldown_ms`，再用 `parse_config` 自检。
+
+    为什么需要合成：出厂 60ms 的全局冷却在 250Hz 真实时序里**不可达** ——
+    任何第二发都要先越过手势锁 150ms + 检测器重新武装，最早也在 300ms 之后。
+    不合成就无法证明「全局冷却真的会吞命中并 suppressed += 1」。
+    """
+    data = copy.deepcopy(base)
+    data["global_cooldown_ms"] = int(global_cooldown_ms)
+    parse_config(data, CONFIG_REL)
+    return data
+
+
+def synthetic_skill_cooldown(base: dict, skill_name: str, cooldown_ms: int) -> dict:
+    """深拷贝整份配置，只改一个动作的 `cooldown_ms`，再自检。
+
+    与 `synthetic_global` 同理：出厂的 350/400/450ms 都短于「锁 150 + 重新武装 +
+    最短动作时长」，逐动作冷却分支在真实时序下永远走不到。
+    """
+    data = copy.deepcopy(base)
+    for item in data.get("skills", []):
+        if item.get("name") == skill_name:
+            item["cooldown_ms"] = int(cooldown_ms)
+            break
+    else:
+        raise SystemExit(f"✗ synthetic_skill_cooldown: 配置里找不到动作 {skill_name!r}")
     parse_config(data, CONFIG_REL)
     return data
 
@@ -1005,9 +1725,12 @@ def _case_payload(case: dict, cfg) -> dict:
     engine = _drive_engine(cfg, frames, ls_points, case_id)
     kind = case.get("kind", "detector")
     if kind == "detector":
-        outcomes = _drive_detector(cfg, case, frames)
+        expect = {"outcomes": _drive_detector(cfg, case, frames)}
     elif kind == "runtime":
-        outcomes = _runtime_outcomes(case_id, engine)
+        expect = {
+            "outcomes": _runtime_outcomes(case_id, engine),
+            "counters": _runtime_counters(engine),
+        }
     else:
         raise SystemExit(f"✗ {case_id}: 未知的用例类型 {kind!r}")
     return {
@@ -1017,7 +1740,7 @@ def _case_payload(case: dict, cfg) -> dict:
         "config": case.get("config", "shipped"),
         "ls": [[int(t), float(a), float(m)] for t, a, m in ls_points],
         "frames": frames,
-        "expect": {"outcomes": outcomes},
+        "expect": expect,
     }
 
 
@@ -1040,6 +1763,16 @@ def build_payload(root: Path) -> dict:
             base_dict, "绿色搓射 Green Finesse", timeout_grace_ms=-50),
         "variant:croqueta_absolute": variant(
             base_dict, "油炸丸子 La Croqueta", relative_to_ls=False),
+        "variant:roulette_max_angle_120": variant(
+            base_dict, "马赛回旋 Roulette", max_angle=120),
+        # 引擎层专用的合成配置：只改一个冷却维度，出厂值下分支不可达。
+        "synthetic:global_1000": synthetic_global(base_dict, 1000),
+        "synthetic:stepover_cd_900": synthetic_skill_cooldown(
+            base_dict, "踩单车 Stepover", 900),
+        "synthetic:roulette_cd_900": synthetic_skill_cooldown(
+            base_dict, "马赛回旋 Roulette", 900),
+        "synthetic:green_cd_900": synthetic_skill_cooldown(
+            base_dict, "绿色搓射 Green Finesse", 900),
     }
     variant_diffs = {
         "variant:roulette_cw": "马赛回旋 Roulette: params.direction 'any' → 'cw'",
@@ -1049,6 +1782,15 @@ def build_payload(root: Path) -> dict:
         "variant:green_negative_grace": (
             "绿色搓射 Green Finesse: params.timeout_grace_ms 150 → -50"),
         "variant:croqueta_absolute": "油炸丸子 La Croqueta: relative_to_ls true → false",
+        "variant:roulette_max_angle_120": (
+            "马赛回旋 Roulette: params.max_angle 230 → 120"),
+    }
+    # 合成配置只给引擎层用：出厂冷却下这些分支不可达。摘要供人读，不参与回放。
+    synthetic_diffs = {
+        "synthetic:global_1000": "global_cooldown_ms 60 → 1000",
+        "synthetic:stepover_cd_900": "踩单车 Stepover: cooldown_ms 350 → 900",
+        "synthetic:roulette_cd_900": "马赛回旋 Roulette: cooldown_ms 400 → 900",
+        "synthetic:green_cd_900": "绿色搓射 Green Finesse: cooldown_ms 450 → 900",
     }
 
     parsed = {
@@ -1059,7 +1801,7 @@ def build_payload(root: Path) -> dict:
     used: dict[str, object] = {}
     cases = []
     seen: set[str] = set()
-    for case in CASES + BOUNDARY_CASES + VARIANT_CASES:
+    for case in CASES + BOUNDARY_CASES + VARIANT_CASES + EXTRA_CASES + RUNTIME_CASES:
         case_id = case["id"]
         if case_id in seen:
             raise SystemExit(f"✗ 夹具 id 重复：{case_id}")
@@ -1076,7 +1818,12 @@ def build_payload(root: Path) -> dict:
             **{name: rel.as_posix() for name, rel in SOURCE_RELS.items()},
             "sha256": {name: _sha256(root, rel) for name, rel in SOURCE_RELS.items()},
         },
-        "meta": {"hz": HZ, "step_ms": STEP_MS, "variants": variant_diffs},
+        "meta": {
+            "hz": HZ,
+            "step_ms": STEP_MS,
+            "variants": variant_diffs,
+            "synthetic": synthetic_diffs,
+        },
         "configs": config_dicts,
         "cases": cases,
     }

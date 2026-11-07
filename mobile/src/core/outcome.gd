@@ -13,6 +13,11 @@ extends RefCounted
 ##
 ## `detail` 在成功时是检测器给的 `Hit.summary`（Python 的 `_record(... detail=hit.summary)`），
 ## 失败时为空串。UI 只显示，不重新拼装。
+##
+## `measured` 是 JUDGE-05 的结构化度量，来自 `Hit.measured` / `Failure.measured`，
+## 由引擎**原样透传**（不复制、不裁剪、不重算）。它是 Phase 7 的时序条、失败点高亮
+## 与逐步拆解的唯一数据源：下游只读，不得解析 `message` 重建数字。
+## 只含角度、毫秒、步标签与目标区间，不含任何可识别设备的字段。
 
 var skill_name: String = ""
 var ok: bool = false
@@ -22,3 +27,4 @@ var elapsed_ms: float = 0.0
 var at: float = 0.0
 var detail: String = ""
 var seq: int = 0
+var measured: Dictionary = {}

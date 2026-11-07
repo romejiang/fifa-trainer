@@ -63,6 +63,15 @@ const HELP_TEXT := "A 保存并开始    B 清空重来    十字键左右翻 X 
 const NO_DEVICE_HELP := "打开手柄电源 → 长按配对键 → 在系统蓝牙里选择它 → 按手柄任意键唤醒"
 ## 量程没推满时按 A 的唯一回应：只说这一句、只改 `%Help`，不写档案、不切屏。
 const RANGE_NOT_READY_HELP := "量程还没推满：把右摇杆往四个方向各推到底几次"
+## 左摇杆（D-06）的三句提示。全部只改 `%Help`，不新增页面 / 步骤 / 按键。
+const LS_NOT_READY_HELP := "左摇杆还没推满：把左摇杆往四个方向各推到底几次"
+const LS_ARM_UP_HELP := "推一下左摇杆：向上（确认方向没接反）"
+const LS_ARM_RIGHT_HELP := "推一下左摇杆：向右"
+## 向上推却推成左右：明确说清楚，绝不静默把 X 的位移当成 Y 的符号。
+const LS_SIDEWAYS_HELP := "推的是左右，请向上推"
+## 松手重臂的阈值：位移回到 0.1 以下并持续 0.25 s，就重新取基线。
+const LS_ARM_IDLE_DELTA := 0.1
+const LS_ARM_IDLE_SECONDS := 0.25
 ## 底部固定提示：日志不随 B 清空，测试者按完可以直接用 adb 取。
 const LOG_HINT := "日志：files/input_log.txt（按 B 清空本页，不删日志）"
 
@@ -78,6 +87,7 @@ const LOG_HINT := "日志：files/input_log.txt（按 B 清空本页，不删日
 @onready var _range: Label = %Range
 @onready var _center: Label = %Center
 @onready var _trigger: Label = %Trigger
+@onready var _ls: Label = %Ls
 @onready var _help: Label = %Help
 @onready var _footer: Label = %Footer
 
@@ -90,6 +100,8 @@ var _last_axes_text: String = ""
 ## 一次性提示（保存失败 / 已清空）。下一次按键就清掉，不会盖住操作行。
 var _notice: String = ""
 var _had_device: bool = false
+## 松手重臂的累计时间：位移回到阈值以下多久（秒）。
+var _ls_arm_idle: float = 0.0
 
 
 func _ready() -> void:
@@ -110,6 +122,7 @@ func reset_stats() -> void:
 	_notice = ""
 	_last_axes_text = ""
 	_accum = REFRESH_SECONDS
+	_ls_arm_idle = 0.0
 	if _marker != null:
 		_marker.visible = false
 
@@ -126,12 +139,45 @@ func _process(delta: float) -> void:
 	var values := _axis_values()
 	# 每帧都要 observe：轴对识别用的是「最近 1 秒的帧」，不是「最近一次刷新」。
 	_setup.observe(values)
+	# 左摇杆的符号确认也在每帧推进：它依赖位移基线，不能等到 10 Hz 的文本刷新。
+	_auto_confirm_ls(delta)
 	_move_marker(values)
 	_accum += delta
 	if _accum < REFRESH_SECONDS:
 		return
 	_accum = 0.0
 	_refresh()
+
+
+## 同一页、零新按键地确认左摇杆符号：轴对认出来之后自动摆臂，用户只要按提示推。
+##
+## 两次摆臂的顺序固定为「先向上、再向右」：Y 先确认（向上推不涉及左右歧义），
+## X 后确认（向右推）。符号只在成功时改；推成左右时 `ls_arm_result()` 为 sideways，
+## 页面把提示换成 `LS_SIDEWAYS_HELP`，下一帧继续重新摆臂，用户再推一次即可。
+##
+## 松手重臂：用户「推住不放看提示」时，基线一直停在按下那一刻，永远采不到完整位移。
+## 这里只在位移回到 0.1 以下时累计时间，满 0.25 s 重新取基线 —— 松手再推一次即可。
+func _auto_confirm_ls(delta: float) -> void:
+	if _setup.ls_pair() == InputSetup.PAIR_NONE:
+		_ls_arm_idle = 0.0
+		return
+	if not _setup.ls_arm_pending():
+		_ls_arm_idle = 0.0
+		if not _setup.has_ls_y_sign():
+			_setup.arm_ls_up()
+		elif not _setup.has_ls_x_sign():
+			_setup.arm_ls_right()
+		return
+	if _setup.ls_arm_delta_len() < LS_ARM_IDLE_DELTA:
+		_ls_arm_idle += delta
+		if _ls_arm_idle >= LS_ARM_IDLE_SECONDS:
+			_ls_arm_idle = 0.0
+			if not _setup.has_ls_y_sign():
+				_setup.arm_ls_up()
+			elif not _setup.has_ls_x_sign():
+				_setup.arm_ls_right()
+	else:
+		_ls_arm_idle = 0.0
 
 
 ## 组合根分派的按键边沿。索引同 `JoyButton`：A=0 B=1 X=2 Y=3 LB=9 RB=10
@@ -191,9 +237,9 @@ static func action_for_button(index: int) -> StringName:
 
 ## A：写档案并进练习。**唯一的写盘入口**，而且只在用户亲手按下时发生。
 ##
-## 三道前置条件都只给提示、不改变页面状态：没有手柄、还没有认出轴对、量程没推满。
-## 最后一条是 04-11 的真机缺陷：量程没推满时保存会写出 `scale=1.0 / center=0`
-## 的「默认校准」，下次启动直接复用，圆点与手柄从此对不上。`can_save()` 为假时
+## 前置条件按「先 RS 后 LS」的顺序逐条提示、不改变页面状态：没有手柄、还没有认出
+## RS 轴对、RS 量程没推满、LS 轴对没认出、LS 符号/量程没就绪。最后两条是 D-06 的
+## 新门：缺 LS 的档案会让四个 relative_to_ls 技能静默失效。`can_save()` 为假时
 ## **不调用 `build_profile`、不调用 `upsert`** —— 那是这道门唯一的实现位置。
 func _save_and_enter() -> void:
 	if _sampler == null or _sampler.buffer.device < 0:
@@ -201,6 +247,20 @@ func _save_and_enter() -> void:
 		return
 	if _setup.active_pair() == InputSetup.PAIR_NONE:
 		_notice = "先推一下右摇杆：认出一对轴之后才能保存"
+		return
+	if not _setup.range_ready():
+		_notice = RANGE_NOT_READY_HELP
+		return
+	if _setup.ls_pair() == InputSetup.PAIR_NONE:
+		_notice = LS_NOT_READY_HELP
+		return
+	if not _setup.ls_ready():
+		if _setup.ls_arm_result() == &"sideways":
+			_notice = LS_SIDEWAYS_HELP
+		elif _setup.has_ls_y_sign():
+			_notice = LS_ARM_RIGHT_HELP
+		else:
+			_notice = LS_ARM_UP_HELP
 		return
 	if not _setup.can_save():
 		_notice = RANGE_NOT_READY_HELP
@@ -227,16 +287,23 @@ func _save_and_enter() -> void:
 
 
 ## 1 Hz 的 logcat 取样行（纯 ASCII）：真机上没有 run-as 时，这一行就是「页面认了哪一对、
-## 符号是什么、量程到没到、布局是什么」的可核对原文。
+## 符号是什么、量程到没到、左摇杆是否就绪、布局是什么」的可核对原文。
+##
+## `rs=` 是**冻结值**，`pair=` 是当前活动轴对：D5-1 的判据就是「rs=2/3、ls=0/1、
+## ls_ready=1」三处同时出现，而 `pair=` 允许已经翻到 0/1。
 func debug_line() -> String:
 	var pair := _setup.active_pair()
+	var rs := _setup.rs_pair()
+	var ls := _setup.ls_pair()
 	var span_x := _setup.axis_span(pair.x) if pair != InputSetup.PAIR_NONE else 0.0
 	var span_y := _setup.axis_span(pair.y) if pair != InputSetup.PAIR_NONE else 0.0
-	return ("pair=%d/%d sign=%d/%d ready=%d span=%.2f/%.2f rest4=%.2f rest5=%.2f"
-		+ " layout=%s confirmed=%d") % [
-		pair.x, pair.y, _setup.x_sign(), _setup.y_sign(),
+	return ("rs=%d/%d pair=%d/%d sign=%d/%d ready=%d span=%.2f/%.2f rest4=%.2f rest5=%.2f"
+		+ " ls=%d/%d ls_sign=%d/%d ls_ready=%d layout=%s confirmed=%d") % [
+		rs.x, rs.y, pair.x, pair.y, _setup.x_sign(), _setup.y_sign(),
 		1 if _setup.range_ready() else 0, span_x, span_y,
 		_setup.trigger_rest(4), _setup.trigger_rest(5),
+		ls.x, ls.y, _setup.ls_x_sign(), _setup.ls_y_sign(),
+		1 if _setup.ls_ready() else 0,
 		String(_setup.layout_cycle(_device_name())), 1 if _setup.layout_confirmed() else 0,
 	]
 
@@ -289,6 +356,11 @@ func _refresh() -> void:
 	_set_text(_range, range_text(pair, _setup.axis_range(pair.x), _setup.axis_range(pair.y)))
 	_set_text(_center, center_text(pair, _setup.center()))
 	_set_text(_trigger, trigger_text(_setup.trigger_rest(4), _setup.trigger_rest(5)))
+	var ls := _setup.ls_pair()
+	_set_text(_ls, ls_text(ls, _setup.ls_x_sign(), _setup.ls_y_sign(),
+		_setup.axis_range(ls.x) if ls != InputSetup.PAIR_NONE else Vector2.ZERO,
+		_setup.axis_range(ls.y) if ls != InputSetup.PAIR_NONE else Vector2.ZERO,
+		_setup.ls_ready()))
 	_set_text(_help, HELP_TEXT if _notice.is_empty() else "%s\n%s" % [HELP_TEXT, _notice])
 	_set_text(_footer, _footer_text())
 
@@ -313,6 +385,7 @@ func _render_no_device() -> void:
 	_set_text(_range, "")
 	_set_text(_center, "")
 	_set_text(_trigger, "")
+	_set_text(_ls, "")
 	_set_text(_help, NO_DEVICE_HELP)
 	_set_text(_footer, "设备：未连接")
 	_marker.visible = false
@@ -375,6 +448,23 @@ static func center_text(pair: Vector2i, center: Vector2) -> String:
 
 static func trigger_text(rest_lt: float, rest_rt: float) -> String:
 	return "扳机静止：%.2f / %.2f（取观测到的最小值）" % [rest_lt, rest_rt]
+
+
+## 左摇杆行：与右摇杆的「轴对 / 符号 / 量程」同构，另加一个保存时事实 ✓。
+##
+## 未识别时不显示 0/0 这种猜出来的值，而是明说「推一下」—— 与 `pair_text()` 同一纪律。
+static func ls_text(pair: Vector2i, x_sign: int, y_sign: int,
+		span_x: Vector2, span_y: Vector2, ready: bool) -> String:
+	if pair == InputSetup.PAIR_NONE:
+		return "左摇杆：还没认出（推一下）"
+	var ready_mark := "✓" if ready else "还没推到底"
+	return "左摇杆：轴 %d/%d  符号 %s/%s  量程 %.2f/%.2f %s" % [
+		pair.x, pair.y, _sign_letter(x_sign), _sign_letter(y_sign),
+		span_x.y - span_x.x, span_y.y - span_y.x, ready_mark]
+
+
+static func _sign_letter(sign: int) -> String:
+	return "+" if sign > 0 else "-"
 
 
 static func _sign_word(sign: int) -> String:
